@@ -145,3 +145,92 @@ export function RoleDeleteModal({ role, ops }: { role: Role; ops: Ops }) {
     </ModalShell>
   );
 }
+
+export function BulkGrantModal({ mods, roles, ops }: { mods: RolesModuleDef[]; roles: Role[]; ops: Ops }) {
+  const [selectedMod, setSelectedMod] = useState(
+    mods.some((m) => m.key === "attendance") ? "attendance" : (mods[0]?.key || "")
+  );
+  const [err, setErr] = useState<EngineErr | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const activeRoles = roles.filter((r) => r.isActive && !r.isSystem && !r.isFullAccess);
+  const targetMod = mods.find((m) => m.key === selectedMod);
+  const allVerbs = (targetMod?.actions || []).map((a) => a.key);
+
+  async function applyBulk() {
+    if (!targetMod || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      for (const role of activeRoles) {
+        const modules = {
+          ...role.modules,
+          [selectedMod]: allVerbs,
+        };
+        await call(AdminOpsService.updateRole(role.id, { name: role.name, modules, isActive: role.isActive }));
+      }
+      ops.done(
+        "Granted " + targetMod.label + " (" + allVerbs.join(", ") + ") to " + activeRoles.length + " active roles."
+      );
+    } catch (e) {
+      setErr(errOf(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ModalShell
+      title="Grant to all active roles"
+      sub="Bulk-update permissions across all non-protected roles"
+      ico="shield"
+      tone="brand"
+      onClose={ops.closeLayer}
+      actions={
+        <>
+          <Button color="secondary" onClick={ops.closeLayer} isDisabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            color="primary"
+            isLoading={busy}
+            showTextWhileLoading
+            isDisabled={!activeRoles.length || !targetMod}
+            onClick={applyBulk}
+          >
+            {"Grant to all " + activeRoles.length + " active roles"}
+          </Button>
+        </>
+      }
+    >
+      <ErrSlot err={err} />
+      <div className="flex flex-col gap-4">
+        <Alert tone="info">
+          This applies all verbs for the selected module to every active, non-system role simultaneously,
+          saving you from having to update each role individually.
+        </Alert>
+
+        <FormField id="bulkMod" label="Module to grant" req>
+          <SelectInput
+            id="bulkMod"
+            value={selectedMod}
+            onChange={setSelectedMod}
+            options={mods.map((m) => ({ v: m.key, l: m.label + " (" + (m.actions || []).map((a) => a.key).join(", ") + ")" }))}
+          />
+        </FormField>
+
+        <div className="rounded-lg bg-secondary p-3 text-sm">
+          <p className="font-medium text-secondary">
+            Will update {activeRoles.length} roles:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {activeRoles.map((r) => (
+              <span key={r.id} className="rounded bg-primary px-2 py-0.5 text-xs text-secondary ring-1 ring-secondary">
+                {r.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}

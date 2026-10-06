@@ -20,7 +20,7 @@
    offers no field for it. A report that lets somebody type their own hours is
    not a record of anything.
    ============================================================================= */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert, Button, FormField, FormSection, IconButton, Icon, Input, ModalShell, Notice, SelectInput, Textarea,
 } from "../../../ui";
@@ -160,9 +160,14 @@ export function EodModal({ m }: { m: Member }) {
      happened: `submitReport` completes a ticked line's item, so a line that is
      done here is done because the item is already terminal, and that loop is
      now a no-op. One writer, and it is the board. */
-  const [lines, setLines] = useState(seedLines);
+  const [lines, setLines] = useState(() => seedLines);
+  const prevSeedKey = useRef(seedLines.map((s) => (s.workItemId || "") + ":" + s.title + ":" + s.done).join("|"));
   useEffect(() => {
-    setLines(seedLines);
+    const key = seedLines.map((s) => (s.workItemId || "") + ":" + s.title + ":" + s.done).join("|");
+    if (prevSeedKey.current !== key) {
+      prevSeedKey.current = key;
+      setLines(seedLines);
+    }
   }, [seedLines]);
 
   const toggleDone = (index: number) => {

@@ -100,7 +100,7 @@ function adaptCycle(c: PlanCycle): Cycle {
 export function adaptPlan(p: PlanRow): Plan {
   return {
     id: p.id,
-    family: p.planFamily || "business",
+    family: (p.planFamily || "business").trim().toLowerCase(),
     entityType: p.entityType || "",
     title: p.title || "",
     subtitle: p.subtitle || "",
@@ -175,6 +175,9 @@ export const savingOf = (c: Cycle) => (c.oldPrice > c.price ? c.oldPrice - c.pri
  *  the filter and the strip with no edit here. */
 export function familiesOf(plans: Plan[]): string[] {
   const out: string[] = [];
-  plans.forEach((p) => { if (out.indexOf(p.family) < 0) out.push(p.family); });
+  plans.forEach((p) => {
+    const f = (p.family || "").trim().toLowerCase();
+    if (f && out.indexOf(f) < 0) out.push(f);
+  });
   return out;
 }

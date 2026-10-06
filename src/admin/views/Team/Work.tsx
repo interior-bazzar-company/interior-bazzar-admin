@@ -35,6 +35,7 @@ import { ChevronDown } from "@untitledui/icons";
 import { Dropdown } from "@/components/base/dropdown/dropdown";
 import { TextAreaBase } from "@/components/base/textarea/textarea";
 import { cx } from "@/utils/cx";
+import { can, getSession } from "../../auth/session";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
@@ -137,9 +138,16 @@ export default function Work() {
 
   const tab = readTab(p);
   const scope = "all" as const;
+  const me = meId();
+  const sess = getSession();
+  const isAdmin = Boolean(sess?.isFullAccess || can("team", "manage") || can("team", "edit") || can("work", "all"));
+  const isFiltered = Boolean(p.member || p.due || p.status || p.q || p.kind || p.priority || p.tag || p.wait || p.parent);
+  const effectiveMember = p.member || (!isAdmin && !isFiltered && me ? String(me) : undefined);
+  const effectiveDue = p.due || (!isAdmin && !isFiltered ? "week" : undefined);
+
   const rows = useWork({
-    member: p.member, kind: p.kind, status: p.status, priority: p.priority,
-    due: p.due, q: p.q, parent: p.parent, tag: p.tag, wait: p.wait,
+    member: effectiveMember, kind: p.kind, status: p.status, priority: p.priority,
+    due: effectiveDue, q: p.q, parent: p.parent, tag: p.tag, wait: p.wait,
   }, scope);
   const members = useMembers();
   const all = useWork({}, scope);
@@ -151,7 +159,6 @@ export default function Work() {
      on `shell`. */
   const { drawer: openDrawer, closeLayer, layerKind } = shell;
   const open = useItem(p.item || null);
-  const me = meId();
 
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const toggleSelect = useCallback((id: string) => {
@@ -297,7 +304,42 @@ export default function Work() {
         }
       />
 
-      <WorkStats p={p} />
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-tertiary">Quick scope:</span>
+        <button
+          type="button"
+          onClick={() => onFilter("due", p.due === "week" ? "" : "week")}
+          className={`px-2.5 py-1 text-xs rounded-full border transition-colors cursor-pointer ${
+            (p.due === "week" || (!isAdmin && !isFiltered))
+              ? "bg-brand-primary text-brand border-brand font-semibold"
+              : "bg-surface text-secondary border-border hover:bg-hover"
+          }`}
+        >
+          Due This Week
+        </button>
+        <button
+          type="button"
+          onClick={() => onFilter("due", p.due === "active" ? "" : "active")}
+          className={`px-2.5 py-1 text-xs rounded-full border transition-colors cursor-pointer ${
+            p.due === "active"
+              ? "bg-brand-primary text-brand border-brand font-semibold"
+              : "bg-surface text-secondary border-border hover:bg-hover"
+          }`}
+        >
+          Active
+        </button>
+        <button
+          type="button"
+          onClick={() => onFilter("due", "")}
+          className={`px-2.5 py-1 text-xs rounded-full border transition-colors cursor-pointer ${
+            !p.due && (isAdmin || isFiltered)
+              ? "bg-brand-primary text-brand border-brand font-semibold"
+              : "bg-surface text-secondary border-border hover:bg-hover"
+          }`}
+        >
+          All Historic
+        </button>
+      </div>
 
       <FilterBar
         search={<SearchField ph="Search work" name="q" val={p.q} onFilter={onFilter} />}
@@ -369,7 +411,7 @@ export default function Work() {
             className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-colors active:scale-95"
           >
             <Icon name="trash" size="xs" />
-            Archive / Cancel
+            Close Stale / Archive
           </button>
           <button
             type="button"
@@ -649,7 +691,13 @@ function Analysis({ rows, all, members }: {
 function CreateMenu({ onPick }: { onPick: (k: string) => void }) {
   return (
     <Dropdown.Root>
-      <Button color="primary" ico="plus" iconTrailing={ChevronDown} aria-haspopup="menu">
+      <Button
+        color="primary"
+        ico="plus"
+        icoTrailing="chev"
+        iconTrailing={<ChevronDown className="size-4" />}
+        aria-haspopup="menu"
+      >
         New task
       </Button>
       <Dropdown.Popover placement="bottom right" className="w-max min-w-44">
@@ -736,7 +784,7 @@ function NewTagField({ ownerId, onMade }: { ownerId: string; onMade: (id: string
         <div className="flex flex-wrap items-center gap-2">
           <Input id="niTag" className="min-w-0 flex-1 basis-48" value={draft} ph="Name a new tag"
             onChange={setDraft} onEnter={add} />
-          <Button color="secondary" isDisabled={!draft.trim()} onClick={add}>Create</Button>
+          <Button color="secondary" isDisabled={!draft.trim()} onClick={add}>Add tag</Button>
         </div>
       </FormField>
       {/* The type is shown as what it will look like, next to the swatches that
@@ -823,7 +871,9 @@ export function NewItemModal({ kind: initial, date }: {
       actions={
         <>
           <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
-          <Button color="primary" isDisabled={!title.trim()} onClick={save}>Create</Button>
+          <Button color="primary" isDisabled={!title.trim()} onClick={save}>
+            {"Create " + labelOf(KIND, kind).toLowerCase()}
+          </Button>
         </>
       }
     >

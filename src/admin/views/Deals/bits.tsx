@@ -54,16 +54,17 @@ export function ChainDots({ d }: { d: any }) {
   const q: string = d.quotation_status || "none";
   const i: string = d.invoice_status || "none";
   const paid = !!d.paid;
+  const isSettled = (d.stage != null && d.stage >= 5) || d.stageKey === "won" || d.stageKey === "lost";
   /* No 'cancelled' branch on either: the server reports the LIVE document and
      resolves a withdrawn one to 'none' (see _invoice_ui_status), so a tone for
      it here would be a branch nothing can reach. */
   return (
     <span className="inline-flex items-center gap-1" role="group" aria-label="Quotation, invoice and payment">
-      <Square letter="Q" tone={q === "none" ? "none" : q === "accepted" ? "ok" : q === "rejected" ? "bad" : "warn"} what={q === "none" ? "No quotation yet" : "Quotation " + q} />
+      <Square letter="Q" tone={q === "none" ? "none" : q === "accepted" ? "ok" : q === "rejected" ? "bad" : "warn"} what={q === "none" ? (isSettled ? "—" : "No quotation yet") : "Quotation " + q} />
       <Square
         letter="I"
         tone={i === "none" ? "none" : i === "paid" ? "ok" : "warn"}
-        what={i === "none" ? (q === "accepted" ? "Ready to invoice" : "Locked — needs an accepted quotation") : "Invoice " + i}
+        what={i === "none" ? (q === "accepted" ? "Ready to invoice" : isSettled ? "—" : "Locked — needs an accepted quotation") : "Invoice " + i}
       />
       <Square letter="₹" tone={paid ? "ok" : "none"} what={paid ? "Payment received" : "No payment yet"} />
     </span>

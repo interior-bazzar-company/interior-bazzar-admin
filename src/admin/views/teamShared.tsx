@@ -240,8 +240,14 @@ export function ActionMatrix({ mods, grants, editable }: { mods: RoleModuleDef[]
                 <td className="sticky left-0 z-10 bg-primary px-3 py-2 whitespace-nowrap">
                   <b className="font-medium text-primary">{m.label}</b>
                   {editable && (m.actions || []).length ? (
-                    <button type="button" className={allBtn} data-act="rl-row-all" onClick={(e) => setAll(e.currentTarget, m.key, null)}>
-                      all
+                    <button
+                      type="button"
+                      className="ml-2 inline-flex cursor-pointer items-center rounded bg-secondary px-1.5 py-0.5 text-2xs font-semibold text-secondary hover:bg-secondary_hover hover:text-primary ring-1 ring-secondary ring-inset transition"
+                      data-act="rl-row-all"
+                      title={"Grant all verbs for " + m.label}
+                      onClick={(e) => setAll(e.currentTarget, m.key, null)}
+                    >
+                      Grant all verbs
                     </button>
                   ) : null}
                 </td>

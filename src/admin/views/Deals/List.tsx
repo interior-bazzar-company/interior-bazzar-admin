@@ -50,8 +50,8 @@ export function AttnStrip({ p, m }: { p: Params; m: Counts }) {
 
   const cells: (StatCell | "sep")[] = [
     { k: "total", v: m.total,
-      to: "#/deals" + qs(omit(p, ["stage", "stalled", "next", "priority", "page"])),
-      on: !p.stage && !p.stalled && !p.next && !p.priority },
+      to: "#/deals" + qs(omit(p, ["stage", "stalled", "next", "priority", "page", "pipe"])),
+      on: !p.stage && !p.stalled && !p.next && !p.priority && (!p.pipe || p.pipe === "open") },
     "sep",
     /* The four working stages only. Lost is not a step of the funnel, it is
        where deals leave it — a cell for it counted an outcome alongside four
@@ -181,9 +181,18 @@ export function DealsList({ id, p, api }: {
   const view = p.view === "board" ? "board" : "table";
   const canCreate = can("deals", "create");
 
+  const pipe = p.pipe || (p.stage ? "custom" : "open");
+  const scopedList = useMemo(() => {
+    if (p.stage) return api.list;
+    if (pipe === "open") return api.list.filter((r) => r.stage < STAGE.WON);
+    if (pipe === "won") return api.list.filter((r) => r.stage === STAGE.WON);
+    if (pipe === "lost") return api.list.filter((r) => r.stage === STAGE.LOST);
+    return api.list;
+  }, [api.list, pipe, p.stage]);
+
   /* `value` and the default order come back already sorted; stage age, close
      date and last activity are ordered here, over the page that arrived. */
-  const rows = localSort(api.list, p.sort);
+  const rows = localSort(scopedList, p.sort);
   const page = Math.max(1, parseInt(p.page || "1", 10) || 1);
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const shown = view === "board" ? rows : rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -229,6 +238,36 @@ export function DealsList({ id, p, api }: {
         }
         actions={
           <>
+            <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
+              <Button
+                color={pipe === "open" ? "primary" : "secondary"}
+                size="xs"
+                onClick={() => go("#/deals" + qs(merge(omit(p, ["stage", "page"]), { pipe: "open" })))}
+              >
+                Open Pipeline
+              </Button>
+              <Button
+                color={pipe === "won" ? "primary" : "secondary"}
+                size="xs"
+                onClick={() => go("#/deals" + qs(merge(omit(p, ["stage", "page"]), { pipe: "won" })))}
+              >
+                Won
+              </Button>
+              <Button
+                color={pipe === "lost" ? "primary" : "secondary"}
+                size="xs"
+                onClick={() => go("#/deals" + qs(merge(omit(p, ["stage", "page"]), { pipe: "lost" })))}
+              >
+                Lost
+              </Button>
+              <Button
+                color={pipe === "all" ? "primary" : "secondary"}
+                size="xs"
+                onClick={() => go("#/deals" + qs(merge(omit(p, ["stage", "page"]), { pipe: "all" })))}
+              >
+                All
+              </Button>
+            </div>
             <MoreMenu label="Actions" items={menu} />
             {canCreate
               ? <Button color="primary" ico="plus" data-act="dl-create" onClick={() => acts.create()}>New deal</Button>
@@ -272,7 +311,7 @@ export function DealsList({ id, p, api }: {
           /* `values` maps the owner id back to the person. The chip printed
              the raw param, so filtering by Nikhil read "Owner 40" — an
              internal id on the one control whose whole job is naming people. */
-          <FilterChips params={omit(p, ["view", "page"])} onUnfilter={onUnfilter}
+          <FilterChips params={omit(p, ["view", "page", "pipe"])} onUnfilter={onUnfilter}
             values={{ owner: Object.fromEntries(api.owners.map((o) => [String(o.id), o.name])) }}
             labels={{ q: "Search", stage: "Stage", owner: "Owner", priority: "Priority",
               next: "Next action", stalled: "Stalled", sort: "Sort", tag: "List" }} />

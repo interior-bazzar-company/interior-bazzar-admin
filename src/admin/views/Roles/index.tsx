@@ -29,7 +29,7 @@ import { HIDDEN_MODULES } from "../../auth/session";
 import { useShell } from "../../shell/ShellContext";
 import type { Ops, Role } from "../teamShared";
 import RoleDrawer from "./RoleDrawer";
-import { RoleModal } from "./roleModals";
+import { BulkGrantModal, RoleModal } from "./roleModals";
 
 /* WHAT THIS ROLE CAN REACH, at a glance. `view` is the gate, so a module
    without it is not granted however many other verbs carry a tick — count
@@ -155,12 +155,26 @@ export default function Roles() {
           <span>{data.roles.length} responsibilit{data.roles.length === 1 ? "y" : "ies"}</span>
           <span>{data.modules.length} modules to grant</span>
         </>}
-        actions={can("roles", "create")
-          ? <Button color="primary" ico="plus" data-act="rl-new"
-              onClick={() => modal(<RoleModal role={null} mods={data.modules} ops={ops} />, "xl")}>
-              New role
-            </Button>
-          : null}
+        actions={
+          <div className="flex items-center gap-2">
+            {can("roles", "edit") ? (
+              <Button
+                color="secondary"
+                ico="shield"
+                data-act="rl-bulk-grant"
+                onClick={() => modal(<BulkGrantModal mods={data.modules} roles={data.roles} ops={ops} />)}
+              >
+                Grant to All Active Roles
+              </Button>
+            ) : null}
+            {can("roles", "create") ? (
+              <Button color="primary" ico="plus" data-act="rl-new"
+                onClick={() => modal(<RoleModal role={null} mods={data.modules} ops={ops} />, "xl")}>
+                New role
+              </Button>
+            ) : null}
+          </div>
+        }
       />
 
       <FilterBar

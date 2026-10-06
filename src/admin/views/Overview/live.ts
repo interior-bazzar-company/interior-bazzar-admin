@@ -36,6 +36,7 @@ import type {
   WorkSettingsRow,
 } from "../../../api/modules/adminOps";
 import { addDays, healthOf, todayLocal } from "./derive";
+import { can } from "../../auth/session";
 /* ONE ON-TIME RULE for the whole panel — Attendance Analytics owns it, this
    page reads it, so "76% arrived on time" and "ON TIME 0%" can only ever
    differ by the days each one counts, never by the arithmetic. */
@@ -180,6 +181,14 @@ export interface LiveTeam {
   work: { total: number; completed: number; cancelled: number; delayed: number };
 }
 
+function isRecentDelayed(i: WorkItemRow): boolean {
+  if (!i.delayed) return false;
+  if (!i.dueDate) return true;
+  const due = new Date(i.dueDate).getTime();
+  const diffDays = (Date.now() - due) / (1000 * 60 * 60 * 24);
+  return diffDays >= 0 && diffDays <= 14;
+}
+
 /** `dept` is a ROLE name (see store.ts useDepartments): a member is in it when
  *  their account holds that role, the same rule the Team section applies. */
 export function liveTeam(r: Raw, dept: string | undefined, rolesOf: Map<string, string[]>): LiveTeam {
@@ -197,7 +206,7 @@ export function liveTeam(r: Raw, dept: string | undefined, rolesOf: Map<string, 
       total: items.length,
       completed: items.filter((i) => key(i) === "completed").length,
       cancelled: items.filter((i) => key(i) === "cancelled").length,
-      delayed: items.filter((i) => i.delayed).length,
+      delayed: items.filter(isRecentDelayed).length,
     },
   };
 }
@@ -232,7 +241,7 @@ export function liveTeamRows(r: Raw, people: AdminUserRow[], dept: string | unde
     return {
       m: { memberId: id, name: u.name || u.username, designation: (rolesOf.get(id) || []).join(" · ") },
       open: mine.filter((i) => TERMINAL.indexOf(i.status?.key) < 0).length,
-      late: mine.filter((i) => i.delayed).length,
+      late: mine.filter(isRecentDelayed).length,
       done: r.doneWork.filter((i) => String(i.assignee.id) === id).length,
       onTime: onTimePctOf(present.length, late),
       /* The day's name is the backend's own label (team/d2), weekly off
@@ -278,14 +287,16 @@ export function useAttentionLive(today: string, on: { reports: boolean; full: bo
     const day = { start: today, end: today };
     const none = Promise.resolve([] as never[]);
     Promise.all([
-      on.reports ? every((n) => call(AdminOpsService.dailyPlans({ member: "all", ...day, pageNo: n, pageSize: 500 })), (r) => r.plans) : none,
-      on.reports ? every((n) => call(AdminOpsService.dailyReports({ member: "all", ...day, pageNo: n, pageSize: 500 })), (r) => r.reports) : none,
-      on.full ? every((n) => call(AdminOpsService.attendanceDays({ member: "all", ...day, pageNo: n, pageSize: 1000 })), (r) => r.days) : none,
-      on.full ? every((n) => call(AdminOpsService.leave({ member: "all", state: "requested,escalated", pageNo: n, pageSize: 500 })), (r) => r.leave) : none,
-      on.full ? every((n) => call(AdminOpsService.agreements({
+      on.reports && can("reports", "view") ? every((n) => call(AdminOpsService.dailyPlans({ member: "all", ...day, pageNo: n, pageSize: 500 })), (r) => r.plans) : none,
+      on.reports && can("reports", "view") ? every((n) => call(AdminOpsService.dailyReports({ member: "all", ...day, pageNo: n, pageSize: 500 })), (r) => r.reports) : none,
+      on.full && can("attendance", "view") ? every((n) => call(AdminOpsService.attendanceDays({ member: "all", ...day, pageNo: n, pageSize: 1000 })), (r) => r.days) : none,
+      on.full && can("attendance", "view") ? every((n) => call(AdminOpsService.leave({ member: "all", state: "requested,escalated", pageNo: n, pageSize: 500 })), (r) => r.leave) : none,
+      on.full && can("agreements", "view") ? every((n) => call(AdminOpsService.agreements({
         member: "all", state: "sent,viewed", expiresFrom: today, expiresTo: addDays(today, 7), pageNo: n, pageSize: 500 })), (r) => r.agreements) : none,
       /* Own row only without full access -- which is then nobody's manager. */
-      call(AdminOpsService.attendanceSettings()).then((r) => r.settings),
+      can("attendance", "view")
+        ? call(AdminOpsService.attendanceSettings()).then((r) => r.settings).catch(() => [] as WorkSettingsRow[])
+        : Promise.resolve([] as WorkSettingsRow[]),
     ]).then(([plans, reports, days, leave, agreements, settings]) => {
       if (live) setS({ state: "ready", raw: { asked: { ...on }, plans, reports, days, leave, agreements, settings } });
     }).catch(() => { if (live) setS((x) => ({ ...x, state: "error" })); });
@@ -355,7 +366,7 @@ export function attentionTeam(a: AttnRaw, work: WorkItemRow[], table: LiveTeamTa
     members: table.members,
     rows: table.rows,
     attention: {
-      delayed: work.filter((i) => i.delayed && inDept(i.assignee.id)).map((i) => ({
+      delayed: work.filter((i) => isRecentDelayed(i) && inDept(i.assignee.id)).map((i) => ({
         itemId: String(i.id), title: i.title, assigneeId: String(i.assignee.id), priority: i.priority?.key, dueDate: i.dueDate })),
       noPlan: owing.filter((m) => !filed(a.plans, m.memberId)).map((m) => ({ member: m })),
       noEod: owing.filter((m) => clock > (settings.get(m.memberId)?.autoCloseAt || "20:00") && !filed(a.reports, m.memberId))

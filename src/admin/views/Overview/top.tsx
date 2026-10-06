@@ -67,51 +67,51 @@ export function Snapshot({ d }: { d: OverviewData }) {
     <Section id="ov-snapshot" title="Executive snapshot" desc={d.periods.deals.label}
       right={<><Stamp clock={d.clocks.deals} /><Stamp clock={d.clocks.money} /></>}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {moneyTile("Collected", "collected", () => (
+        {d.gates.finance ? moneyTile("Collected", "collected", () => (
           <Kpi k="Collected" tip="collected" v={<Money paise={collected(fin!.cur)} />}
               s={fin!.cur.collectedN + " payment" + (fin!.cur.collectedN === 1 ? "" : "s") + " in"}
               now={collected(fin!.cur)} before={collected(fin!.prev)} of={ofF} to="#/finance-analytics" />
-        ))}
+        )) : null}
 
-        {dealTile("Pipeline value", "pipeline", () => (
+        {d.gates.deals ? dealTile("Pipeline value", "pipeline", () => (
           <Kpi k="Pipeline value" tip="pipeline" v={<Money paise={deals!.openInPeriod.value} />}
             s={deals!.openInPeriod.n + " open" + (deals!.openInPeriod.unquoted ? " · " + deals!.openInPeriod.unquoted + " without a value" : "")}
             to="#/deals?view=board" />
-        ))}
+        )) : null}
         {/* NAMED FOR ITS WINDOW. This counts deals that REACHED won inside the
             period; "Pipeline by stage" below counts where every deal stands
             now. Both are right and they disagree by design, so the windowed
             one carries its period the way "Enquiries · 7 days" does — an
             unlabelled "WON 0" beside "Won 2" reads as a contradiction. */}
-        {dealTile(wonK, "won", () => (
+        {d.gates.deals ? dealTile(wonK, "won", () => (
           <Kpi k={wonK} tip="won" v={String(deals!.won.n)} s={<Money paise={deals!.won.value} />}
             now={deals!.won.n} before={deals!.wonPrev.n} kind="n" of={ofD} to="#/deals?stage=5"
             foot={deals!.wonSeries.length > 1 ? <Spark values={deals!.wonSeries} tone="s1" label="Won per slice" /> : null} />
-        ))}
-        {dealTile("Conversion", "conversion", () => (
+        )) : null}
+        {d.gates.deals ? dealTile("Conversion", "conversion", () => (
           <Kpi k="Conversion" tip="conversion" v={deals!.conversion === null ? "—" : deals!.conversion + "%"}
             s={deals!.won.n + " won · " + deals!.lost.n + " lost"}
             now={deals!.conversion} before={deals!.conversionPrev} kind="pts" of={ofD} to="#/deals?view=board" />
-        ))}
+        )) : null}
 
-        {moneyTile("Receivable", "outstanding", () => (
+        {d.gates.finance ? moneyTile("Receivable", "outstanding", () => (
           <Kpi k="Receivable" tip="outstanding" v={<Money paise={fin!.totals.outstandingPaise} />}
               s={fin!.totals.dueN + " due · " + fin!.totals.failedN + " failed"}
               tone={fin!.totals.failedN ? "warn" : undefined} to="#/finance?flag=due" />
-        ))}
+        )) : null}
         {/* The intake counter answers with a total or with nothing; a backend
             that returns no total leaves the topbar's own zeros standing, so
             the tile prints a zero rather than the word `undefined`. While the
             counts are answering, or when they failed, the tile says so
             rather than printing those zeros as a count (d11). */}
-        {d.intake && d.intake.state === "loading"
-          ? <Loading k="Enquiries · 7 days" tip="enquiries" />
-          : d.intake && d.intake.state === "error"
-          ? <Kpi k="Enquiries · 7 days" tip="enquiries" {...NA} s="could not load" foot={<Retry onPress={d.intake.retry} />} />
-          : d.intake
-          ? <Kpi k="Enquiries · 7 days" tip="enquiries" v={String(Number(d.intake.week) || 0)} s={(Number(d.intake.today) || 0) + " today"}
-              to="#/business-enquiries?received=7d" />
-          : <Kpi k="Enquiries · 7 days" tip="enquiries" {...NA} s="not in your access" />}
+        {d.gates.enquiries && d.intake ? (
+          d.intake.state === "loading"
+            ? <Loading k="Enquiries · 7 days" tip="enquiries" />
+            : d.intake.state === "error"
+            ? <Kpi k="Enquiries · 7 days" tip="enquiries" {...NA} s="could not load" foot={<Retry onPress={d.intake.retry} />} />
+            : <Kpi k="Enquiries · 7 days" tip="enquiries" v={String(Number(d.intake.week) || 0)} s={(Number(d.intake.today) || 0) + " today"}
+                to="#/business-enquiries?received=7d" />
+        ) : null}
       </div>
 
       {/* FOUR ONE-LINE VERDICTS. Not numbers again — a reading of them, and a
@@ -138,6 +138,7 @@ const FLOW: Series[] = [
    other "where does it stand right now"; together they are the whole of
    performance, and neither is readable without the other. */
 export function Performance({ d }: { d: OverviewData }) {
+  if (!d.gates.deals) return null;
   const ds = dealState(d);
   const m = d.deals;
   const flow: ColumnPoint[] = m

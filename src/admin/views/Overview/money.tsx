@@ -50,14 +50,12 @@ export function Finance({ d }: { d: OverviewData }) {
   /* The backend, on the real clock (d5). `d.fin` — the seed metrics — is what
      the attention list and the signals still read, and is not touched here. */
   const f = d.finLive;
-  const of = "vs prev " + d.periods.financeLive.days + "d";
-  if (!d.gates.finance || !f) {
+  if (!d.gates.finance) return null;
+  if (!f) {
     return (
       <Section id="ov-finance" title="Finance"
-        right={d.gates.finance ? <Stamp clock={d.clocks.financeLive} /> : null}>
-        {!d.gates.finance ? (
-          <Card tight><Gone what="Finance" needs="finance access" /></Card>
-        ) : d.finState === "loading" ? (
+        right={<Stamp clock={d.clocks.financeLive} />}>
+        {d.finState === "loading" ? (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {["Net", "In", "Out", "Due in 30 days", "Failed to pay", "Refunds owed"].map((k) => (

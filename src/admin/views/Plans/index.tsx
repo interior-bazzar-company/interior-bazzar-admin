@@ -169,7 +169,7 @@ export default function Plans() {
      the drawer opens for any of them by id whatever the filter says. */
   if (p.status) rows = rows.filter((x) => statusOf(x) === p.status);
   else rows = rows.filter((x) => !x.archived);
-  if (p.fam) rows = rows.filter((x) => x.family === p.fam);
+  if (p.fam) rows = rows.filter((x) => (x.family || "").trim().toLowerCase() === p.fam.trim().toLowerCase());
   if (p.q) {
     const s = p.q.toLowerCase();
     rows = rows.filter((x) =>
@@ -187,7 +187,10 @@ export default function Plans() {
      first two make (which is also exactly what the list below shows). */
   const c = countsOf(plans);
   const byFam: Record<string, number> = {};
-  live.forEach((x) => { byFam[x.family] = (byFam[x.family] || 0) + 1; });
+  live.forEach((x) => {
+    const f = (x.family || "").trim().toLowerCase();
+    byFam[f] = (byFam[f] || 0) + 1;
+  });
 
   function route(k: string, v: string) {
     const q2: Record<string, string> = { ...params };

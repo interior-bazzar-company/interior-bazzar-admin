@@ -26,6 +26,8 @@ import { iconOf } from "./icon";
 export type ButtonProps = UIButtonProps & {
     /** the panel's icon name, as an alternative to `iconLeading` */
     ico?: string;
+    /** the panel's icon name, as an alternative to `iconTrailing` */
+    icoTrailing?: string;
     /** `block` stretches to the container — a form's submit, the door */
     block?: boolean;
     /** HOW MANY THIS BUTTON WILL ACT ON — "Export 24", "Assign 3". A figure on
@@ -34,7 +36,7 @@ export type ButtonProps = UIButtonProps & {
     count?: number | string;
 };
 
-export function Button({ ico, block, count, className, iconLeading, children, size = "sm", ...rest }: ButtonProps) {
+export function Button({ ico, icoTrailing, block, count, className, iconLeading, iconTrailing, children, size = "sm", ...rest }: ButtonProps) {
     /* pass `children` THROUGH untouched when there is no count: the library
        reads `!children` to decide a button is icon-only, and an always-present
        wrapper would give every icon button a text slot it does not want. */
@@ -48,7 +50,13 @@ export function Button({ ico, block, count, className, iconLeading, children, si
             </>
         );
     return (
-        <UIButton size={size} iconLeading={iconLeading || (ico ? iconOf(ico) : undefined)} className={cx(block && "w-full", className)} {...rest}>
+        <UIButton
+            size={size}
+            iconLeading={iconLeading || (ico ? iconOf(ico) : undefined)}
+            iconTrailing={iconTrailing || (icoTrailing ? iconOf(icoTrailing) : undefined)}
+            className={cx(block && "w-full", className)}
+            {...rest}
+        >
             {label}
         </UIButton>
     );

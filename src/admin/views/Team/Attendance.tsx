@@ -47,13 +47,15 @@ import { ColumnChart } from "../charts";
 import { go } from "../../ui/nav";
 import {
   LEAVE_KIND, TODAY, addDays, canDecideLeave, attendanceTotals, clampDay, datesIn, dayFor, fmtDate, fmtDayName,
-  fmtMonth, isWeekend, labelOf, leaveOverlap, leaveQueue, fmtHM, fmtTime, meId, monthStep,
+  fmtMonth, isHumanEmployee, isWeekend, labelOf, leaveOverlap, leaveQueue, fmtHM, fmtTime, meId, monthStep,
   readMember, arrivalSpread, earliestAttendance, scopeLabel, scopeOf, spanDays, spanRows,
-  spanTotals, stateOf, openDayAt, useDayRows, useLeave, useMe, useMembers, workedOf,
-  now as clockNow,
+  spanTotals, stateOf, openDayAt, startBreak, resumeDay, useDayRows, useLeave, useMe, useMembers,
+  
+  useMyDay, workedOf, now as clockNow,
 } from "./store";
 import type { DayRow, LeaveRequest, Member, Scope, SpanRow } from "./store";
-import { LeaveDecideModal, LeaveEscalateModal } from "./member/modals";
+import { LeaveDecideModal, LeaveEscalateModal, LeaveRequestModal } from "./member/modals";
+import { EodModal } from "./member/reportForms";
 import { BarScale, DayBar, Meter, StatePill, Who } from "./bits";
 import { HeatGrid, HeatLegend, SortHead, StackBars } from "./workBits";
 import type { HeatCell, HeatRow, StackDay } from "./workBits";
@@ -91,6 +93,7 @@ export default function Attendance() {
   const rows = useDayRows(date, scope);
   const members = useMembers();
   const me = useMe();
+  const shell = useShell();
 
   usePageChrome({ crumbs: <TbTitle label="Attendance" to="#/attendance" /> }, face + date);
 
@@ -131,9 +134,20 @@ export default function Attendance() {
             <span className="font-medium text-secondary">
               {zoom === "month" ? fmtMonth(date, true) : fmtDayName(date) + " · " + fmtDate(date)}
             </span>
-            <span>{scopeLabel(scope, members.filter((m) => m.status === "active").length)}</span>
+            <span>{scopeLabel(scope, members.filter(isHumanEmployee).filter((m) => m.status === "active").length)}</span>
             {date === TODAY ? <Pill xs dot tone="live" text="live" /> : null}
           </>
+        }
+        actions={
+          face === "requests" ? (
+            <Button
+              color="primary"
+              ico="plus"
+              onClick={() => shell.modal(<LeaveRequestModal memberId={me ? me.memberId : meId()} />)}
+            >
+              Request leave
+            </Button>
+          ) : undefined
         }
         tabs={
           <Tabs cur={tab}
@@ -348,30 +362,89 @@ const hhmm = (at: number) => new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/
 function CheckIn() {
   const shell = useShell();
   const me = meId();
+  const myDay = useMyDay();
+  const state = myDay.state;
+  const isPunchedIn = !!myDay.day;
   const [at, setAt] = useState(() => hhmm(clockNow()));
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const changed = at !== hhmm(clockNow());
+
   const submit = async () => {
     setBusy(true);
     const r = await openDayAt(me, at, note.trim());
     setBusy(false);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     setNote("");
-    shell.toast(r.data.isLate ? "Checked in at " + at + " — marked late." : "Checked in at " + at + ".");
+    shell.toast("Attendance time adjusted successfully.");
   };
+
+  const onEndDay = () => {
+    const m = readMember(me);
+    if (!m) { shell.toast("No member record for you.", "bad"); return; }
+    shell.modal(<EodModal m={m} />);
+  };
+
+  const handleBreak = async () => {
+    setBusy(true);
+    const r = await startBreak(me);
+    setBusy(false);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.toast("Break started.");
+  };
+
+  const handleResume = async () => {
+    setBusy(true);
+    const r = await resumeDay(me);
+    setBusy(false);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.toast("Resumed work.");
+  };
+
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-lg p-3 ring-1 ring-secondary">
-      <FormField id="ciAt" label="Start time">
-        <Input id="ciAt" type="time" value={at} mono onChange={setAt} />
-      </FormField>
-      <FormField id="ciNote" label="Reason" req cls="min-w-56 flex-1">
-        <Input id="ciNote" value={note} ph={changed ? "Why the time differs from now" : "Why you are stating it"} onChange={setNote} />
-      </FormField>
-      <Button color="primary" isDisabled={busy || !at || !note.trim()} onClick={submit}>Check in</Button>
-      <p className="basis-full text-xs text-tertiary">
-        Signing in starts your day automatically. If that time is wrong, state when you really started and why.
-      </p>
+    <div className="flex flex-col gap-3 rounded-lg p-3 ring-1 ring-secondary bg-primary">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-secondary pb-3">
+        <div className="flex items-center gap-2">
+          <StatePill state={state} />
+          {state === "ended" && myDay.day?.endedAt ? (
+            <span className="text-sm font-medium text-secondary">
+              Day completed at {fmtTime(myDay.day.endedAt)}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          {state === "working" && (
+            <>
+              <Button color="secondary" size="sm" isDisabled={busy} onClick={handleBreak}>
+                Take Break
+              </Button>
+              <Button color="primary" size="sm" isDisabled={busy} onClick={onEndDay}>
+                End Day / Clock Out
+              </Button>
+            </>
+          )}
+          {state === "on_break" && (
+            <Button color="primary" size="sm" isDisabled={busy} onClick={handleResume}>
+              Resume Work
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <FormField id="ciAt" label="Start time">
+          <Input id="ciAt" type="time" value={at} mono onChange={setAt} />
+        </FormField>
+        <FormField id="ciNote" label="Reason" req cls="min-w-56 flex-1">
+          <Input id="ciNote" value={note} ph={changed ? "Why the time differs from now" : "Why you are stating it"} onChange={setNote} />
+        </FormField>
+        <Button color="secondary" isDisabled={busy || !at || !note.trim()} onClick={submit}>
+          {isPunchedIn ? "Update Start Time" : "Check in"}
+        </Button>
+        <p className="basis-full text-xs text-tertiary">
+          Signing in starts your day automatically. If that time is wrong, state when you really started and why.
+        </p>
+      </div>
     </div>
   );
 }
@@ -651,6 +724,7 @@ function Analytics({ scope, span, onSpan }: {
  *  loud — a request that simply sat there is the exact failure the second table
  *  exists to prevent. */
 function Requests() {
+  const shell = useShell();
   useLeave();
   const { mine, unrouted } = leaveQueue(scopeOf("attendance"));
 
@@ -658,7 +732,12 @@ function Requests() {
     return (
       <>
         <EmptyState icon="inbox" title="Nothing waiting on you"
-          body="No leave request needs a decision. A request appears here only while it is undecided — once it is approved or refused it lives on that member's own leave page." />
+          body="No leave request needs a decision. A request appears here only while it is undecided — once it is approved or refused it lives on that member's own leave page."
+          action={
+            <Button color="primary" ico="plus" onClick={() => shell.modal(<LeaveRequestModal memberId={meId()} />)}>
+              Request leave
+            </Button>
+          } />
         <Alert tone="info">
           Approving writes no attendance row. It suppresses the derived absence and those days
           read as On leave instead.
@@ -673,7 +752,14 @@ function Requests() {
         <section className="flex flex-col gap-3">
           <SectionHead className="mb-0" title="Leave requests"
             desc="Until you decide, those days still read as absent."
-            right={<Pill tone="warn" text={mine.length + " waiting"} />} />
+            right={
+              <div className="flex items-center gap-2">
+                <Pill tone="warn" text={mine.length + " waiting"} />
+                <Button size="xs" color="primary" ico="plus" onClick={() => shell.modal(<LeaveRequestModal memberId={meId()} />)}>
+                  Request leave
+                </Button>
+              </div>
+            } />
           <LeaveTable list={mine} />
         </section>
       ) : null}

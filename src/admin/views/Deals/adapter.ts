@@ -131,7 +131,7 @@ export function adaptDeal(row: DealRow): any {
     // rename — the one component that reads it parses it where a failure can
     // be shown instead of taking the whole deal list down with it.
     submission: row.submission || "",
-    is_stalled: !!row.stalled,
+    is_stalled: (row.stageKey === "won" || row.stageKey === "lost" || row.stageKey === "dead" || stage >= 5) ? false : !!row.stalled,
     close_reason: row.lostReason || null,
     tags: row.tags || [],
     // duplicate_count intentionally OMITTED (stays undefined). The server

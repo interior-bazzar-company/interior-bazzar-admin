@@ -200,6 +200,9 @@ export default function List({ all, page, onPage, p, sel, onFilter, onSearch, on
      NaN. */
   const total = page.total || rows.length;
   const pages = Math.max(1, Math.ceil(total / (page.pageSize || 1)));
+  const unassigned = Math.max(0, page.counts
+    ? (page.counts.total - (page.counts.byStatus?.assigned || 0) - (page.counts.byStatus?.converted || 0) - (page.counts.byStatus?.not_converted || 0) - (page.counts.byStatus?.invalid || 0))
+    : all.filter((e) => !e.activeAssignmentId && e.status !== "assigned").length);
 
   const onExport = async () => {
     try {
@@ -226,7 +229,7 @@ export default function List({ all, page, onPage, p, sel, onFilter, onSearch, on
         title="Business Enquiries"
         meta={
           <>
-            <span><b className="font-medium text-secondary tnum">{total.toLocaleString()}</b> {filtered ? "matching" : "in the queue"}</span>
+            <span><b className="font-medium text-secondary tnum">{unassigned.toLocaleString()}</b> awaiting assignment · <span className="tnum">{total.toLocaleString()}</span> total in records</span>
             {filtered ? <span>{activeFilters} filter{activeFilters === 1 ? "" : "s"} on</span> : null}
             <span>as of {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
           </>
@@ -488,7 +491,7 @@ function Row({ e, p, sel, load }: {
       </td>
 
       <td className="cell-1">
-        <div>{e.requirement.category || <span className="text-quaternary">—</span>}</div>
+        <div>{e.requirement.category || (e.tags && e.tags.length ? e.tags[0] : null) || e.source?.label || e.requirement.service || <span className="text-quaternary">—</span>}</div>
         <div className="cell-2">{place(e)}</div>
       </td>
 

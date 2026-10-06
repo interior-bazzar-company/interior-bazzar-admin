@@ -48,6 +48,7 @@ import type {
 import { call } from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
 import type { ApiResponseType } from "../../../types/reqResType";
+import { can } from "../../auth/session";
 
 /* ============================================================ THE SHAPES === */
 
@@ -583,11 +584,20 @@ export async function loadPage(query: EnquiryQuery, force = false): Promise<void
  *  `state` and `retry` are for a reader that has to tell "0" from "not yet" and
  *  "failed" — the Overview's Enquiries tile (overview/d11). The topbar reads
  *  only the two numbers, which stay 0 until the counts land. */
-export type IntakeState = "loading" | "ready" | "error";
-export function useIntakeCounts(): { today: number; week: number; state: IntakeState; retry: () => void } {
-  const [n, setN] = useState<{ today: number; week: number; state: IntakeState }>({ today: 0, week: 0, state: "loading" });
+export type IntakeState = "loading" | "ready" | "error" | "off";
+export function useIntakeCounts(enabled = true): { today: number; week: number; state: IntakeState; retry: () => void } {
+  const allowed = enabled && can("business-enquiries", "view");
+  const [n, setN] = useState<{ today: number; week: number; state: IntakeState }>({
+    today: 0,
+    week: 0,
+    state: allowed ? "loading" : "off",
+  });
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
+    if (!enabled || !can("business-enquiries", "view")) {
+      setN({ today: 0, week: 0, state: "off" });
+      return;
+    }
     let live = true;
     setN((x) => ({ ...x, state: "loading" }));
     const count = async (received: string) => {
@@ -607,7 +617,7 @@ export function useIntakeCounts(): { today: number; week: number; state: IntakeS
       }
     })();
     return () => { live = false; };
-  }, [nonce]);
+  }, [enabled, nonce]);
   return { ...n, retry: () => setNonce((k) => k + 1) };
 }
 

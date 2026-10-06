@@ -951,6 +951,17 @@ const purchaseRefOf = (id: string): { family: string; purchase: number } | null 
   return m ? { family: m[1], purchase: Number(m[2]) } : null;
 };
 
+export function resolveSubscriptionStatus(status: SubscriptionStatus, expireDate?: string | null): SubscriptionStatus {
+  if (!expireDate) return status;
+  const now = new Date();
+  const end = new Date(expireDate.length === 10 ? expireDate + "T23:59:59" : expireDate);
+  if (!isNaN(end.getTime())) {
+    if (end < now) return "expired";
+    if (status === "expired" && end > now) return "active";
+  }
+  return status;
+}
+
 function liveSubscription(x: SubPurchaseRow): Subscription {
   const startDate = dateOnly(x.startedAt) || "";
   const endDate = dateOnly(x.expireDate) || "";
@@ -959,7 +970,8 @@ function liveSubscription(x: SubPurchaseRow): Subscription {
      purchase's own status otherwise — `defaulting` and a cancellation exist
      only on the commitment, because only it can carry the reason. */
   const held = x.subscription || null;
-  const status = subStatusOf(held && held.state ? held.state.key : x.status);
+  let status = subStatusOf(held && held.state ? held.state.key : x.status);
+  status = resolveSubscriptionStatus(status, x.expireDate || endDate);
   const p = x.payment;
   const settled = !!p && (p.orderStatus === "PAID" || p.orderStatus === "REFUNDED");
   const payment: InstallmentPayment | null = p && settled ? {
@@ -1036,9 +1048,10 @@ function saleSubscription(c: ApiSubscriptionRow): Subscription {
   const open = installments.filter((i) => i.status !== "cancelled");
   const paidAll = open.length > 0 && open.every((i) => i.status === "paid");
   const state = c.state ? c.state.key : "active";
-  const status: SubscriptionStatus = state === "cancelled" ? "cancelled"
+  const rawStatus: SubscriptionStatus = state === "cancelled" ? "cancelled"
     : open.some((i) => i.status === "fail_to_pay") ? "defaulting"
       : paidAll ? "completed" : subStatusOf(state);
+  const status = resolveSubscriptionStatus(rawStatus, c.renewsOn);
   return {
     subscriptionId: QSUB + c.id,
     source: "sales",

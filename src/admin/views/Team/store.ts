@@ -102,6 +102,34 @@ export interface Member {
   roles: string[];
   addedAt: string;
   lastLogin: string | null;
+  is_service_account?: boolean;
+}
+
+export function isHumanEmployee(m: {
+  name?: string;
+  username?: string;
+  email?: string;
+  designation?: string;
+  roles?: (string | { name?: string })[];
+  role?: string;
+  is_service_account?: boolean;
+} | null | undefined): boolean {
+  if (!m) return false;
+  if (m.is_service_account) return false;
+  const name = (m.name || "").trim().toLowerCase();
+  const username = (m.username || "").trim().toLowerCase();
+  const email = (m.email || "").trim().toLowerCase();
+  const designation = (m.designation || "").trim().toLowerCase();
+  const role = (m.role || "").trim().toLowerCase();
+  const roles = (Array.isArray(m.roles) ? m.roles : []).map((r) =>
+    (typeof r === "string" ? r : r?.name || "").trim().toLowerCase()
+  );
+
+  if (name === "—" || name === "-" || name === "" || username === "admin") return false;
+  if (username === "gmb_bot" || email === "bot@gmail.com") return false;
+  if (role === "bot" || roles.includes("bot")) return false;
+  if (name.includes("bot") || username.includes("bot") || designation.includes("bot")) return false;
+  return true;
 }
 
 export interface Break { startedAt: string; endedAt: string | null; minutes: number | null }
@@ -717,6 +745,7 @@ export type LoadPart =
   | { state: "error"; message: string };
 
 const LOADED: LoadPart = { state: "ok", own: false };
+const DENIED: LoadPart = { state: "denied", message: "" };
 const refused = (e: unknown) => e instanceof AppExceptions && e.code > 0 && e.code < 500;
 export const loadFailure = (e: unknown): LoadPart =>
   (refused(e) ? { state: "denied", message: errMessage(e) } : { state: "error", message: errMessage(e) });
@@ -788,35 +817,61 @@ async function load(current: () => boolean): Promise<void> {
   const t = await call(AdminOpsService.serverTime()).catch(() => null);
   if (t) setClock(t.epochMs);
 
+  const canUsers = can("team", "view");
+  const canAttendance = can("attendance", "view");
+  const canWork = can("work", "view");
+  const canReports = can("reports", "view") || can("work", "view");
+  const canAgreements = can("agreements", "view");
+  const canDocs = can("resources", "view") || can("team", "view");
+  const canIncentives = can("finance-salaries", "view");
+
   const [vocabGot, usersGot, settingsGot, [days, daysPart], itemsGot, tagsGot, plansGot, reportsGot, leaveGot,
     agreementsGot, documentsGot, incentivesGot] = await Promise.all([
     Promise.all(VOCAB_LISTS.map((n) => one(call(AdminOpsService.vocab(n)).then((r) => [n, r.items] as const), null))),
-    one(call(AdminOpsService.users()), null),
-    one(call(AdminOpsService.attendanceSettings()).then((r) => r.settings), [] as WorkSettingsRow[]),
-    wide((() => pages((n) => call(AdminOpsService.attendanceDays({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.days)),
-      () => pages((n) => call(AdminOpsService.attendanceDays({ pageNo: n, pageSize: 1000 })), (r) => r.days)),
-    wide(() => pages((n) => call(AdminOpsService.work({ assignee: "all", pageNo: n, pageSize: 500 })), (r) => r.items),
-      () => pages((n) => call(AdminOpsService.work({ pageNo: n, pageSize: 500 })), (r) => r.items)),
-    wide(() => call(AdminOpsService.workTags({ owner: "all", includeArchived: true })).then((r) => r.tags),
-      () => call(AdminOpsService.workTags({ includeArchived: true })).then((r) => r.tags)),
-    wide(() => pages((n) => call(AdminOpsService.dailyPlans({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.plans),
-      () => pages((n) => call(AdminOpsService.dailyPlans({ pageNo: n, pageSize: 1000 })), (r) => r.plans)),
-    wide(() => pages((n) => call(AdminOpsService.dailyReports({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.reports),
-      () => pages((n) => call(AdminOpsService.dailyReports({ pageNo: n, pageSize: 1000 })), (r) => r.reports)),
-    wide(() => pages((n) => call(AdminOpsService.leave({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.leave),
-      () => pages((n) => call(AdminOpsService.leave({ pageNo: n, pageSize: 1000 })), (r) => r.leave)),
-    wide(() => pages((n) => call(AdminOpsService.agreements({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.agreements),
-      () => pages((n) => call(AdminOpsService.agreements({ pageNo: n, pageSize: 1000 })), (r) => r.agreements)),
-    wide(() => call(AdminOpsService.memberDocuments({ member: "all" })).then((r) => r.documents),
-      () => call(AdminOpsService.memberDocuments()).then((r) => r.documents)),
-    one(call(AdminOpsService.incentives()).then((r) => r.incentives), [] as IncentiveRow[]),
+    canUsers ? one(call(AdminOpsService.users()), null) : Promise.resolve([null, DENIED] as Got<AdminUserRow[] | null>),
+    canAttendance ? one(call(AdminOpsService.attendanceSettings()).then((r) => r.settings), [] as WorkSettingsRow[]) : Promise.resolve([[], DENIED] as Got<WorkSettingsRow[]>),
+    canAttendance
+      ? wide((() => pages((n) => call(AdminOpsService.attendanceDays({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.days)),
+          () => pages((n) => call(AdminOpsService.attendanceDays({ pageNo: n, pageSize: 1000 })), (r) => r.days))
+      : Promise.resolve([[], DENIED] as Got<AttendanceDayRow[]>),
+    canWork
+      ? wide(() => pages((n) => call(AdminOpsService.work({ assignee: "all", pageNo: n, pageSize: 500 })), (r) => r.items),
+          () => pages((n) => call(AdminOpsService.work({ pageNo: n, pageSize: 500 })), (r) => r.items))
+      : Promise.resolve([[], DENIED] as Got<WorkItemRow[]>),
+    canWork
+      ? wide(() => call(AdminOpsService.workTags({ owner: "all", includeArchived: true })).then((r) => r.tags),
+          () => call(AdminOpsService.workTags({ includeArchived: true })).then((r) => r.tags))
+      : Promise.resolve([[], DENIED] as Got<WorkTagRow[]>),
+    canReports
+      ? wide(() => pages((n) => call(AdminOpsService.dailyPlans({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.plans),
+          () => pages((n) => call(AdminOpsService.dailyPlans({ pageNo: n, pageSize: 1000 })), (r) => r.plans))
+      : Promise.resolve([[], DENIED] as Got<DailyPlanRow[]>),
+    canReports
+      ? wide(() => pages((n) => call(AdminOpsService.dailyReports({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.reports),
+          () => pages((n) => call(AdminOpsService.dailyReports({ pageNo: n, pageSize: 1000 })), (r) => r.reports))
+      : Promise.resolve([[], DENIED] as Got<DailyReportRow[]>),
+    canAttendance
+      ? wide(() => pages((n) => call(AdminOpsService.leave({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.leave),
+          () => pages((n) => call(AdminOpsService.leave({ pageNo: n, pageSize: 1000 })), (r) => r.leave))
+      : Promise.resolve([[], DENIED] as Got<LeaveRow[]>),
+    canAgreements
+      ? wide(() => pages((n) => call(AdminOpsService.agreements({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.agreements),
+          () => pages((n) => call(AdminOpsService.agreements({ pageNo: n, pageSize: 1000 })), (r) => r.agreements))
+      : Promise.resolve([[], DENIED] as Got<AgreementRow[]>),
+    canDocs
+      ? wide(() => call(AdminOpsService.memberDocuments({ member: "all" })).then((r) => r.documents),
+          () => call(AdminOpsService.memberDocuments()).then((r) => r.documents))
+      : Promise.resolve([[], DENIED] as Got<MemberDocumentRow[]>),
+    canIncentives
+      ? one(call(AdminOpsService.incentives()).then((r) => r.incentives), [] as IncentiveRow[])
+      : Promise.resolve([[], DENIED] as Got<IncentiveRow[]>),
   ]);
 
   /* Today, with the people nobody has opened a day for (includeMissing). Only
      asked when the wide read above was not refused — a viewer with no reports
      gets an error for `member=all`. Its members top up a roster the viewer may
      not read (no team.view), so "Everyone" is not just them. */
-  const todayMissing = daysPart.state === "ok" && !daysPart.own
+  const todayMissing = canAttendance && daysPart.state === "ok" && !daysPart.own
     ? await call(AdminOpsService.attendanceDays({ member: "all", start: TODAY, end: TODAY, includeMissing: "true", pageSize: 1000 }))
       .then((r) => r.days).catch(() => [] as AttendanceDayRow[])
     : [];
@@ -1071,6 +1126,7 @@ export interface DayRow {
  *  that only renders rows can never show who did not come in. */
 export function dayRows(date: string, scope: Scope, at = now()): DayRow[] {
   return membersInScope(scope)
+    .filter(isHumanEmployee)
     .filter((m) => m.status === "active")
     .map((m) => {
       const day = dayFor(m.memberId, date);
@@ -1163,7 +1219,7 @@ export function spanRows(from: string, to: string, scope: Scope): SpanRow[] {
      span, for the same reason. */
   const dates = datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY);
   const out = new Map<string, SpanRow>();
-  membersInScope(scope).filter((m) => m.status === "active").forEach((m) => {
+  membersInScope(scope).filter(isHumanEmployee).filter((m) => m.status === "active").forEach((m) => {
     out.set(m.memberId, {
       member: m, days: 0, present: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0,
       worked: 0, expected: 0, lateMinutes: 0, breakMinutes: 0, arrivals: [],
@@ -1664,7 +1720,10 @@ export function workRows(f: WorkFilter, scope: Scope): WorkItem[] {
   if (f.due === "today") rows = rows.filter((i) => i.dueDate === TODAY);
   if (f.due === "week") {
     const wk = weekOf(TODAY);
-    rows = rows.filter((i) => !!i.dueDate && wk.indexOf(i.dueDate) >= 0);
+    rows = rows.filter((i) => !isTerminal(i.status) && !!i.dueDate && wk.indexOf(i.dueDate) >= 0);
+  }
+  if (f.due === "active") {
+    rows = rows.filter((i) => !isTerminal(i.status));
   }
   if (f.q) {
     const q = f.q.toLowerCase();
@@ -1743,23 +1802,33 @@ export interface ReviewRow {
  *  built on and the reason its headline numbers are not served separately. */
 export function reviewRows(date: string, scope: Scope, at = now()): ReviewRow[] {
   return membersInScope(scope)
+    .filter(isHumanEmployee)
     .filter((m) => m.status === "active")
     .map((m) => {
       const day = dayFor(m.memberId, date);
+      const plan = planFor(m.memberId, date);
+      const planLines = plan ? plan.lines : [];
+      const hasPlan = !!plan && planLines.length > 0;
       const items = snap.items.filter((i) => i.assigneeId === m.memberId);
       const dueToday = items.filter((i) => i.dueDate === date);
+      const planDone = hasPlan
+        ? planLines.filter((l) => {
+            const it = items.filter((i) => i.itemId === l.workItemId)[0];
+            return !!it && it.status === "completed";
+          }).length
+        : 0;
       return {
         member: m,
         day,
         state: stateOf(day, m, at, date),
         worked: workedOf(day, m, at),
-        plan: planFor(m.memberId, date),
+        plan,
         report: reportFor(m.memberId, date),
         eodDue: eodDue(date, m, at),
         items,
-        doing: items.filter((i) => i.status === "in_progress")[0] || null,
-        done: dueToday.filter((i) => i.status === "completed").length,
-        planned: dueToday.length,
+        doing: items.filter((i) => i.status === "in_progress" && (i.dueDate === date || planLines.some((l) => l.workItemId === i.itemId)))[0] || null,
+        done: hasPlan ? planDone : dueToday.filter((i) => i.status === "completed").length,
+        planned: hasPlan ? planLines.length : 0,
         delayed: items.filter((i) => isDelayed(i)).length,
         waiting: items.filter((i) => !!blockerOf(i)).length,
       };
@@ -1810,7 +1879,7 @@ export function reportSpanRows(from: string, to: string, scope: Scope): ReportSp
      because of how it happens to be called is one bad argument from lying. A
      check asking for a window in the future is what found it. */
   const dates = datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY);
-  return membersInScope(scope).filter((m) => m.status === "active").map((m) => {
+  return membersInScope(scope).filter(isHumanEmployee).filter((m) => m.status === "active").map((m) => {
     const row: ReportSpanRow = {
       member: m, days: 0, plans: 0, eodsDue: 0, eods: 0, unread: 0, planned: 0, done: 0,
     };

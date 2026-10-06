@@ -3,6 +3,7 @@
    who is carrying too much, and where execution is blocked on a person.
    ============================================================================= */
 import { Avatar, Card, Eyebrow, ListSkeleton, ListTable, Meter, Rail } from "../../ui";
+import { can } from "../../shell/AdminShell";
 import { Empty, Gone, Go, Money, Section, StatLine, Stamp, Tip, rowLink } from "./bits";
 import type { OverviewData } from "./store";
 import { Retry } from "./top";
@@ -16,6 +17,7 @@ function OnTime({ v }: { v: number | null }) {
 }
 
 export function TeamIntel({ d }: { d: OverviewData }) {
+  if (!d.gates.team) return null;
   /* The roster, the attendance and the tasks come from the backend on the real
      clock (d4). Operations below reads its own backend counts (d7). */
   const t = d.teamTable;
@@ -100,14 +102,14 @@ export function TeamIntel({ d }: { d: OverviewData }) {
    owes a manager. A count with nothing behind it is drawn quiet rather than
    dropped — "nothing overdue" is the news the reader came for. */
 export function Operations({ d }: { d: OverviewData }) {
+  if (d.opsState === "forbidden" || (!d.gates.team && !can("work", "view") && !can("attendance", "view"))) return null;
   /* One backend read, every count worked out on the server's clock (d7). */
   const t = d.ops;
   return (
     <Section id="ov-ops" title="Operations" tip="ops" desc={t ? "today on the Team clock" : undefined}
       right={t ? <><Stamp clock={d.clocks.teamLive} /><Go to="#/reports?face=actions">Actions</Go></> : null}>
       <Card tight>
-        {d.opsState === "forbidden" ? <Gone what="Operations" needs="tasks and attendance access" />
-          : d.opsState === "loading" ? <ListSkeleton rows={4} />
+        {d.opsState === "loading" ? <ListSkeleton rows={4} />
           : !t ? <Empty title="Operations did not load." why={<Retry onPress={d.retryOps} />} /> : (
           <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1">
@@ -138,8 +140,8 @@ export function Operations({ d }: { d: OverviewData }) {
               <StatLine label="End-of-day report owed" n={t.owed.noEod} to="#/reports?face=actions" tone="warn" />
               <StatLine label="Reports not read" n={t.owed.unread} to="#/reports?face=actions" />
               <StatLine label="Leave to decide" n={t.owed.leave} to="#/reports?face=actions" tone="warn" />
-              <StatLine label="Agreements unopened" n={t.owed.agreementsUnopened} to="#/agreements" />
-              <StatLine label="Members missing documents" n={t.owed.docsMissing} to="#/team" tone="warn" />
+              {can("agreements", "view") ? <StatLine label="Agreements unopened" n={t.owed.agreementsUnopened} to="#/agreements" /> : null}
+              {can("team", "view") ? <StatLine label="Members missing documents" n={t.owed.docsMissing} to="#/team" tone="warn" /> : null}
             </div>
           </div>
         )}

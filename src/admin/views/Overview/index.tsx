@@ -183,11 +183,11 @@ export default function Overview() {
 
       <div className="flex flex-col gap-6">
         <Snapshot d={d} />
-        <Performance d={d} />
-        <DealsIntel d={d} />
-        <TeamIntel d={d} />
-        <Finance d={d} />
-        <Operations d={d} />
+        {d.gates.deals ? <Performance d={d} /> : null}
+        {d.gates.deals ? <DealsIntel d={d} /> : null}
+        {d.gates.team ? <TeamIntel d={d} /> : null}
+        {d.gates.finance ? <Finance d={d} /> : null}
+        {d.gates.team || can("work", "view") || can("team", "view") ? <Operations d={d} /> : null}
         <Attention d={d} />
         <Signals d={d} />
       </div>

@@ -38,7 +38,7 @@ import { RoleChips } from "../teamShared";
 import type { Member, Ops, Role } from "../teamShared";
 import { getSession } from "../../auth/session";
 import MemberPage from "./MemberPage";
-import { loadFailure, useMembers } from "./store";
+import { isHumanEmployee, loadFailure, useMembers } from "./store";
 import type { LoadPart } from "./store";
 import { LoadNotice } from "./loadState";
 import { opOf } from "./member/ops";
@@ -439,6 +439,7 @@ function ReportsTo({ u }: { u: Member }) {
  *  blocks on it. Naming which ones are short is what makes the column
  *  actionable — "2 missing" sends somebody hunting. */
 function DocsCell({ u }: { u: Member }) {
+  if (!isHumanEmployee(u)) return <span className="text-quaternary" title="Not applicable">—</span>;
   const missing = u.missingDocuments;
   if (!missing) return <span className="text-quaternary">—</span>;
   if (!missing.length) return <Pill xs tone="ok" text="Complete" />;

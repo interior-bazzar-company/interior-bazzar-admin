@@ -106,10 +106,15 @@ function useDepartments(enabled: boolean): Departments {
     names: [], rolesOf: NO_ROLES, people: NO_PEOPLE, state: enabled ? "loading" : "off" });
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
-    if (!enabled) { setD({ names: [], rolesOf: NO_ROLES, people: NO_PEOPLE, state: "off" }); return; }
+    if (!enabled || (!can("roles", "view") && !can("team", "view"))) {
+      setD({ names: [], rolesOf: NO_ROLES, people: NO_PEOPLE, state: "off" });
+      return;
+    }
     let live = true;
     setD((x) => ({ ...x, state: "loading" }));
-    Promise.all([call(AdminOpsService.listRoles()), call(AdminOpsService.users())])
+    const rolesPromise = can("roles", "view") ? call(AdminOpsService.listRoles()) : Promise.resolve({ roles: [] });
+    const usersPromise = can("team", "view") ? call(AdminOpsService.users()) : Promise.resolve([]);
+    Promise.all([rolesPromise, usersPromise])
       .then(([roles, users]) => {
         if (!live) return;
         const rolesOf = new Map<string, string[]>();
@@ -177,7 +182,7 @@ export function useOverview(p: Params): OverviewData {
   /* The owner filter is a server parameter, so changing it is a refetch — the
      same one the Deals module makes for its own Owner chip. */
   const api = useDealsApi(p.owner ? { owner: p.owner } : {});
-  const intake = useIntakeCounts();
+  const intake = useIntakeCounts(gates.enquiries);
   const dept = useDepartments(gates.team);
   useEffect(() => { if (gates.team) ensureAdopted(); }, [gates.team]);
 
@@ -266,8 +271,24 @@ export function useOverview(p: Params): OverviewData {
   ];
   const attentionState: LiveState = attnStates.includes("loading") ? "loading" : attnStates.includes("error") ? "error" : "ready";
   const attention = useMemo(
-    () => (attentionState === "loading" ? [] : attentionItems(deals, finLive, payLive, attTeam, ck.teamLive.today)),
-    [attentionState, deals, finLive, payLive, attTeam, ck]);
+    () => {
+      if (attentionState === "loading") return [];
+      const items = attentionItems(
+        gates.deals ? deals : null,
+        gates.finance ? finLive : null,
+        gates.payroll ? payLive : null,
+        gates.team ? attTeam : null,
+        ck.teamLive.today
+      );
+      return items.filter((item) => {
+        if (item.id.startsWith("agr:") && !can("agreements", "view")) return false;
+        if (item.id.startsWith("fin:") && !gates.finance && !gates.payroll) return false;
+        if ((item.id.startsWith("team:") || item.id.startsWith("load:")) && !gates.team) return false;
+        if (item.id.startsWith("work:") && !gates.team && !can("work", "view")) return false;
+        return true;
+      });
+    },
+    [attentionState, gates, deals, finLive, payLive, attTeam, ck]);
   /* PLANNING SIGNALS ON THE BACKEND (d8). Deals as before; the next-30-days
      tile is the Finance section's installments plus salaries/ `owed` (every
      unpaid, un-held slip); the workload tile is Operations' split; net cash and

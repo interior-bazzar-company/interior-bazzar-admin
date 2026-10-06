@@ -244,12 +244,14 @@ function ReviewCard({ r }: { r: ReviewRow }) {
         <section className="flex min-w-0 flex-col gap-2">
           <header className="flex items-center gap-2">
             <h4 className="label-mono">Plan</h4>
-            {plan && plan.submittedAt
-              ? <Pill xs dot tone="ok" text={"in " + fmtTime(plan.submittedAt)} />
-              : plan
-                ? <Pill xs dot tone="neutral" text="draft" title="Started and not submitted" />
-                : <Pill xs dot tone="warn" text="not submitted" />}
-            {r.planned ? (
+            {plan && plan.submittedAt ? (
+              <Pill xs dot tone="ok" text={"in " + fmtTime(plan.submittedAt)} />
+            ) : plan && plan.lines.length ? (
+              <Pill xs dot tone="neutral" text="draft" title="Started and not submitted" />
+            ) : (
+              <Pill xs tone="neutral" text="No morning plan" />
+            )}
+            {plan && plan.lines.length && r.planned ? (
               <span className="ml-auto text-xs font-medium text-secondary tnum">{r.done}/{r.planned} done</span>
             ) : null}
           </header>
@@ -296,26 +298,49 @@ function ReviewCard({ r }: { r: ReviewRow }) {
                 : <Pill xs dot tone="neutral" text="not due yet" />}
           </header>
           {rep && rep.submittedAt ? (
-            <>
-              {rep.achievement ? <p className="text-sm text-secondary"><span className="label-mono mr-1.5">Win</span>{rep.achievement}</p> : null}
-              {rep.pendingWork ? <p className="text-sm text-secondary"><span className="label-mono mr-1.5">Left over</span>{rep.pendingWork}</p> : null}
-              {rep.pendingReason ? <p className="text-sm text-secondary"><span className="label-mono mr-1.5">Why not done</span>{rep.pendingReason}</p> : null}
+            <div className="flex flex-col gap-2">
+              {rep.achievement ? (
+                <div>
+                  <div className="text-xs font-medium text-tertiary">Win:</div>
+                  <div className="text-sm text-secondary">{rep.achievement}</div>
+                </div>
+              ) : null}
+              {rep.pendingWork ? (
+                <div>
+                  <div className="text-xs font-medium text-tertiary">Left over:</div>
+                  <div className="text-sm text-secondary">{rep.pendingWork}</div>
+                </div>
+              ) : null}
+              {rep.pendingReason ? (
+                <div>
+                  <div className="text-xs font-medium text-tertiary">Why not done:</div>
+                  <div className="text-sm text-secondary">{rep.pendingReason}</div>
+                </div>
+              ) : null}
               {rep.blockers ? (
-                <p className="text-sm text-warning-primary">
-                  <span className="label-mono mr-1.5">Blocked</span>{rep.blockers}
-                </p>
+                <div>
+                  <div className="text-xs font-medium text-warning-primary">Blocked:</div>
+                  <div className="text-sm text-warning-primary">{rep.blockers}</div>
+                </div>
               ) : null}
               {rep.supportNeeded ? (
-                <p className="text-sm text-warning-primary">
-                  <span className="label-mono mr-1.5">Needs help</span>{rep.supportNeeded}
-                </p>
+                <div>
+                  <div className="text-xs font-medium text-warning-primary">Needs help:</div>
+                  <div className="text-sm text-warning-primary">{rep.supportNeeded}</div>
+                </div>
               ) : null}
               {rep.tomorrowPriority ? (
-                <p className="text-sm text-tertiary">
-                  <span className="label-mono mr-1.5">Tomorrow</span>{rep.tomorrowPriority}
-                </p>
+                <div>
+                  <div className="text-xs font-medium text-tertiary">Tomorrow:</div>
+                  <div className="text-sm text-tertiary">{rep.tomorrowPriority}</div>
+                </div>
               ) : null}
-              {rep.notes ? <p className="text-sm text-tertiary"><span className="label-mono mr-1.5">Notes</span>{rep.notes}</p> : null}
+              {rep.notes ? (
+                <div>
+                  <div className="text-xs font-medium text-tertiary">Notes:</div>
+                  <div className="text-sm text-tertiary">{rep.notes}</div>
+                </div>
+              ) : null}
               {rep.acknowledgedById || !canAcknowledge(r.member.memberId) ? null : (
                 <div className="mt-auto pt-1">
                   <Button color="secondary" size="xs" ico="eye" onClick={async () => {
@@ -324,7 +349,7 @@ function ReviewCard({ r }: { r: ReviewRow }) {
                   }}>Mark read</Button>
                 </div>
               )}
-            </>
+            </div>
           ) : (
             <p className="text-sm text-quaternary">
               {r.eodDue

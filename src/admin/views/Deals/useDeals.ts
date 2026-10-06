@@ -461,6 +461,10 @@ export function useDealsApi(p: Params): DealsApiState {
 
   useEffect(() => {
     let cancelled = false;
+    if (!can("deals", "view")) {
+      setState({ ...DEALS_API_IDLE, loading: false, forbidden: true, error: null });
+      return;
+    }
     setState((s) => ({ ...s, loading: true }));
     AdminOpsService.deals({
       stage: apiStageKey(p.stage), priority: apiPriorityKey(p.priority),
@@ -493,7 +497,7 @@ export function useDealsApi(p: Params): DealsApiState {
       publishCounts(counts);
       setState({
         loading: false, forbidden: false, error: null,
-        list: data.deals.map(adaptDeal),
+        list: data.deals.map(adaptDeal).filter((d: any) => !String(d.deal_id).includes("DEMO")),
         counts,
         stages: data.stages, priorities: data.priorities, tags: data.tags,
         // Placeholder until the roster lands (below); the rows are all that is
