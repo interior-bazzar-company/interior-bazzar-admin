@@ -33,6 +33,7 @@ import type { Params } from "./store";
 import { PERIOD, RECORD_TYPES, inr, useActiveCount, useSalaryRows, useSalaryTotals, useSubTotals } from "./store";
 import { ROUTE_OF, VIEW_OF } from "./Frame";
 import Subscriptions from "./Subscriptions";
+import Installments from "./Installments";
 import SubscriptionDetail from "./SubscriptionDetail";
 import Salaries from "./Salaries";
 import SalaryDetail from "./SalaryDetail";
@@ -221,6 +222,7 @@ export default function Finance() {
   }
 
   const shared = { p, onFilter, onSearch, onUnfilter, onParams };
+  if (view === "installments") return <Installments {...shared} />;
   if (view === "salaries") return <Salaries {...shared} />;
   if (view === "transactions") return <Transactions {...shared} />;
   if (view === "refunds") return <Refunds {...shared} />;

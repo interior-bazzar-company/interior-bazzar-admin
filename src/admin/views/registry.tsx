@@ -58,6 +58,7 @@ export const VIEWS: Record<string, ComponentType> = {
   "business-enquiries": BusinessEnquiries,
   users: Users,
   finance: Finance,
+  "finance-installments": Finance,
   /* The same component five times over, on purpose: Finance is ONE module
      reading ONE store, and the five keys exist so the sidebar can name what
      is inside it and the server can grant the sections separately. */

@@ -442,7 +442,7 @@ const slugOptions = (tags: Tag[]) => {
  *  It reads the store ITSELF rather than taking totals as a prop, minus the one
  *  dimension it filters on: scoping the counts by `status` would zero every
  *  other cell the moment one was pressed. */
-function WorkStats({ p }: { p: Record<string, string> }) {
+export function WorkStats({ p }: { p: Record<string, string> }) {
   const sansStatus = { ...p };
   delete sansStatus.status;
   const t = workTotals(useWork(sansStatus, "all"));

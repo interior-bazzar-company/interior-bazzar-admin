@@ -60,13 +60,17 @@ export function useActs(p: Params) {
   const closeDeal = (ref: string) => modal(<CloseModal dealRef={ref} onClose={close} done={done} />);
 
   return {
-    /* ------------------------------------------------------ create/edit */
     create() {
       if (!can("deals", "create"))
         return shell.toast("403 — you do not have deal-creation access.", "bad");
       modal(<CreateModal onClose={close} done={done} />, "lg");
     },
     edit,
+    createBusiness(ref: string) {
+      if (!can("deals", "create"))
+        return shell.toast("403 — you do not have business-creation access.", "bad");
+      modal(<CreateBusinessModal dealRef={ref} onClose={close} done={done} />, "lg");
+    },
     /* Read-only, so no permission check and no `done` — it writes nothing and
        there is nothing for the list to re-fetch afterwards. Anyone who can
        already open the deal can read the form that created it. */
@@ -1001,6 +1005,343 @@ function ReassignModal({ dealRef, onClose, done }: {
           hint="Mandatory, and enforced by the server. It is appended to the timeline as a remark.">
           <Textarea id="raReason" rows={3} ph="Owner on extended leave; customer needs a response this week." />
         </FormField>
+      </div>
+    </ModalShell>
+  );
+}
+
+/* -------------------------------------------------- CreateBusinessModal --- */
+export function CreateBusinessModal({
+  dealRef,
+  onClose,
+  done,
+}: {
+  dealRef: string;
+  onClose: () => void;
+  done: (msg: string, ref?: string) => void;
+}) {
+  const { deal, loading } = useDealApi(dealRef);
+  const shell = useShell();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<Refusal | null>(null);
+  const [createdResult, setCreatedResult] = useState<any | null>(null);
+
+  // Form fields
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [address, setAddress] = useState("");
+  const [pinCode, setPinCode] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const dl = deal as any;
+
+  // Auto-fill from deal data & submission
+  useEffect(() => {
+    if (!dl) return;
+    let subData: any = {};
+    if (dl.submission) {
+      try {
+        subData = JSON.parse(dl.submission);
+        if (typeof subData !== "object" || subData === null) subData = {};
+      } catch {
+        subData = {};
+      }
+    }
+
+    const initialBiz = (
+      dl.business_name ||
+      subData.businessName ||
+      subData.companyName ||
+      subData.firmName ||
+      dl.customer_name ||
+      ""
+    );
+    setBusinessName(initialBiz);
+
+    const emailStr = (dl.email || subData.email || "").trim().toLowerCase();
+    const phoneStr = (dl.phone || subData.phone || "").replace(/\D/g, "");
+    setUsername(emailStr || (phoneStr.length >= 10 ? phoneStr.slice(-10) : ""));
+
+    setCity(dl.city || subData.city || "");
+    setState(dl.state || subData.state || "");
+    setAddress(subData.address || subData.fullAddress || "");
+    setPinCode(subData.pinCode || subData.pincode || subData.pin || "");
+
+    // Generate strong default password
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    let randPass = "";
+    for (let i = 0; i < 8; i++) {
+      randPass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPassword(randPass + "!9");
+  }, [dl]);
+
+  const generateNewPassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    let randPass = "";
+    for (let i = 0; i < 8; i++) {
+      randPass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPassword(randPass + "!9");
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  const commit = () => {
+    if (!username.trim()) {
+      shell.toast("Username / Email is required", "bad");
+      return;
+    }
+    if (!password.trim()) {
+      shell.toast("Password is required", "bad");
+      return;
+    }
+
+    setBusy(true);
+    setErr(null);
+
+    AdminOpsService.createBusinessFromDeal(dealRef, {
+      username: username.trim(),
+      password: password.trim(),
+      businessName: businessName.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      address: address.trim(),
+      pinCode: pinCode.trim(),
+    })
+      .then((res) => {
+        setBusy(false);
+        if (res.response === false) {
+          setErr({
+            http: 400,
+            code: "creation_failed",
+            detail: (res.data as any)?.message || "Could not create business account.",
+          });
+          return;
+        }
+        render();
+        setCreatedResult(res.data);
+      })
+      .catch((e) => {
+        setBusy(false);
+        setErr(refusalOf(e));
+      });
+  };
+
+  if (loading || !dl) {
+    return (
+      <ModalShell title="Create Business Account" mono sub={dealRef} onClose={onClose}>
+        <PaneLoading label="Loading deal details…" />
+      </ModalShell>
+    );
+  }
+
+  // If successfully created, render ONE-TIME CREDENTIALS SCREEN
+  if (createdResult) {
+    const waMessage = `Hello *${createdResult.contactName || "Partner"}*,\n\nYour Interior Bazzar seller portal account is now active! 🚀\n\n🌐 *Login URL:* ${createdResult.loginUrl || "https://interiorbazzar.com/login"}\n👤 *Username:* ${createdResult.username}\n🔑 *Password:* ${createdResult.password}\n📦 *Plan:* ${createdResult.planName || "Active Subscription"}\n\nYou can log in now to update your profile, add catalogue items, and connect with clients across Interior Bazzar.\n\nNeed assistance? Feel free to reply here.`;
+
+    return (
+      <ModalShell
+        ico="shield"
+        title="Business Account Created"
+        mono
+        sub={<>{dealRef} · {createdResult.businessName}</>}
+        onClose={() => {
+          onClose();
+          done("Business created and linked to deal.", dealRef);
+        }}
+        actions={
+          <Button
+            color="primary"
+            onClick={() => {
+              onClose();
+              done("Business account active.", dealRef);
+            }}
+          >
+            Done
+          </Button>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Notice tone="ok">
+            Platform account, seller profile, and subscription plan have been activated and linked to this deal.
+          </Notice>
+
+          <div className="rounded-lg border border-warning-primary/30 bg-warning-primary/10 p-3 text-xs text-warning-primary">
+            <b>⚠️ Copy these credentials now.</b> For security reasons, the plaintext password is shown only once and cannot be recovered from the database later.
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-xl border border-secondary bg-surface-secondary/70 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-xs uppercase font-semibold tracking-wider text-tertiary">Username / Email</span>
+                <span className="font-mono text-base font-bold text-primary">{createdResult.username}</span>
+              </div>
+              <Button
+                size="xs"
+                color="secondary"
+                ico={copied === "user" ? "check" : "copy"}
+                onClick={() => copyToClipboard(createdResult.username, "user")}
+              >
+                {copied === "user" ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+
+            <div className="h-px w-full bg-border-secondary" />
+
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-xs uppercase font-semibold tracking-wider text-tertiary">Password</span>
+                <span className="font-mono text-base font-bold text-brand-secondary bg-brand-primary/10 px-2 py-0.5 rounded">
+                  {createdResult.password}
+                </span>
+              </div>
+              <Button
+                size="xs"
+                color="secondary"
+                ico={copied === "pass" ? "check" : "copy"}
+                onClick={() => copyToClipboard(createdResult.password, "pass")}
+              >
+                {copied === "pass" ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+
+            <div className="h-px w-full bg-border-secondary" />
+
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-xs uppercase font-semibold tracking-wider text-tertiary">Login Portal</span>
+                <span className="font-mono text-xs text-secondary">{createdResult.loginUrl}</span>
+              </div>
+              <Button
+                size="xs"
+                color="secondary"
+                ico={copied === "url" ? "check" : "copy"}
+                onClick={() => copyToClipboard(createdResult.loginUrl, "url")}
+              >
+                {copied === "url" ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-xl border border-brand/30 bg-brand-primary/5 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-primary">Send Welcome Message via WhatsApp</span>
+              <Button
+                color="primary"
+                size="sm"
+                ico="message"
+                onClick={() => {
+                  const phone = (createdResult.phone || "").replace(/\D/g, "");
+                  const cleanPhone = phone.length === 10 ? "91" + phone : phone;
+                  const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMessage)}`;
+                  window.open(waUrl, "_blank", "noopener,noreferrer");
+                }}
+              >
+                Open WhatsApp Chat
+              </Button>
+            </div>
+            <Button
+              color="secondary"
+              size="xs"
+              ico={copied === "wa" ? "check" : "copy"}
+              onClick={() => copyToClipboard(waMessage, "wa")}
+              className="self-start mt-1"
+            >
+              {copied === "wa" ? "WhatsApp Message Copied!" : "Copy Message Text"}
+            </Button>
+          </div>
+        </div>
+      </ModalShell>
+    );
+  }
+
+  const hasSubmission = Boolean(dl.submission);
+
+  return (
+    <ModalShell
+      ico="shield"
+      title="Create Business & Subscription Account"
+      mono
+      sub={<>{dealRef} · {dl.customer_name || "Client"}</>}
+      onClose={onClose}
+      actions={
+        <Commit
+          onClose={onClose}
+          onGo={commit}
+          busy={busy}
+          label="Create Account"
+          busyLabel="Creating Account…"
+          act="dl-create-business-go"
+          dealRef={dealRef}
+        />
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <ErrSlot err={err} />
+
+        {hasSubmission && (
+          <div className="flex items-center gap-2 rounded-lg border border-brand/20 bg-brand-primary/10 px-3 py-2 text-xs text-brand-secondary font-medium">
+            <span>✓ Pre-filled using intake & Google Form submission data</span>
+          </div>
+        )}
+
+        <FormSection title="Account Credentials">
+          <FormField label="Username / Login Email" req hint="The seller will use this to sign in.">
+            <Input
+              value={username}
+              onChange={setUsername}
+              ph="e.g. client@example.com or 9876543210"
+            />
+          </FormField>
+          <FormField label="Account Password" req hint="Temporary password for client onboarding.">
+            <div className="flex items-center gap-2">
+              <Input
+                value={password}
+                onChange={setPassword}
+                ph="Set password..."
+              />
+              <Button
+                color="secondary"
+                onClick={generateNewPassword}
+                title="Generate new secure password"
+              >
+                Generate
+              </Button>
+            </div>
+          </FormField>
+        </FormSection>
+
+        <FormSection title="Business Profile">
+          <FormField label="Business Name" req>
+            <Input
+              value={businessName}
+              onChange={setBusinessName}
+              ph="Firm / Company Name"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="City">
+              <Input value={city} onChange={setCity} ph="e.g. Delhi" />
+            </FormField>
+            <FormField label="State">
+              <Input value={state} onChange={setState} ph="e.g. Haryana" />
+            </FormField>
+          </div>
+          <FormField label="Address">
+            <Input value={address} onChange={setAddress} ph="Plot/Street/Area" />
+          </FormField>
+          <FormField label="Pin Code">
+            <Input value={pinCode} onChange={setPinCode} ph="6-digit pin" />
+          </FormField>
+        </FormSection>
       </div>
     </ModalShell>
   );

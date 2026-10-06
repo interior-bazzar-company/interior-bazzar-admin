@@ -26,6 +26,7 @@ import type { Params } from "./store";
    and every subscription record already lives under it. */
 export const ROUTE_OF: Record<string, string> = {
   subscriptions: "finance",
+  installments: "finance-installments",
   salaries: "finance-salaries",
   transactions: "finance-transactions",
   refunds: "finance-refunds",

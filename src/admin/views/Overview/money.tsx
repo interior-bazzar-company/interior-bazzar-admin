@@ -15,7 +15,7 @@ import { inr } from "../../ui/format";
 import { shortMonth } from "./derive";
 import { ColumnChart, SignedColumns } from "../charts";
 import type { ColumnPoint, Series, SignedPoint } from "../charts";
-import { Gone, Go, Kpi, Loading, Money, PlotSkeleton, Section, Stamp, Tip, Empty, rowLink } from "./bits";
+import { Go, Kpi, Loading, Money, PlotSkeleton, Section, Stamp, Tip, Empty, rowLink } from "./bits";
 import type { OverviewData } from "./store";
 import type { FinanceSource, Gaps } from "./financeLive";
 import { Retry } from "./top";
@@ -97,6 +97,8 @@ export function Finance({ d }: { d: OverviewData }) {
     const last = years[years.length - 1];
     if (last && last.label === y) last.n += 1; else years.push({ label: y, n: 1 });
   });
+
+  const of = "vs prev " + (d.periods.financeLive?.days || 30) + "d";
 
   return (
     <Section id="ov-finance" title="Finance" desc={d.periods.financeLive.label + " · cash, not profit"}

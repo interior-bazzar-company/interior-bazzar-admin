@@ -826,6 +826,34 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
           : <ChainAdd dl={dl} kind="invoice" docs={docs} />}
       </section>
 
+      {/* Seller Platform Account */}
+      <section className="flex flex-col gap-2">
+        <Eyebrow>Seller Account</Eyebrow>
+        {dl.customer ? (
+          <div className="flex items-center justify-between rounded-lg border border-secondary bg-surface-secondary/50 p-2.5 text-xs">
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-primary truncate">Linked Account</span>
+              <span className="font-mono text-tertiary truncate">@{typeof dl.customer === "object" ? dl.customer.username : dl.customer}</span>
+            </div>
+            <button
+              type="button"
+              className="ml-2 inline-flex items-center gap-1 rounded bg-brand-primary/10 px-2 py-1 text-xs font-semibold text-brand-secondary hover:underline cursor-pointer"
+              onClick={() => go(`#/users?search=${encodeURIComponent(typeof dl.customer === "object" ? dl.customer.username : dl.customer)}`)}
+            >
+              View User
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-brand bg-brand-primary/10 px-3 py-2 text-xs font-semibold text-brand-secondary outline-focus-ring transition duration-100 hover:bg-brand-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2"
+            onClick={() => useActs(p).createBusiness(dl.deal_id)}
+          >
+            <Icon name="shield" size="xs" />Create Business Account
+          </button>
+        )}
+      </section>
+
       <section className="flex flex-col gap-2">
         <Eyebrow>Actions</Eyebrow>
         <ChatActions dl={dl} p={p} />

@@ -747,11 +747,43 @@ export interface PlanPaymentsListResponse { payments: PlanPaymentRow[]; total: n
 export interface InstallmentRow {
   id: number | null; source: "stored" | "computed"; quotationId: number; quotationNumber: string | null;
   dealRef: string; seq: number; count: number; amountPaise: number; dueDate: string;
+  contactName?: string; businessName?: string; phone?: string; email?: string; city?: string;
+  planTitle?: string;
+  owner?: { id: number; username: string } | null;
+  dealStage?: { key: string; label: string; tone: string } | null;
+  daysOverdue?: number;
   status: VocabItem; graceEnds: string; invoiceId: number | null; invoiceNumber: string | null;
   paidAt: string | null; failedAt: string | null; failureReason: VocabItem | null; failureNote: string;
   cancelledAt: string | null; cancelledReason: string;
 }
 export interface InstallmentsListResponse { installments: InstallmentRow[]; total: number; pageNo: number; pageSize: number; }
+
+export interface DealCreateBusinessInput {
+  username?: string;
+  password?: string;
+  businessName?: string;
+  city?: string;
+  state?: string;
+  address?: string;
+  pinCode?: string;
+  category?: string;
+}
+
+export interface DealCreateBusinessResponse {
+  success: boolean;
+  dealRef: string;
+  userId: number;
+  username: string;
+  password: string;
+  businessId: number;
+  businessName: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  planName: string;
+  expireDate: string | null;
+  loginUrl: string;
+}
 
 /** interior_admin.OtherIncome — money in that is not a customer payment. */
 export interface IncomeRow {
@@ -1822,6 +1854,10 @@ export class AdminOpsService {
     return apiService.getPostApiResponse<{ flagged: number; cleared: number; scanned: number }>(
       `${base}/deals/stall-sweep/`, {});
   }
+  static createBusinessFromDeal(dealRef: string, data: DealCreateBusinessInput = {}) {
+    return apiService.getPostApiResponse<DealCreateBusinessResponse>(
+      `${base}/deals/${encodeURIComponent(dealRef)}/create-business/`, data);
+  }
 
   // ── Quotations (interior_admin QuotationsViews) ──
   static quotations(params: {
@@ -1988,7 +2024,10 @@ export class AdminOpsService {
   }
 
   // ── Installments / other income / tasks / attendance / value lists (overview d3) ──
-  static installments(params: { start?: string; end?: string; status?: string; deal?: string; pageNo?: number; pageSize?: number } = {}) {
+  static installments(params: {
+    start?: string; end?: string; status?: string; deal?: string;
+    search?: string; owner?: number; pageNo?: number; pageSize?: number;
+  } = {}) {
     return apiService.getGetApiResponse<InstallmentsListResponse>(`${base}/installments/${qs(params)}`);
   }
   static income(params: { start?: string; end?: string; kind?: string; state?: string; pageNo?: number; pageSize?: number } = {}) {

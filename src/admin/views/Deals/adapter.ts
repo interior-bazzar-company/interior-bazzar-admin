@@ -103,6 +103,7 @@ export function dateOnly(v: string | null | undefined): string | null {
 }
 
 export function adaptDeal(row: DealRow): any {
+  const stageInt = legacyStageInt({ key: row.stageKey, label: row.stageLabel, tone: row.stageTone });
   return {
     deal_id: row.ref,
     customer_name: row.contactName,
@@ -112,7 +113,7 @@ export function adaptDeal(row: DealRow): any {
     city: row.city,
     state: row.state || "",
     interested_in: row.interestedIn,
-    stage: legacyStageInt({ key: row.stageKey, label: row.stageLabel, tone: row.stageTone }),
+    stage: stageInt,
     priority: legacyPriorityInt({ key: row.priorityKey, label: row.priorityLabel }),
     // Paise on both sides — passed straight through, no arithmetic. null
     // ("not quoted yet") stays null; D.inr() already renders that as "—".
@@ -131,7 +132,7 @@ export function adaptDeal(row: DealRow): any {
     // rename — the one component that reads it parses it where a failure can
     // be shown instead of taking the whole deal list down with it.
     submission: row.submission || "",
-    is_stalled: (row.stageKey === "won" || row.stageKey === "lost" || row.stageKey === "dead" || stage >= 5) ? false : !!row.stalled,
+    is_stalled: (row.stageKey === "won" || row.stageKey === "lost" || row.stageKey === "dead" || stageInt >= 5) ? false : !!row.stalled,
     close_reason: row.lostReason || null,
     tags: row.tags || [],
     // duplicate_count intentionally OMITTED (stays undefined). The server

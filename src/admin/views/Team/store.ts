@@ -109,7 +109,7 @@ export function isHumanEmployee(m: {
   name?: string;
   username?: string;
   email?: string;
-  designation?: string;
+  designation?: string | { key?: string; label?: string; tone?: string } | null;
   roles?: (string | { name?: string })[];
   role?: string;
   is_service_account?: boolean;
@@ -119,7 +119,8 @@ export function isHumanEmployee(m: {
   const name = (m.name || "").trim().toLowerCase();
   const username = (m.username || "").trim().toLowerCase();
   const email = (m.email || "").trim().toLowerCase();
-  const designation = (m.designation || "").trim().toLowerCase();
+  const desigRaw = typeof m.designation === "object" && m.designation ? m.designation.label || m.designation.key : m.designation;
+  const designation = (desigRaw || "").trim().toLowerCase();
   const role = (m.role || "").trim().toLowerCase();
   const roles = (Array.isArray(m.roles) ? m.roles : []).map((r) =>
     (typeof r === "string" ? r : r?.name || "").trim().toLowerCase()

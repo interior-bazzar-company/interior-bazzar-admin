@@ -42,6 +42,7 @@ const ICON_OF: Record<string, string> = {
   "business-enquiries": "route",
   users: "users",
   finance: "cash",
+  "finance-installments": "clock",
   "finance-salaries": "team",
   "finance-transactions": "out",
   "finance-refunds": "refund",
@@ -159,6 +160,7 @@ const PROTO_ROWS: { key: string; label: string; group: string }[] = [
      Order is the order money moves: what was sold, what the team costs,
      everything else, what went back out, then all four read together. */
   { key: "finance", label: "Subscriptions", group: "Finance" },
+  { key: "finance-installments", label: "Receivables", group: "Finance" },
   { key: "finance-salaries", label: "Salaries A/C", group: "Finance" },
   { key: "finance-transactions", label: "Add Transaction", group: "Finance" },
   { key: "finance-refunds", label: "Refunds", group: "Finance" },
