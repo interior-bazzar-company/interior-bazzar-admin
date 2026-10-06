@@ -1095,6 +1095,10 @@ export function CreateBusinessModal({
   };
 
   const commit = () => {
+    if (dl && dl.stage !== STAGE.WON) {
+      shell.toast("Only Won deals can create a business account.", "warn");
+      return;
+    }
     if (!username.trim()) {
       shell.toast("Username / Email is required", "bad");
       return;

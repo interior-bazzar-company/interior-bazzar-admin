@@ -722,6 +722,7 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
 
 /* ========================================================== CONTEXT PANE === */
 function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
+  const shell = useShell();
   const acts = useActs(p);
   /* One fetch for the whole chain half of this pane — the Quotation block, the
      Invoices block AND the two chain actions all read it, so they cannot
@@ -848,7 +849,13 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
           <button
             type="button"
             className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-brand bg-brand-primary/10 px-3 py-2 text-xs font-semibold text-brand-secondary outline-focus-ring transition duration-100 hover:bg-brand-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2"
-            onClick={() => acts.createBusiness(dl.deal_id)}
+            onClick={() => {
+              if (dl.stage !== STAGE.WON) {
+                shell.toast("Only Won deals can create a business account.", "warn");
+                return;
+              }
+              acts.createBusiness(dl.deal_id);
+            }}
           >
             <Icon name="shield" size="xs" />Create Business Account
           </button>

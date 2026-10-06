@@ -120,6 +120,7 @@ export function adaptDeal(row: DealRow): any {
     deal_value: row.valuePaise,
     owner_id: row.owner ? row.owner.name : null,
     co_owner_id: row.coOwner ? row.coOwner.name : null,
+    customer: row.customer || null,
     // No split ratio in this API contract — left unset rather than guessed;
     // KvList's co-owner row renders it as an empty parenthetical, not a 0/—.
     created_at: dateOnly(row.createdAt),
