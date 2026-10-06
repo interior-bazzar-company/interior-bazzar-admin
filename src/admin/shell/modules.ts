@@ -160,7 +160,7 @@ const PROTO_ROWS: { key: string; label: string; group: string }[] = [
      Order is the order money moves: what was sold, what the team costs,
      everything else, what went back out, then all four read together. */
   { key: "finance", label: "Subscriptions", group: "Finance" },
-  { key: "finance-installments", label: "Receivables", group: "Finance" },
+  { key: "finance-installments", label: "Installments & Receivables", group: "Finance" },
   { key: "finance-salaries", label: "Salaries A/C", group: "Finance" },
   { key: "finance-transactions", label: "Add Transaction", group: "Finance" },
   { key: "finance-refunds", label: "Refunds", group: "Finance" },

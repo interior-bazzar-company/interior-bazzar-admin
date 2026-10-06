@@ -72,7 +72,7 @@ export const HIDDEN_MODULES = new Set(["design", "payments", "finance-bank", "ba
  *  `can(key)` like every other module. A row with no endpoints behind it
  *  refuses nothing and leaks nothing; a key in this set refuses nothing and
  *  leaks everything. */
-export const PROTO_MODULES = new Set<string>([]);
+export const PROTO_MODULES = new Set<string>(["finance-installments"]);
 
 export function getSession(): MePermissions | null {
   return session;
