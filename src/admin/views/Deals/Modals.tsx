@@ -19,7 +19,7 @@
    list until intake started storing the submitted form on `Deal.submission`;
    it is back, at the bottom of this file, because now there is a model.
    ============================================================================= */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   Alert, Button, DateInput, FieldRow, FormField, FormSection, Input, KvList, ModalShell, Notice,
@@ -1037,15 +1037,19 @@ export function CreateBusinessModal({
   const [copied, setCopied] = useState<string | null>(null);
 
   const dl = deal as any;
+  const initialChecked = useRef(false);
 
   // Auto-fill from deal data & submission
   useEffect(() => {
-    if (!dl) return;
-    if (dl.customer) {
-      const usernameStr = typeof dl.customer === "object" ? dl.customer.username : dl.customer;
-      shell.toast(`A business account (@${usernameStr}) is already created for this deal.`, "warn");
-      onClose();
-      return;
+    if (!dl || createdResult) return;
+    if (!initialChecked.current) {
+      initialChecked.current = true;
+      if (dl.customer) {
+        const usernameStr = typeof dl.customer === "object" ? dl.customer.username : dl.customer;
+        shell.toast(`A business account (@${usernameStr}) is already created for this deal.`, "warn");
+        onClose();
+        return;
+      }
     }
     let subData: any = {};
     if (dl.submission) {
@@ -1083,7 +1087,7 @@ export function CreateBusinessModal({
       randPass += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setPassword(randPass + "!9");
-  }, [dl]);
+  }, [dl, createdResult]);
 
   const generateNewPassword = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -1153,7 +1157,6 @@ export function CreateBusinessModal({
           });
           return;
         }
-        render();
         setCreatedResult(res.data);
       })
       .catch((e) => {
@@ -1186,24 +1189,20 @@ export function CreateBusinessModal({
   if (createdResult) {
     const waMessage = `Hello *${createdResult.contactName || "Partner"}*,\n\nYour Interior Bazzar seller portal account is now active! 🚀\n\n🌐 *Login URL:* ${createdResult.loginUrl || "https://interiorbazzar.com/login"}\n👤 *Username:* ${createdResult.username}\n🔑 *Password:* ${createdResult.password}\n📦 *Plan:* ${createdResult.planName || "Active Subscription"}\n\nYou can log in now to update your profile, add catalogue items, and connect with clients across Interior Bazzar.\n\nNeed assistance? Feel free to reply here.`;
 
+    const finish = () => {
+      onClose();
+      done("Business account active.", dealRef);
+    };
+
     return (
       <ModalShell
         ico="shield"
         title="Business Account Created"
         mono
         sub={<>{dealRef} · {createdResult.businessName}</>}
-        onClose={() => {
-          onClose();
-          done("Business created and linked to deal.", dealRef);
-        }}
+        onClose={finish}
         actions={
-          <Button
-            color="primary"
-            onClick={() => {
-              onClose();
-              done("Business account active.", dealRef);
-            }}
-          >
+          <Button color="primary" onClick={finish}>
             Done
           </Button>
         }
