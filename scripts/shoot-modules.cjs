@@ -58,7 +58,7 @@ const ROUTES = [
   ["users", "Users Management", "Business Ops"],
   ["finance", "Subscriptions", "Finance"],
   ["finance-salaries", "Salaries A/C", "Finance"],
-  ["finance-transactions", "Other Transaction", "Finance"],
+  ["finance-transactions", "Add Transaction", "Finance"],
   ["finance-refunds", "Refunds", "Finance"],
   ["finance-analytics", "Analytics", "Finance"],
   ["team", "Members", "Team"],

@@ -174,7 +174,7 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
 
   return (
     <Frame toast={toast}
-      title="Other Transaction"
+      title="Add Transaction"
       meta={
         <>
           <span className="label-mono">

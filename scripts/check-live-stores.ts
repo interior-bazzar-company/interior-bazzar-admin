@@ -118,7 +118,7 @@ const ok = (what: string, cond: boolean) => { console.log("  " + (cond ? "ok  " 
     && [...F.METRICS, ...F.KPIS, ...F.PAYROLL_METRICS].every((d) => !!d.formula && !!d.caution)
     && F.kpis().every((k) => !!F.kpiMeta(k.key)) && !!F.SLIP_RULE && !!F.decision("FN-OD-07"));
   ok("finance section names are the sidebar's", F.RECORD_TYPES.map((r) => r.label).join("|")
-    === "Subscriptions|Salaries A/C|Other Transaction|Refunds|Analytics");
+    === "Subscriptions|Salaries A/C|Add Transaction|Refunds|Analytics");
   ok("every subscription's source and status is a served key", F.readSubscriptions().every((s) =>
     !!F.sourceMeta(s.source) && !!F.subStatusMeta(s.status)));
   await F.bootFinanceLive();

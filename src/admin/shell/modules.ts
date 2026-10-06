@@ -108,6 +108,7 @@ const LABEL_OVERRIDE: Record<string, string> = {
      here too. Same treatment as `team`, and the same fix: a Module-row update
      on the server, after which both entries go. */
   resources: "Data Forms",
+  "finance-transactions": "Add Transaction",
 };
 
 /* ---------------------------------------------------------- proto rows ---
@@ -159,7 +160,7 @@ const PROTO_ROWS: { key: string; label: string; group: string }[] = [
      everything else, what went back out, then all four read together. */
   { key: "finance", label: "Subscriptions", group: "Finance" },
   { key: "finance-salaries", label: "Salaries A/C", group: "Finance" },
-  { key: "finance-transactions", label: "Other Transaction", group: "Finance" },
+  { key: "finance-transactions", label: "Add Transaction", group: "Finance" },
   { key: "finance-refunds", label: "Refunds", group: "Finance" },
   { key: "finance-analytics", label: "Analytics", group: "Finance" },
 

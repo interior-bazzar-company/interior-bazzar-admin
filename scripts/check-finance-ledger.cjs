@@ -1189,7 +1189,7 @@ void (async () => {
   ok("...and its steps reconcile to its closing figure",
     w[0].paise + w[1].paise - w[2].paise - w[3].paise - w[4].paise, w[5].paise);
   ok("NO AT-RISK ROW LABELS ITS LINK WITH A SECTION NAME — the sidebar owns that job",
-    S.atRisk().filter((r) => ["Subscriptions", "Refunds", "Other Transaction", "Salaries A/C"]
+    S.atRisk().filter((r) => ["Subscriptions", "Refunds", "Add Transaction", "Other Transaction", "Salaries A/C"]
       .indexOf(r.toLabel) >= 0).map((r) => r.key), []);
   ok("a month series needs two readings, so none is drawn from nothing", S.kpiSeries("burn"), null);
 

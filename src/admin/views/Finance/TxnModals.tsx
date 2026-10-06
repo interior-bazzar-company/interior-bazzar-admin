@@ -79,20 +79,23 @@ function TxnFields({ f, set, tags, onErr }: {
           that is not free and the only thing worth knowing while picking
           one. It was a description line under every option; as a group label
           it is structure instead of prose — the same fact, read in a glance,
-          and the option itself is just the tag's name.
+          and the option itself is just the tag's name. */}
 
-          `bill` rides the option because a tag that requires one will refuse
-          the write later, and finding that out at the button is worse than
-          reading it here. */}
-      <Field label="Tag">
-        <SelectInput ariaLabel="Tag" value={f.tagKey} onChange={(v) => set({ tagKey: v })}
-          options={[{ v: "", l: "Pick a tag…" }].concat(
-            TAG_KINDS.flatMap((k) => tags.filter((t) => t.kind === k.key).map((t) => ({
-              v: t.tagKey,
-              l: k.label + " → " + t.label
-                + (t.active ? "" : " · inactive")
-                + (t.proofRequired ? " · bill required" : ""),
-            }))))} />
+      <Field label="Tag" help="Pick an existing tag from suggestions or type a new one to save.">
+        <Input
+          ariaLabel="Tag"
+          value={f.tagKey}
+          list="txn-tag-list"
+          ph="Pick a tag or type a new one…"
+          onChange={(v) => set({ tagKey: v })}
+        />
+        <datalist id="txn-tag-list">
+          {tags.map((t) => (
+            <option key={t.tagKey} value={t.label}>
+              {t.label + (t.proofRequired ? " · bill required" : "")}
+            </option>
+          ))}
+        </datalist>
       </Field>
 
       <Field label="Amount"><RupeeInput value={f.amount} onChange={(v) => set({ amount: v })} /></Field>
@@ -202,7 +205,6 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
 
   const set = (patch: Partial<TxnForm>) => { setF((prev) => ({ ...prev, ...patch })); setErr(""); };
   const isIn = f.direction === "in";
-  const tag = tags.filter((t) => t.tagKey === f.tagKey)[0] || null;
   const account = COMPANY_ACCOUNTS.filter((x) => x.accountId === f.accountId)[0] || null;
   const paise = toPaise(f.amount);
 
@@ -235,14 +237,30 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
        half-typed "1,2" or an empty box never becomes a number, let alone NaN
        in the field the person is still looking at. */
     if (paise === null) { setErr("Enter the amount in whole rupees (paise to two decimals), above zero."); return; }
+
+    let targetTagKey = f.tagKey.trim();
+    const matchedTag = tags.find((t) => t.tagKey === targetTagKey || t.label.toLowerCase() === targetTagKey.toLowerCase());
+    let displayTagLabel = targetTagKey;
+
+    if (matchedTag) {
+      targetTagKey = matchedTag.tagKey;
+      displayTagLabel = matchedTag.label;
+    } else if (!isIn && targetTagKey) {
+      const created = await addTag(targetTagKey, "variable", null, false);
+      if (created.error) { setErr(created.error); return; }
+      if (created.tagKey) {
+        targetTagKey = created.tagKey;
+      }
+    }
+
     const res = await recordTransaction({
-      direction: f.direction, tagKey: f.tagKey, amountPaise: paise, description: f.description,
+      direction: f.direction, tagKey: targetTagKey, amountPaise: paise, description: f.description,
       party: f.party, mode: f.mode, reference: f.reference, valueDate: f.valueDate,
       accountId: f.accountId, creditKind: isIn ? f.creditKind || null : null,
       bill: f.bill || { filename: "", mime: "" },
     });
     if (res.error) { setErr(res.error); return; }
-    setDone({ txnId: res.txnId as string, paise, tag: tag ? tag.label : "the tag" });
+    setDone({ txnId: res.txnId as string, paise, tag: displayTagLabel || "the tag" });
   };
 
   return (

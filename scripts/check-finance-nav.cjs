@@ -47,7 +47,7 @@ const SERVED = FINANCE_ROWS.map((m) => m.key);
 const SECTIONS = [
   { key: "finance", label: "Subscriptions", icon: "cash" },
   { key: "finance-salaries", label: "Salaries A/C", icon: "team" },
-  { key: "finance-transactions", label: "Other Transaction", icon: "out" },
+  { key: "finance-transactions", label: "Add Transaction", icon: "out" },
   { key: "finance-refunds", label: "Refunds", icon: "refund" },
   { key: "finance-analytics", label: "Analytics", icon: "chart" },
 ];

@@ -42,7 +42,7 @@ let unreachable = false;
  *  server-side and this set goes with them. Lives in this file (not modules.ts)
  *  because modules.ts already imports from here — the other direction would
  *  be a cycle. */
-export const HIDDEN_MODULES = new Set(["design", "payments"]);
+export const HIDDEN_MODULES = new Set(["design", "payments", "finance-bank", "bank", "finance-reconciliation", "reconciliation"]);
 
 /** THE MIRROR IMAGE OF HIDDEN_MODULES, AND NOW EMPTY — keep it that way.
  *
