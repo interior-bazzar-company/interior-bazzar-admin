@@ -1409,7 +1409,7 @@ export function CreateBusinessModal({
    email, city, state, and address on the deal.
    ============================================================================= */
 export function LinkIntakeModal({ dealRef, onClose, done }: {
-  dealRef: string; onClose: () => void; done: () => void;
+  dealRef: string; onClose: () => void; done: (msg: string, ref?: string | null) => void;
 }) {
   const shell = useShell();
   const [loading, setLoading] = useState(true);
@@ -1441,7 +1441,7 @@ export function LinkIntakeModal({ dealRef, onClose, done }: {
     call(AdminOpsService.linkIntakeToDeal(dealRef, item.id))
       .then(() => {
         shell.toast(`Connected form submission to ${dealRef}. Form data applied with priority.`, "good");
-        done();
+        done("Connected form submission to " + dealRef, dealRef);
         onClose();
       })
       .catch((err: any) => {
@@ -1454,7 +1454,6 @@ export function LinkIntakeModal({ dealRef, onClose, done }: {
     <ModalShell
       title={`Connect Google Form Intake — ${dealRef}`}
       onClose={onClose}
-      wide
     >
       <div className="flex flex-col gap-4 text-xs">
         <Notice tone="info">
@@ -1472,7 +1471,7 @@ export function LinkIntakeModal({ dealRef, onClose, done }: {
         </div>
 
         {loading ? (
-          <PaneLoading text="Searching unassigned submissions…" />
+          <PaneLoading label="Searching unassigned submissions…" />
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-secondary py-10 text-center text-secondary">
             <p className="font-semibold text-primary">No unassigned intake submissions found</p>
