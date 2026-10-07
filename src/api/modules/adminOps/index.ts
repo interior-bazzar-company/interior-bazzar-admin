@@ -769,6 +769,26 @@ export interface DealCreateBusinessInput {
   category?: string;
 }
 
+export interface CustomerIntakeRow {
+  id: number;
+  clientName: string;
+  businessName: string;
+  phone: string;
+  email: string;
+  city: string;
+  state: string;
+  gstNumber: string;
+  address: string;
+  dealRefProvided: string;
+  createdAt: string;
+  payload: Record<string, any>;
+}
+
+export interface UnassignedIntakesResponse {
+  items: CustomerIntakeRow[];
+  count: number;
+}
+
 export interface DealCreateBusinessResponse {
   success: boolean;
   dealRef: string;
@@ -1857,6 +1877,14 @@ export class AdminOpsService {
   static createBusinessFromDeal(dealRef: string, data: DealCreateBusinessInput = {}) {
     return apiService.getPostApiResponse<DealCreateBusinessResponse>(
       `${base}/deals/${encodeURIComponent(dealRef)}/create-business/`, data);
+  }
+  static getUnassignedIntakes(q?: string) {
+    return apiService.getGetApiResponse<UnassignedIntakesResponse>(
+      `${base}/deals/intakes/unassigned/${qs({ q })}`);
+  }
+  static linkIntakeToDeal(dealRef: string, intakeId: number) {
+    return apiService.getPostApiResponse<{ message: string; dealRef: string; submission: any }>(
+      `${base}/deals/${encodeURIComponent(dealRef)}/link-intake/`, { intakeId });
   }
 
   // ── Quotations (interior_admin QuotationsViews) ──

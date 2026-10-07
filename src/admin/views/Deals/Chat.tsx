@@ -828,6 +828,55 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
           : <ChainAdd dl={dl} kind="invoice" docs={docs} />}
       </section>
 
+      {/* Customer Intake / Onboarding Form */}
+      <section className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <Eyebrow>Customer Intake Form</Eyebrow>
+          <button
+            type="button"
+            className="text-[11px] font-semibold text-brand-secondary hover:underline cursor-pointer"
+            onClick={() => acts.linkIntake(dl.deal_id)}
+          >
+            {dl.submission ? "Re-link Form" : "Connect Form"}
+          </button>
+        </div>
+        {dl.submission ? (
+          <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5 text-xs">
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-emerald-700 dark:text-emerald-300 truncate flex items-center gap-1">
+                <Icon name="check" size="xs" /> Form Captured
+              </span>
+              <span className="text-tertiary truncate text-[11px]">
+                {(() => {
+                  try {
+                    const parsed = JSON.parse(dl.submission);
+                    const cnt = parsed._submissionCount || 1;
+                    return `Submission #${cnt} active`;
+                  } catch {
+                    return "Intake data connected";
+                  }
+                })()}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="ml-2 inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:underline cursor-pointer"
+              onClick={() => acts.response(dl.deal_id)}
+            >
+              View Answers
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-secondary bg-surface-secondary/40 px-3 py-2 text-xs font-semibold text-secondary outline-focus-ring transition duration-100 hover:border-brand-primary hover:text-brand-secondary"
+            onClick={() => acts.linkIntake(dl.deal_id)}
+          >
+            <Icon name="link" size="xs" /> Search & Link Form
+          </button>
+        )}
+      </section>
+
       {/* Seller Platform Account */}
       <section className="flex flex-col gap-2">
         <Eyebrow>Seller Account</Eyebrow>
@@ -992,22 +1041,17 @@ function chainGate(dl: any, kind: "quotation" | "invoice", docs: DealDocsState):
    stage on its own stage button. Add remark is the composer to the left. */
 function ChatActions({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
-  const pop = usePop();
   return (
     <div className="grid grid-cols-2 gap-2">
       <Button color="secondary" ico="doc" data-act="dl-edit" data-ref={dl.deal_id}
         onClick={() => acts.edit(dl.deal_id)}>Edit deal</Button>
-      {/* Real on a deal that arrived through a funnel, gated on one that did
-          not. The test is the STORED FORM, not the enquiry ref: a ref is a
-          string somebody can type into Edit deal, and gating on it would offer
-          an empty dialog on every hand-keyed deal that happens to carry one. */}
       {dl.submission
         ? <Button color="secondary" ico="quote" data-act="dl-response" data-ref={dl.deal_id}
             title="The intake form this deal was created from"
             onClick={() => acts.response(dl.deal_id)}>View response</Button>
-        : <Button color="secondary" ico="lock" data-act="dl-gate"
-            onClick={(e?: ReactMouseEvent<HTMLButtonElement>) => e && pop(e, <GateBody title={RESPONSE_GATE.title} body={RESPONSE_GATE.body} />, { width: 288 })}>
-            View response</Button>}
+        : <Button color="secondary" ico="link" data-act="dl-link-intake"
+            title="Search and connect unassigned Google Form submission"
+            onClick={() => acts.linkIntake(dl.deal_id)}>Connect form</Button>}
     </div>
   );
 }

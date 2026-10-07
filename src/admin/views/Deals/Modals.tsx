@@ -71,6 +71,11 @@ export function useActs(p: Params) {
         return shell.toast("403 — you do not have business-creation access.", "bad");
       modal(<CreateBusinessModal dealRef={ref} onClose={close} done={done} />, "lg");
     },
+    linkIntake(ref: string) {
+      if (!can("deals", "edit"))
+        return shell.toast("403 — you do not have edit access.", "bad");
+      modal(<LinkIntakeModal dealRef={ref} onClose={close} done={done} />, "wide");
+    },
     /* Read-only, so no permission check and no `done` — it writes nothing and
        there is nothing for the list to re-fetch afterwards. Anyone who can
        already open the deal can read the form that created it. */
@@ -1384,3 +1389,148 @@ export function CreateBusinessModal({
     </ModalShell>
   );
 }
+
+/* =============================================================================
+   LINK INTAKE MODAL — Search and connect unassigned Google Form / Webhook submissions.
+   Form data takes priority upon connecting, updating business name, phone,
+   email, city, state, and address on the deal.
+   ============================================================================= */
+export function LinkIntakeModal({ dealRef, onClose, done }: {
+  dealRef: string; onClose: () => void; done: () => void;
+}) {
+  const shell = useShell();
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [items, setItems] = useState<any[]>([]);
+  const [linkingId, setLinkingId] = useState<number | null>(null);
+
+  const fetchSubmissions = (searchQuery: string) => {
+    setLoading(true);
+    call(AdminOpsService.getUnassignedIntakes(searchQuery))
+      .then((res: any) => {
+        setItems(res?.items || []);
+      })
+      .catch((err: any) => {
+        shell.toast(err?.message || "Could not fetch unassigned submissions", "bad");
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchSubmissions(query);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const handleLink = (item: any) => {
+    setLinkingId(item.id);
+    call(AdminOpsService.linkIntakeToDeal(dealRef, item.id))
+      .then(() => {
+        shell.toast(`Connected form submission to ${dealRef}. Form data applied with priority.`, "good");
+        done();
+        onClose();
+      })
+      .catch((err: any) => {
+        shell.toast(err?.message || "Failed to link submission", "bad");
+      })
+      .finally(() => setLinkingId(null));
+  };
+
+  return (
+    <ModalShell
+      title={`Connect Google Form Intake — ${dealRef}`}
+      onClose={onClose}
+      wide
+    >
+      <div className="flex flex-col gap-4 text-xs">
+        <Notice tone="info">
+          Search and connect unassigned intake submissions (e.g. client used company credentials in Google Form). 
+          <strong> Note: Form data will update this deal with highest priority.</strong>
+        </Notice>
+
+        <div className="flex items-center gap-2">
+          <Input
+            value={query}
+            onChange={setQuery}
+            ph="Search by business name, contact person, phone, email, or city..."
+            autoFocus
+          />
+        </div>
+
+        {loading ? (
+          <PaneLoading text="Searching unassigned submissions…" />
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-secondary py-10 text-center text-secondary">
+            <p className="font-semibold text-primary">No unassigned intake submissions found</p>
+            <p className="mt-1 text-xs text-tertiary">
+              {query ? `No unlinked submissions matching "${query}"` : "All Google Form submissions are already linked to deals."}
+            </p>
+          </div>
+        ) : (
+          <div className="flex max-h-[420px] flex-col gap-3 overflow-y-auto pr-1">
+            {items.map((item) => {
+              const isLinking = linkingId === item.id;
+              const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleString() : "Recently";
+              return (
+                <div
+                  key={item.id}
+                  className="flex flex-col justify-between gap-3 rounded-lg border border-secondary bg-surface-secondary/40 p-3.5 transition hover:border-brand-primary sm:flex-row sm:items-center"
+                >
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-primary text-sm">
+                        {item.businessName || item.clientName || "Unnamed Submission"}
+                      </span>
+                      {item.dealRefProvided && (
+                        <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-tertiary">
+                          Target Ref: {item.dealRefProvided}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-quaternary">{dateStr}</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-secondary text-xs mt-0.5">
+                      {item.clientName && (
+                        <span><strong className="text-tertiary">Contact:</strong> {item.clientName}</span>
+                      )}
+                      {item.phone && (
+                        <span><strong className="text-tertiary">Phone:</strong> {item.phone}</span>
+                      )}
+                      {item.email && (
+                        <span><strong className="text-tertiary">Email:</strong> {item.email}</span>
+                      )}
+                      {(item.city || item.state) && (
+                        <span><strong className="text-tertiary">Location:</strong> {[item.city, item.state].filter(Boolean).join(", ")}</span>
+                      )}
+                      {item.gstNumber && (
+                        <span><strong className="text-tertiary">GSTIN:</strong> {item.gstNumber}</span>
+                      )}
+                    </div>
+
+                    {item.address && (
+                      <p className="text-[11px] text-tertiary truncate mt-0.5">
+                        {item.address}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center shrink-0">
+                    <Button
+                      color="primary"
+                      disabled={isLinking}
+                      onClick={() => handleLink(item)}
+                    >
+                      {isLinking ? "Connecting…" : "Connect to Deal"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </ModalShell>
+  );
+}
+
