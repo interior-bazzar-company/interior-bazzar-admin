@@ -155,15 +155,18 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
 function ActionBar({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
   const ref = dl.deal_id;
+  const hasIntake = Boolean(dl.has_intake);
+  const hasFunnel = Boolean(dl.has_funnel || (dl.submission && !hasIntake));
   const items = [
     { icon: "rupee", label: dl.deal_value ? "Change deal value" : "Set deal value", act: () => acts.value(ref) },
     { icon: "route", label: "Change stage", act: () => acts.stage(ref, dl.stage) },
     { icon: "tag", label: "Lists", act: () => acts.tags(ref) },
-    ...(dl.submission
+    ...(hasIntake
       ? [{ icon: "quote", label: "View intake response", act: () => acts.response(ref) },
          { icon: "link", label: "Re-link intake form", act: () => acts.linkIntake(ref) }]
       : [{ icon: "copy", label: "Copy prefilled form link", act: () => acts.copyFormLink(dl) },
          { icon: "link", label: "Search & link intake form", act: () => acts.linkIntake(ref) }]),
+    ...(hasFunnel ? [{ icon: "quote", label: "View lead funnel answers", act: () => acts.response(ref) }] : []),
     ...(dl.stage === STAGE.WON && !dl.customer ? [{ icon: "shield", label: "Create business account", act: () => acts.createBusiness(ref) }] : []),
     ...(head() ? [{ icon: "recon", label: "Reassign", act: () => acts.reassign(ref) }] : []),
     ...(head() ? [{ icon: "x", label: "Close deal", act: () => acts.closeDeal(ref), tone: "bad" }] : []),

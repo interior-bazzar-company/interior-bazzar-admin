@@ -1054,13 +1054,14 @@ function chainGate(dl: any, kind: "quotation" | "invoice", docs: DealDocsState):
    stage on its own stage button. Add remark is the composer to the left. */
 function ChatActions({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
+  const hasIntake = Boolean(dl.has_intake);
   return (
     <div className="grid grid-cols-2 gap-2">
       <Button color="secondary" ico="doc" data-act="dl-edit" data-ref={dl.deal_id}
         onClick={() => acts.edit(dl.deal_id)}>Edit deal</Button>
-      {dl.submission
+      {hasIntake
         ? <Button color="secondary" ico="quote" data-act="dl-response" data-ref={dl.deal_id}
-            title="The intake form this deal was created from"
+            title="View submitted onboarding intake form"
             onClick={() => acts.response(dl.deal_id)}>View response</Button>
         : <Button color="secondary" ico="copy" data-act="dl-copy-form"
             title="Copy prefilled Google Form link with deal details to send to client"

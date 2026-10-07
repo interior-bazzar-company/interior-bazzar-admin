@@ -36,6 +36,7 @@ import {
 import type { Params, Refusal } from "./useDeals";
 import { ErrSlot, StageChip } from "./bits";
 import { TagsModal } from "./Tags";
+import { isIntakeSubmitted } from "./adapter";
 
 /* ==========================================================================
    THE ACTION TABLE
@@ -546,32 +547,33 @@ const humanKey = (k: string) => k.replace(/[_-]+/g, " ").trim() || k;
 
 function ResponseModal({ dealRef, onClose }: { dealRef: string; onClose: () => void }) {
   const { dl, loading } = useDeal(dealRef);
-  if (loading) return <Opening title="Funnel response" dealRef={dealRef} onClose={onClose} />;
-  if (!dl) return <Gone title="Funnel response" dealRef={dealRef} onClose={onClose} />;
+  if (loading) return <Opening title="Form response" dealRef={dealRef} onClose={onClose} />;
+  if (!dl) return <Gone title="Form response" dealRef={dealRef} onClose={onClose} />;
 
+  const isIntake = isIntakeSubmitted(dl.submission || "");
   const answers = parseSubmission(dl.submission || "");
-  const keys = answers ? Object.keys(answers) : [];
+  
+  // Filter out internal metadata keys from main view
+  const keys = answers
+    ? Object.keys(answers).filter((k) => !k.startsWith("_") && k !== "is_google_form")
+    : [];
+
+  const modalTitle = isIntake ? "Business Intake Response" : "Marketing Funnel Survey";
+  const subTitle = isIntake ? (dl.business_name || dl.customer_name) : dl.customer_name;
+  const subCount = answers?._submissionCount ? Number(answers._submissionCount) : 1;
+  const lastSubAt = answers?._lastSubmittedAt || null;
 
   return (
-    <ModalShell ico="quote" tone="brand" title="Funnel response" mono
-      sub={<>{dealRef} · {dl.customer_name}</>} onClose={onClose}
+    <ModalShell ico="quote" tone="brand" title={modalTitle} mono
+      sub={<>{dealRef} · {subTitle}{subCount > 1 ? <> · <Pill xs tone="info" text={`Submission #${subCount}`} /></> : null}</>}
+      onClose={onClose}
       actions={<Button color="secondary" data-close="1" onClick={onClose}>Close</Button>}>
-      {/* Which form, and when. A caption rather than the first answer — the
-          same submission read six months later has to say which funnel asked
-          these questions, because the funnel has moved on since. */}
-      <FormSection title="What they submitted" descInline desc={<>
-        {dl.enquiry_id ? <>Received through <span className="font-mono">{dl.enquiry_id}</span></> : "Received through the intake form"}
-        {dl.created_at ? <> on {D.fmtDate(dl.created_at)}</> : null}
-        . These are the visitor's own answers, exactly as submitted — nothing here is editable,
-        and correcting the deal's own fields on Edit deal does not change this record.
+      <FormSection title={isIntake ? "Customer Intake Form Data" : "Inbound Lead Qualification Answers"} descInline desc={<>
+        {isIntake
+          ? <>Received via <b>Google Form onboarding intake</b>{lastSubAt ? <> on {D.fmtDate(lastSubAt)}</> : (dl.created_at ? <> on {D.fmtDate(dl.created_at)}</> : null)}.</>
+          : <>{dl.enquiry_id ? <>Received through <span className="font-mono">{dl.enquiry_id}</span></> : "Received through website/ad marketing funnel"}{dl.created_at ? <> on {D.fmtDate(dl.created_at)}</> : null}.</>}
+        {" "}These are the submitted answers — correcting deal facts does not alter this record.
       </>}>
-        {/* THREE OUTCOMES, ALL SAID OUT LOUD. Stored and readable is the
-            ordinary one. Stored but unparseable must not render as "no
-            response" — that would claim we hold nothing when we hold
-            something broken, and the raw block is then the only way to
-            recover the lead's answers. An empty object is a form that posted
-            nothing, which is different again from a deal that never had a
-            form (that one never reaches this dialog — see Chat's gate). */}
         {answers === null
           ? <Notice tone="bad" text={<>
               <b>This response could not be read.</b> It was stored, but it is not the JSON object
@@ -583,11 +585,8 @@ function ResponseModal({ dealRef, onClose }: { dealRef: string; onClose: () => v
                 the deal itself carries the name and number it was created from.</>} />
             : <KvList pairs={keys.map((k) => [humanKey(k), answers[k]] as [ReactNode, ReactNode])} />}
 
-        {/* Folded, and always present. "What did they ACTUALLY send" is a rare
-            question, but when the table above looks wrong this is the only
-            thing that settles it — including the keys under their real names,
-            which humanKey above rewrites. */}
-        <details className="group">
+        {/* Folded, and always present. */}
+        <details className="group mt-3">
           <summary className="cursor-pointer text-xs font-medium text-tertiary hover:text-secondary">Raw payload</summary>
           <pre className="mt-2 overflow-x-auto rounded-lg bg-secondary p-3 font-mono text-xs text-secondary">{dl.submission || ""}</pre>
         </details>
@@ -1319,7 +1318,8 @@ export function CreateBusinessModal({
     );
   }
 
-  const hasSubmission = Boolean(dl.submission);
+  const hasIntake = isIntakeSubmitted(dl.submission);
+  const hasFunnel = Boolean(dl.submission && !hasIntake);
 
   return (
     <ModalShell
@@ -1343,11 +1343,15 @@ export function CreateBusinessModal({
       <div className="flex flex-col gap-4">
         <ErrSlot err={err} />
 
-        {hasSubmission && (
+        {hasIntake ? (
           <div className="flex items-center gap-2 rounded-lg border border-brand/20 bg-brand-primary/10 px-3 py-2 text-xs text-brand-secondary font-medium">
-            <span>✓ Pre-filled using intake & Google Form submission data</span>
+            <span>✓ Pre-filled using Google Form onboarding intake data</span>
           </div>
-        )}
+        ) : hasFunnel ? (
+          <div className="flex items-center gap-2 rounded-lg border border-border-secondary bg-surface-secondary px-3 py-2 text-xs text-secondary font-medium">
+            <span>✓ Pre-filled using marketing lead contact details</span>
+          </div>
+        ) : null}
 
         <FormSection title="Account Credentials">
           <FormField label="Username / Login Email" req hint="The seller will use this to sign in.">

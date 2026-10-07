@@ -102,8 +102,26 @@ export function dateOnly(v: string | null | undefined): string | null {
   return isNaN(at.getTime()) ? v.slice(0, v.indexOf("T")) : IST_DATE.format(at);
 }
 
+export function isIntakeSubmitted(submission?: string | null): boolean {
+  if (!submission || !submission.trim()) return false;
+  try {
+    const data = JSON.parse(submission);
+    if (!data || typeof data !== "object" || Array.isArray(data)) return false;
+    if (data._linkedIntakeId || data._submissionCount || data.is_google_form) return true;
+    const keys = Object.keys(data);
+    return keys.some((k) =>
+      k.startsWith("entry.") ||
+      ["dealsWith", "gst", "gstNumber", "since", "primaryLocations", "secondaryLocations",
+       "keywords", "services", "idealCustomers", "problemsFacing", "logoNotice", "businessAddress"].includes(k)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function adaptDeal(row: DealRow): any {
   const stageInt = legacyStageInt({ key: row.stageKey, label: row.stageLabel, tone: row.stageTone });
+  const hasIntake = isIntakeSubmitted(row.submission);
   return {
     deal_id: row.ref,
     customer_name: row.contactName,
@@ -133,6 +151,8 @@ export function adaptDeal(row: DealRow): any {
     // rename — the one component that reads it parses it where a failure can
     // be shown instead of taking the whole deal list down with it.
     submission: row.submission || "",
+    has_intake: hasIntake,
+    has_funnel: Boolean(row.submission && !hasIntake),
     is_stalled: (row.stageKey === "won" || row.stageKey === "lost" || row.stageKey === "dead" || stageInt >= 5) ? false : !!row.stalled,
     close_reason: row.lostReason || null,
     tags: row.tags || [],
