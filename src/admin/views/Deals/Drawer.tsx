@@ -159,7 +159,11 @@ function ActionBar({ dl, p }: { dl: any; p: Params }) {
     { icon: "rupee", label: dl.deal_value ? "Change deal value" : "Set deal value", act: () => acts.value(ref) },
     { icon: "route", label: "Change stage", act: () => acts.stage(ref, dl.stage) },
     { icon: "tag", label: "Lists", act: () => acts.tags(ref) },
-    { icon: "link", label: dl.submission ? "View intake response" : "Connect intake form", act: () => dl.submission ? acts.response(ref) : acts.linkIntake(ref) },
+    ...(dl.submission
+      ? [{ icon: "quote", label: "View intake response", act: () => acts.response(ref) },
+         { icon: "link", label: "Re-link intake form", act: () => acts.linkIntake(ref) }]
+      : [{ icon: "copy", label: "Copy prefilled form link", act: () => acts.copyFormLink(dl) },
+         { icon: "link", label: "Search & link intake form", act: () => acts.linkIntake(ref) }]),
     ...(dl.stage === STAGE.WON && !dl.customer ? [{ icon: "shield", label: "Create business account", act: () => acts.createBusiness(ref) }] : []),
     ...(head() ? [{ icon: "recon", label: "Reassign", act: () => acts.reassign(ref) }] : []),
     ...(head() ? [{ icon: "x", label: "Close deal", act: () => acts.closeDeal(ref), tone: "bad" }] : []),

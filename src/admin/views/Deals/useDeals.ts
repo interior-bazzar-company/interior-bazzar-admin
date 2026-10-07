@@ -669,3 +669,25 @@ export function useDealDocs(ref: string | null): DealDocsState {
 
   return state;
 }
+
+/** Generates Google Form URL prefilled with current deal facts for sharing with client */
+export function getPrefilledIntakeFormUrl(dl: any): string {
+  const base = "https://docs.google.com/forms/d/e/1FAIpQLSfY1mKlILFcJ_CAxCT8q1NlBesqCJlsMoPtq03eOC9BFUB9_A/viewform";
+  const params = new URLSearchParams();
+  params.set("usp", "pp_url");
+
+  const bizName = dl?.business_name || dl?.businessName || "";
+  const contactName = dl?.customer_name || dl?.contactName || "";
+  const phone = dl?.phone || "";
+  const city = dl?.city || "";
+  const state = dl?.state || "";
+  const address = dl?.address || (city ? `${city}${state ? ", " + state : ""}` : "");
+
+  if (bizName) params.set("entry.1648714462", bizName);
+  if (contactName) params.set("entry.1009337288", contactName);
+  if (phone) params.set("entry.1996676158", phone);
+  if (city) params.set("entry.754127033", city);
+  if (address) params.set("entry.279246687", address);
+
+  return `${base}?${params.toString()}`;
+}

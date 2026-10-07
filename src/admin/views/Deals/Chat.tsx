@@ -832,13 +832,15 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <Eyebrow>Customer Intake Form</Eyebrow>
-          <button
-            type="button"
-            className="text-[11px] font-semibold text-brand-secondary hover:underline cursor-pointer"
-            onClick={() => acts.linkIntake(dl.deal_id)}
-          >
-            {dl.submission ? "Re-link Form" : "Connect Form"}
-          </button>
+          {dl.submission ? (
+            <button
+              type="button"
+              className="text-[11px] font-semibold text-brand-secondary hover:underline cursor-pointer"
+              onClick={() => acts.linkIntake(dl.deal_id)}
+            >
+              Re-link
+            </button>
+          ) : null}
         </div>
         {dl.submission ? (
           <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5 text-xs">
@@ -867,13 +869,24 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-secondary bg-surface-secondary/40 px-3 py-2 text-xs font-semibold text-secondary outline-focus-ring transition duration-100 hover:border-brand-primary hover:text-brand-secondary"
-            onClick={() => acts.linkIntake(dl.deal_id)}
-          >
-            <Icon name="link" size="xs" /> Search & Link Form
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-brand bg-brand-primary/10 px-3 py-2 text-xs font-semibold text-brand-secondary outline-focus-ring transition duration-100 hover:bg-brand-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2"
+              title="Generate and copy prefilled Google Form URL with deal data to send to client"
+              onClick={() => acts.copyFormLink(dl)}
+            >
+              <Icon name="copy" size="xs" /> Generate & Copy Form Link
+            </button>
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-secondary bg-surface-secondary/40 px-3 py-1.5 text-xs font-semibold text-secondary outline-focus-ring transition duration-100 hover:border-brand-primary hover:text-brand-secondary"
+              title="Search and connect unassigned Google Form submission"
+              onClick={() => acts.linkIntake(dl.deal_id)}
+            >
+              <Icon name="link" size="xs" /> Search & Link Form
+            </button>
+          </div>
         )}
       </section>
 
@@ -1049,9 +1062,9 @@ function ChatActions({ dl, p }: { dl: any; p: Params }) {
         ? <Button color="secondary" ico="quote" data-act="dl-response" data-ref={dl.deal_id}
             title="The intake form this deal was created from"
             onClick={() => acts.response(dl.deal_id)}>View response</Button>
-        : <Button color="secondary" ico="link" data-act="dl-link-intake"
-            title="Search and connect unassigned Google Form submission"
-            onClick={() => acts.linkIntake(dl.deal_id)}>Connect form</Button>}
+        : <Button color="secondary" ico="copy" data-act="dl-copy-form"
+            title="Copy prefilled Google Form link with deal details to send to client"
+            onClick={() => acts.copyFormLink(dl)}>Copy Form link</Button>}
     </div>
   );
 }

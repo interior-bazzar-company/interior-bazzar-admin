@@ -30,8 +30,8 @@ import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import {
-  D, STAGE, apiPriorityKey, apiStageKey, head, inr, refusalOf, rupeeStr, rupees,
-  setChan, useDealApi, useDone, useRefuse, val, render
+  D, STAGE, apiPriorityKey, apiStageKey, getPrefilledIntakeFormUrl, head, inr,
+  refusalOf, rupeeStr, rupees, setChan, useDealApi, useDone, useRefuse, val, render
 } from "./useDeals";
 import type { Params, Refusal } from "./useDeals";
 import { ErrSlot, StageChip } from "./bits";
@@ -75,6 +75,19 @@ export function useActs(p: Params) {
       if (!can("deals", "edit"))
         return shell.toast("403 — you do not have edit access.", "bad");
       modal(<LinkIntakeModal dealRef={ref} onClose={close} done={done} />, "wide");
+    },
+    copyFormLink(dl: any) {
+      const url = getPrefilledIntakeFormUrl(dl);
+      const bizName = dl?.business_name || dl?.customer_name || dl?.deal_id || "client";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          shell.toast(`Prefilled intake form link copied for ${bizName}! Ready to share via WhatsApp/Email.`, "ok");
+        }).catch(() => {
+          window.open(url, "_blank");
+        });
+      } else {
+        window.open(url, "_blank");
+      }
     },
     /* Read-only, so no permission check and no `done` — it writes nothing and
        there is nothing for the list to re-fetch afterwards. Anyone who can
