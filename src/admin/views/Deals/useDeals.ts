@@ -679,10 +679,12 @@ export function getPrefilledIntakeFormUrl(dl: any): string {
   const bizName = dl?.business_name || dl?.businessName || "";
   const contactName = dl?.customer_name || dl?.contactName || "";
   const phone = dl?.phone || "";
+  const email = dl?.email || dl?.customer_email || "";
   const city = dl?.city || "";
   const state = dl?.state || "";
   const address = dl?.address || (city ? `${city}${state ? ", " + state : ""}` : "");
 
+  if (email) params.set("emailAddress", email);
   if (bizName) params.set("entry.1648714462", bizName);
   if (contactName) params.set("entry.1009337288", contactName);
   if (phone) params.set("entry.1996676158", phone);
@@ -691,3 +693,4 @@ export function getPrefilledIntakeFormUrl(dl: any): string {
 
   return `${base}?${params.toString()}`;
 }
+
