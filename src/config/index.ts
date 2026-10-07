@@ -1,9 +1,26 @@
 const resolveBaseUrl = () => {
   const envUrl = import.meta.env.VITE_BASE_URL;
-  if (typeof window !== "undefined" && window.location?.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-    return `http://${window.location.hostname}:8000/api`;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim().replace(/\/+$/, "");
   }
-  return envUrl || "http://localhost:8000/api";
+
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    const host = window.location.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:8000/api";
+    }
+    if (host.includes("stageadmin") || host.includes("stage-admin")) {
+      return "https://stage.interiorbazzar.com/api";
+    }
+    if (host.includes("testadmin") || host.includes("dev-admin") || host.includes("devadmin") || host.includes("netlify.app")) {
+      return "https://dev.interiorbazzar.com/api";
+    }
+    if (host.includes("admin.interiorbazzar.com")) {
+      return "https://prod.interiorbazzar.com/api";
+    }
+  }
+
+  return "https://dev.interiorbazzar.com/api";
 };
 
 const config = {
