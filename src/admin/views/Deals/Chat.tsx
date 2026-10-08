@@ -832,7 +832,7 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <Eyebrow>Customer Intake Form</Eyebrow>
-          {dl.submission ? (
+          {dl.has_intake ? (
             <button
               type="button"
               className="text-[11px] font-semibold text-brand-secondary hover:underline cursor-pointer"
@@ -842,7 +842,7 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
             </button>
           ) : null}
         </div>
-        {dl.submission ? (
+        {dl.has_intake ? (
           <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5 text-xs">
             <div className="flex flex-col min-w-0">
               <span className="font-semibold text-emerald-700 dark:text-emerald-300 truncate flex items-center gap-1">
@@ -886,6 +886,15 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
             >
               <Icon name="link" size="xs" /> Search & Link Form
             </button>
+            {dl.has_funnel && (
+              <button
+                type="button"
+                className="text-[11px] font-medium text-tertiary hover:text-secondary text-left pl-1 cursor-pointer"
+                onClick={() => acts.response(dl.deal_id)}
+              >
+                📋 View Marketing Funnel Quiz Answers
+              </button>
+            )}
           </div>
         )}
       </section>
@@ -910,7 +919,13 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
         ) : (
           <button
             type="button"
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-brand bg-brand-primary/10 px-3 py-2 text-xs font-semibold text-brand-secondary outline-focus-ring transition duration-100 hover:bg-brand-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2"
+            disabled={dl.stage !== STAGE.WON}
+            className={`flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition duration-100 ${
+              dl.stage === STAGE.WON
+                ? "cursor-pointer border-brand bg-brand-primary/10 text-brand-secondary outline-focus-ring hover:bg-brand-primary/20 focus-visible:outline-2"
+                : "cursor-not-allowed border-secondary bg-surface-secondary/40 text-quaternary opacity-60"
+            }`}
+            title={dl.stage === STAGE.WON ? "Create platform account for client" : "Business account can only be created once deal is Won"}
             onClick={() => {
               if (dl.customer) {
                 const usernameStr = typeof dl.customer === "object" ? dl.customer.username : dl.customer;
@@ -924,7 +939,8 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
               acts.createBusiness(dl.deal_id);
             }}
           >
-            <Icon name="shield" size="xs" />Create Business Account
+            <Icon name="shield" size="xs" />
+            {dl.stage === STAGE.WON ? "Create Business Account" : "Create Business Account (Won only)"}
           </button>
         )}
       </section>
