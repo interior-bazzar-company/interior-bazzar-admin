@@ -1052,6 +1052,9 @@ export function CreateBusinessModal({
   const [address, setAddress] = useState("");
   const [pinCode, setPinCode] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const dl = deal as any;
   const initialChecked = useRef(false);
@@ -1119,6 +1122,43 @@ export function CreateBusinessModal({
     navigator.clipboard.writeText(text);
     setCopied(label);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const sendCredEmail = () => {
+    if (!createdResult) return;
+    const targetEmail = (createdResult.email || (createdResult.username.includes("@") ? createdResult.username : "")).trim();
+    if (!targetEmail || !targetEmail.includes("@")) {
+      shell.toast("No valid recipient email available to send credentials.", "warn");
+      return;
+    }
+    setEmailSending(true);
+    setEmailError(null);
+    AdminOpsService.sendDealCredentials(dealRef, {
+      recipientEmail: targetEmail,
+      username: createdResult.username,
+      password: createdResult.password,
+      businessName: createdResult.businessName,
+      contactName: createdResult.contactName,
+      loginUrl: createdResult.loginUrl,
+      planName: createdResult.planName,
+    })
+      .then((res) => {
+        setEmailSending(false);
+        if (res.response === false) {
+          const detail = (res.data as any)?.message || "Failed to send credentials email.";
+          setEmailError(detail);
+          shell.toast(detail, "bad");
+        } else {
+          setEmailSentTo(targetEmail);
+          shell.toast(`Credentials successfully emailed to ${targetEmail}!`, "good");
+        }
+      })
+      .catch((err) => {
+        setEmailSending(false);
+        const detail = refusalOf(err).detail || "Failed to send credentials email.";
+        setEmailError(detail);
+        shell.toast(detail, "bad");
+      });
   };
 
   const commit = () => {
@@ -1284,6 +1324,33 @@ export function CreateBusinessModal({
                 {copied === "url" ? "Copied!" : "Copy"}
               </Button>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-xl border border-secondary bg-surface-secondary/70 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-primary">Send Credentials via Email</span>
+                <span className="text-xs text-secondary font-mono">
+                  {createdResult.email || (createdResult.username.includes("@") ? createdResult.username : "No email available for this account")}
+                </span>
+              </div>
+              {emailSentTo ? (
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg">
+                  <Icon name="check" size="xs" /> Emailed to {emailSentTo}
+                </span>
+              ) : (
+                <Button
+                  color="secondary"
+                  size="sm"
+                  ico="note"
+                  isDisabled={emailSending || (!createdResult.email && !createdResult.username.includes("@"))}
+                  onClick={sendCredEmail}
+                >
+                  {emailSending ? "Sending Email…" : "Send Credentials Email"}
+                </Button>
+              )}
+            </div>
+            {emailError && <span className="text-xs text-danger-primary">{emailError}</span>}
           </div>
 
           <div className="flex flex-col gap-2 rounded-xl border border-brand/30 bg-brand-primary/5 p-4">

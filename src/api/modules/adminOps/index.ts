@@ -805,6 +805,16 @@ export interface DealCreateBusinessResponse {
   loginUrl: string;
 }
 
+export interface DealSendCredentialsInput {
+  recipientEmail: string;
+  username: string;
+  password: string;
+  businessName?: string;
+  contactName?: string;
+  loginUrl?: string;
+  planName?: string;
+}
+
 /** interior_admin.OtherIncome — money in that is not a customer payment. */
 export interface IncomeRow {
   id: number; kind: VocabItem; amountPaise: number; description: string; party: string; mode: VocabItem;
@@ -1877,6 +1887,10 @@ export class AdminOpsService {
   static createBusinessFromDeal(dealRef: string, data: DealCreateBusinessInput = {}) {
     return apiService.getPostApiResponse<DealCreateBusinessResponse>(
       `${base}/deals/${encodeURIComponent(dealRef)}/create-business/`, data);
+  }
+  static sendDealCredentials(dealRef: string, data: DealSendCredentialsInput) {
+    return apiService.getPostApiResponse<{ message: string }>(
+      `${base}/deals/${encodeURIComponent(dealRef)}/send-credentials/`, data);
   }
   static getUnassignedIntakes(q?: string) {
     return apiService.getGetApiResponse<UnassignedIntakesResponse>(
