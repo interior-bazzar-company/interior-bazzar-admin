@@ -1409,7 +1409,7 @@ export function CreateBusinessModal({
    email, city, state, and address on the deal.
    ============================================================================= */
 export function LinkIntakeModal({ dealRef, onClose, done }: {
-  dealRef: string; onClose: () => void; done: () => void;
+  dealRef: string; onClose: () => void; done: (m: string, r?: string | null) => void;
 }) {
   const shell = useShell();
   const [loading, setLoading] = useState(true);
@@ -1440,9 +1440,7 @@ export function LinkIntakeModal({ dealRef, onClose, done }: {
     setLinkingId(item.id);
     call(AdminOpsService.linkIntakeToDeal(dealRef, item.id))
       .then(() => {
-        shell.toast(`Connected form submission to ${dealRef}. Form data applied with priority.`, "good");
-        done();
-        onClose();
+        done(`Connected form submission to ${dealRef}. Form data applied with priority.`, dealRef);
       })
       .catch((err: any) => {
         shell.toast(err?.message || "Failed to link submission", "bad");
@@ -1454,7 +1452,6 @@ export function LinkIntakeModal({ dealRef, onClose, done }: {
     <ModalShell
       title={`Connect Google Form Intake — ${dealRef}`}
       onClose={onClose}
-      wide
     >
       <div className="flex flex-col gap-4 text-xs">
         <Notice tone="info">
@@ -1472,7 +1469,7 @@ export function LinkIntakeModal({ dealRef, onClose, done }: {
         </div>
 
         {loading ? (
-          <PaneLoading text="Searching unassigned submissions…" />
+          <PaneLoading label="Searching unassigned submissions…" />
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-secondary py-10 text-center text-secondary">
             <p className="font-semibold text-primary">No unassigned intake submissions found</p>
@@ -1531,7 +1528,7 @@ export function LinkIntakeModal({ dealRef, onClose, done }: {
                   <div className="flex items-center shrink-0">
                     <Button
                       color="primary"
-                      disabled={isLinking}
+                      isDisabled={isLinking}
                       onClick={() => handleLink(item)}
                     >
                       {isLinking ? "Connecting…" : "Connect to Deal"}

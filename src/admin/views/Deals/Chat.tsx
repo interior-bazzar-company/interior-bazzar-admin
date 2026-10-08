@@ -1069,14 +1069,3 @@ function ChatActions({ dl, p }: { dl: any; p: Params }) {
   );
 }
 
-/* What is left of the old always-on gate, and it is still a statement about
-   the data rather than a placeholder. Funnel intake now stores the submitted
-   form on `Deal.submission`, so the button opens it — but only deals that
-   CAME THROUGH a funnel have one. A deal keyed in by hand was typed by the
-   person reading this screen; there was never a form, and saying so beats
-   opening a dialog with nothing in it. */
-const RESPONSE_GATE = {
-  title: "No stored submission",
-  body: "This deal was created by hand rather than from an intake form, so there is no " +
-        "submitted response to show. Deals that arrive through a funnel open theirs here.",
-};
