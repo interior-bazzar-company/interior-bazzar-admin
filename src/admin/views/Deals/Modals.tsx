@@ -22,7 +22,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  Alert, Button, DateInput, FieldRow, FormField, FormSection, Input, KvList, ModalShell, Notice,
+  Alert, Button, DateInput, FieldRow, FormField, FormSection, Icon, Input, KvList, ModalShell, Notice,
   PaneLoading, Pill, Radio, Segmented, SelectInput, Textarea
 } from "../../ui";
 import { go } from "../../ui/nav";
@@ -1511,9 +1511,7 @@ export function LinkIntakeModal({ dealRef, onClose, done }: {
     setLinkingId(item.id);
     call(AdminOpsService.linkIntakeToDeal(dealRef, item.id))
       .then(() => {
-        shell.toast(`Connected form submission to ${dealRef}. Form data applied with priority.`, "good");
-        done("Connected form submission to " + dealRef, dealRef);
-        onClose();
+        done(`Connected form submission to ${dealRef}. Form data applied with priority.`, dealRef);
       })
       .catch((err: any) => {
         shell.toast(err?.message || "Failed to link submission", "bad");
@@ -1601,7 +1599,7 @@ export function LinkIntakeModal({ dealRef, onClose, done }: {
                   <div className="flex items-center shrink-0">
                     <Button
                       color="primary"
-                      disabled={isLinking}
+                      isDisabled={isLinking}
                       onClick={() => handleLink(item)}
                     >
                       {isLinking ? "Connecting…" : "Connect to Deal"}
