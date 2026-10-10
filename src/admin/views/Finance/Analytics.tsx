@@ -36,9 +36,10 @@
    ONE CLOCK. `PERIOD` and `ago()` read the store's clock: the server's once
    read, the browser's until then.
    ============================================================================= */
+import { useMemo } from "react";
 import { useShell } from "../../shell/ShellContext";
 import {
-  ActivityFeed, Card, ChartFrame, Icon, ListTable, Meter, Rail, Table, Tiles,
+  ActivityFeed, Card, ChartFrame, Icon, ListTable, Meter, Rail, SelectInput, Table, Tiles,
 } from "../../ui";
 import type { TileProps } from "../../ui";
 import { go } from "../../ui/nav";
@@ -49,7 +50,7 @@ import { KpiTip, MetricTip } from "./InfoTip";
 import { BarRows, SignedColumns, Spark, Waterfall } from "../charts";
 import type { BarRow, SignedPoint, WaterStep } from "../charts";
 import {
-  PERIOD, accountOf, ago, delta, eventMeta, fmtDate, fmtMonth, inr, kpiSeries, pct, todayIso,
+  PERIOD, accountOf, ago, delta, eventMeta, fmtDate, fmtMonth, fmtMonthLong, inr, kpiSeries, pct, periodOf, todayIso,
   useActivity, useAtRisk, useKpis, useMonthPoints, useOverview,
   useReconciliation, useTagTotals, useTaxSummary, useWaterfall,
 } from "./store";
@@ -166,12 +167,13 @@ function kpiTile(k: Kpi, priorLabel: string | null, note?: string): TileProps {
 
 /* ============================================================ overview === */
 
-function Overview() {
-  const o = useOverview();
-  const steps = useWaterfall();
-  const risk = useAtRisk();
+function Overview({ month }: { month?: string }) {
+  const curPeriod = periodOf(month || PERIOD.key);
+  const o = useOverview(month);
+  const steps = useWaterfall(month);
+  const risk = useAtRisk(month);
   const months = useMonthPoints();
-  const tags = useTagTotals();
+  const tags = useTagTotals(month);
   const recon = useReconciliation();
   /* THE SAME SCOPE ON BOTH SIDES. This is ONE statement's share, printed over
      that statement's line count; the aggregate figure the server keeps over
@@ -230,7 +232,7 @@ function Overview() {
           400px chart's height with nothing in the gap — and the reading order
           was sideways where every other page in the panel reads down. */}
       <Tiles cols={4} list={[
-        { k: <>Net · {PERIOD.label}<MetricTip k="net" /></>,
+        { k: <>Net · {curPeriod.label}<MetricTip k="net" /></>,
           v: inr(o.netPaise), tone: o.netPaise >= 0 ? "ok" : "bad", s: "cash, not profit",
           foot: <span className="label-mono">as of {fmtDate(todayIso())}</span> },
         { k: "Collected", v: inr(o.collectedPaise),
@@ -240,7 +242,7 @@ function Overview() {
         { k: "Out", v: inr(o.outPaise), s: "salary, other spend and refunds together" },
       ]} />
 
-      <ChartFrame title={"Where " + PERIOD.label + " went"}
+      <ChartFrame title={"Where " + curPeriod.label + " went"}
         note={o.salaryN ? undefined : (
           <span className="inline-flex items-start gap-1.5 text-warning-primary">
             <Icon name="alert" size="xs" className="mt-0.5 shrink-0" />
@@ -264,7 +266,7 @@ function Overview() {
 
       <Blocks>
         {/* ============================================ where it went | risk === */}
-        <ChartFrame title={"Where it went · by tag · " + PERIOD.label}
+        <ChartFrame title={"Where it went · by tag · " + curPeriod.label}
           right={<span className="label-mono">{inr(tags.totalPaise)} out</span>}>
           {spendRows.length
             ? <BarRows rows={spendRows} unit="₹" />
@@ -428,14 +430,16 @@ function caveatFor(k: Kpi, salaryPaid: boolean): string | undefined {
   return undefined;
 }
 
-function Kpis() {
-  const list = useKpis();
+function Kpis({ month }: { month?: string }) {
+  const selectedKey = month || PERIOD.key;
+  const curPeriod = periodOf(selectedKey);
+  const list = useKpis(month);
   const months = useMonthPoints();
-  const o = useOverview();
+  const o = useOverview(month);
 
   /* Which month a `prior` is measured against, so a movement is never an
      unlabelled arrow. Derived from the same month series the charts draw. */
-  const here = months.findIndex((m) => m.month === PERIOD.key);
+  const here = months.findIndex((m) => m.month === selectedKey);
   const priorLabel = here > 0 ? fmtMonth(months[here - 1].month) : null;
 
   /* Grouped in the order the store returns them — Revenue, Cost, Health,
@@ -458,7 +462,7 @@ function Kpis() {
               <p className="mt-0.5 text-sm text-tertiary">{GROUP_DECIDES[g] || "read together"}</p>
             </div>
             <span className="label-mono">
-              {priorLabel ? "movement against " + priorLabel : PERIOD.label}
+              {priorLabel ? "movement against " + priorLabel : curPeriod.label}
             </span>
           </div>
           <Tiles cols={3} list={byGroup[g].map((k) => kpiTile(k, priorLabel, caveatFor(k, !!o.salaryN)))} />
@@ -482,23 +486,49 @@ function Kpis() {
 export default function Analytics({ p, onParams }: FaceProps) {
   const { toast } = useShell();
   const tab = p.tab === "kpi" ? "kpi" : "overview";
+  const selectedMonth = p.month || PERIOD.key;
+  const curPeriod = periodOf(selectedMonth);
+  const months = useMonthPoints();
+
+  const monthOptions = useMemo(() => {
+    const list = months.slice().reverse().map((m) => ({
+      v: m.month,
+      l: fmtMonthLong(m.month) + (m.month === PERIOD.key ? " (Current)" : ""),
+    }));
+    if (!list.some((o) => o.v === PERIOD.key)) {
+      list.unshift({ v: PERIOD.key, l: fmtMonthLong(PERIOD.key) + " (Current)" });
+    }
+    return list;
+  }, [months]);
 
   return (
     <Frame toast={toast}
       title="Analytics"
       meta={
         <>
-          <span className="label-mono">Period {PERIOD.label}</span>
+          <span className="label-mono">Period {curPeriod.label}</span>
           <span className="label-mono">as of {fmtDate(todayIso())}</span>
         </>
       }
       cmd={
         <SubTabs cur={tab}
           items={[{ k: "overview", label: "Overview" }, { k: "kpi", label: "KPI" }]}
-          onPick={(k) => onParams({ tab: k === "overview" ? undefined : k })}
-          right={<Fine>Every figure is derived from the four record types beside it — nothing here is a fifth.</Fine>} />
+          onPick={(k) => onParams({ ...p, tab: k === "overview" ? undefined : k })}
+          right={
+            <div className="flex items-center gap-2">
+              <span className="label-mono">Month:</span>
+              <div className="w-52">
+                <SelectInput
+                  ariaLabel="Select Reporting Month"
+                  value={selectedMonth}
+                  onChange={(m) => onParams({ ...p, month: m === PERIOD.key ? undefined : m })}
+                  options={monthOptions}
+                />
+              </div>
+            </div>
+          } />
       }>
-      {tab === "kpi" ? <Kpis /> : <Overview />}
+      {tab === "kpi" ? <Kpis month={p.month} /> : <Overview month={p.month} />}
     </Frame>
   );
 }

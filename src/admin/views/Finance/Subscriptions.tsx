@@ -33,7 +33,7 @@ import SubAnalytics from "./SubAnalytics";
 import {
   FILTER_LABELS, PERIOD, SUB_SOURCES, SUB_STATUSES,
   applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, subYears, todayIso,
-  useOverview, useSubRows,
+  useOverview, useSubRows, useSubTotals,
 } from "./store";
 import type { Params, SubRow } from "./store";
 
@@ -45,6 +45,11 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
   const { toast, modal, closeLayer } = useShell();
   const rows = useSubRows();
   const o = useOverview();
+  /* FIX-05: Subscription-scoped failure totals. `useOverview()` (o) counts ALL
+     installments including deal quotation ones — so o.failedN was 14 while the
+     subscription table only shows 3 failed rows. `st` is scoped to subscriptions
+     only, so the strip cell count matches the filtered table row count. */
+  const st = useSubTotals();
   const shown = applySubFilters(rows, p);
   const writable = can("finance", "edit");
 
@@ -215,10 +220,10 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
               is revenue until it is collected.</> },
           /* LAST, and last on purpose: it is the one a person acts on, so it
              ends the strip rather than interrupting it. */
-          { k: <>Fail to pay <b className="tnum">{inr(o.failedPaise)}</b></>,
-            v: o.failedN, dot: o.failedN ? "bad" : "", on: p.flag === "failed",
-            to: o.failedN ? queueHash("failed") : undefined,
-            tip: o.failedN
+          { k: <>Fail to pay <b className="tnum">{inr(st.failedPaise)}</b></>,
+            v: st.failedN, dot: st.failedN ? "bad" : "", on: p.flag === "failed",
+            to: st.failedN ? queueHash("failed") : undefined,
+            tip: st.failedN
               ? <>Installments that <b>did not clear</b> — a decline, a cancelled mandate, or a due
                 date that demonstrably passed. Each carries its evidence on the record; none of it
                 is written off.</>

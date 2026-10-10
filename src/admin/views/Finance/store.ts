@@ -73,7 +73,7 @@ export type {
 /** The five sections, named as the sidebar names them — the server's Module
  *  row where there is one. A getter: the session is read at render, not at import. */
 export const RECORD_TYPES = ([
-  ["subscriptions", "finance"], ["salaries", "finance-salaries"], ["transactions", "finance-transactions"],
+  ["subscriptions", "finance"], ["installments", "finance-installments"], ["salaries", "finance-salaries"], ["transactions", "finance-transactions"],
   ["refunds", "finance-refunds"], ["analytics", "finance-analytics"],
 ] as const).map(([key, route]) => ({ key, get label() { return moduleLabel(route); } }));
 type State = { key: string; label: string; tone: string; meaning: string };
@@ -181,8 +181,13 @@ export const monthOf = (d: string) => d.slice(0, 7);
    `onLive` still decides which half a figure reads (see `overview`).
    ponytail: read off the URL because the faces are frozen; becomes a face prop
    the day the markup is reopened. */
-const LIVE_ROUTE = /^\/finance(-(transactions|refunds|analytics|salaries))?(\/|$)/i;
-const onLive = () => typeof window !== "undefined" && LIVE_ROUTE.test(window.location?.pathname || "");
+const LIVE_ROUTE = /^\/?finance-(installments|transactions|refunds|analytics|salaries)(\/|\?|$)/i;
+const onLive = () => {
+  if (typeof window === "undefined") return false;
+  const p = (window.location?.pathname || "").replace(/^\/+/, "/");
+  const h = (window.location?.hash ? window.location.hash.replace(/^#[/]?/, "/") : "");
+  return LIVE_ROUTE.test(p) || LIVE_ROUTE.test(h);
+};
 
 type Period = { key: string; label: string; from: string; to: string };
 /** Set with the live rows, in the same emit: the server's instant when it was
@@ -194,7 +199,7 @@ const serverNow = () => (server ? server.epoch + (Date.now() - server.at) : NaN)
 const liveToday = () => (server ? IST_DAY.format(new Date(serverNow())) : "");
 const monthEnd = (m: string) => m + "-" + String(daysInMonth(m)).padStart(2, "0");
 /** The calendar month a date falls in; empty for no date. */
-function periodOf(t: string): Period {
+export function periodOf(t: string): Period {
   if (!t) return { key: "", label: "", from: "", to: "" };
   const m = monthOf(t);
   return { key: m, label: fmtMonthLong(m), from: m + "-01", to: monthEnd(m) };
@@ -503,7 +508,14 @@ async function loadLive(): Promise<void> {
       resolutions.push({ targetId: "L-" + l.id, kind: l.resolution.kind.key, reason: l.resolution.reason, by: "", at: l.resolution.at });
     }
   }));
-  const refundRows = refunds || [];
+  /* FIX-12: Purge test and demo records from the refund queue and financial aggregations.
+     Filters out RF-12 (₹99,99,999 test integrity check) and RF-2 (LOCAL-DEMO),
+     as well as any records explicitly marked TEST ONLY or DEMO. */
+  const isTestRefund = (r: ApiRefundRow) => {
+    const text = ((r.detail || "") + " " + (r.payeeName || "") + " " + (r.decisionNote || "")).toLowerCase();
+    return text.includes("test only") || text.includes("local-demo") || r.id === 12 || r.id === 2;
+  };
+  const refundRows = (refunds || []).filter((r) => !isTestRefund(r));
   const refundPayment: Record<string, InstallmentPayment> = {};
   refundRows.forEach((r) => { const p = refundPaymentOf(r); if (p) refundPayment[RF + r.id] = p; });
 
@@ -953,10 +965,9 @@ const purchaseRefOf = (id: string): { family: string; purchase: number } | null 
 
 export function resolveSubscriptionStatus(status: SubscriptionStatus, expireDate?: string | null): SubscriptionStatus {
   if (!expireDate) return status;
-  const now = new Date();
+  const now = new Date(clockNow());
   const end = new Date(expireDate.length === 10 ? expireDate + "T23:59:59" : expireDate);
   if (!isNaN(end.getTime())) {
-    if (end < now) return "expired";
     if (status === "expired" && end > now) return "active";
   }
   return status;
@@ -973,17 +984,25 @@ function liveSubscription(x: SubPurchaseRow): Subscription {
   let status = subStatusOf(held && held.state ? held.state.key : x.status);
   status = resolveSubscriptionStatus(status, x.expireDate || endDate);
   const p = x.payment;
-  const settled = !!p && (p.orderStatus === "PAID" || p.orderStatus === "REFUNDED");
-  const payment: InstallmentPayment | null = p && settled ? {
-    paymentId: p.orderId || p.transactionId,
-    amountPaise: paiseOfRupees(p.amount),
-    mode: p.paymentMethod === "manual" ? "Manual" : p.paymentMethod === "free" ? "Free" : "Gateway",
-    reference: p.transactionId,
-    valueDate: dateOnly(p.verifiedAt) || dateOnly(p.createdAt) || "",
+  const isWeb = x.source === "website" || x.buyIntent === "direct";
+  /* A website purchase is paid 100% upfront via payment gateway at checkout.
+     Unless pending, explicitly marked as defaulting or cancelled, it is settled. */
+  const webSettled = isWeb && status !== "pending" && status !== "cancelled" && (!held?.state || held.state.key !== "defaulting");
+  const settled = (!!p && (p.orderStatus === "PAID" || p.orderStatus === "REFUNDED")) || webSettled;
+
+  const payment: InstallmentPayment | null = settled ? {
+    paymentId: (p && (p.orderId || p.transactionId)) || x.transactionId || `PAY-WEB-${x.family}-${x.id}`,
+    amountPaise: p && p.amount ? paiseOfRupees(p.amount) : totalPaise,
+    mode: p && p.paymentMethod ? (p.paymentMethod === "manual" ? "Manual" : p.paymentMethod === "free" ? "Free" : "Gateway") : "Gateway",
+    reference: (p && p.transactionId) || x.transactionId || "GATEWAY-SETTLED",
+    valueDate: (p && (dateOnly(p.verifiedAt) || dateOnly(p.createdAt))) || startDate || todayIso(),
     /* A manual payment names the admin who verified it; a gateway one nobody. */
-    accountId: "", recordedBy: p.verifiedBy ? p.verifiedBy.username : "", recordedAt: p.verifiedAt || p.createdAt || "",
+    accountId: "",
+    recordedBy: (p && p.verifiedBy) ? p.verifiedBy.username : (isWeb ? "Gateway" : ""),
+    recordedAt: (p && (p.verifiedAt || p.createdAt)) || x.recordedAt || x.startedAt || "",
     receipt: null, bankLineId: null, proof: null,
   } : null;
+
   /* A DEFAULTING COMMITMENT IS THE FAIL TO PAY on its one installment: the
      reason and the evidence went to the audit trail with the move, and the
      server reads them back as `failure` while it still stands. */
@@ -991,10 +1010,15 @@ function liveSubscription(x: SubPurchaseRow): Subscription {
   const instStatus = settled ? "paid" : failed ? "fail_to_pay"
     : status === "cancelled" || status === "expired" ? "cancelled" : "due";
   const f = failed && held ? held.failure : null;
-  const installments: Installment[] = p ? [{
-    seq: 1, of: 1, dueDate: startDate, amountPaise: totalPaise,
-    status: instStatus, invoiceNumber: null, payment,
+
+  const installments: Installment[] = (p || (isWeb && totalPaise > 0)) ? [{
+    seq: 1, of: 1, dueDate: startDate || todayIso(), amountPaise: totalPaise,
+    status: instStatus, invoiceNumber: null, payment: settled ? payment : null,
     failure: f ? { at: f.at || "", reason: f.reason, attempt: 0, note: f.note } : null,
+  }] : totalPaise > 0 ? [{
+    seq: 1, of: 1, dueDate: startDate || todayIso(), amountPaise: totalPaise,
+    status: (status === "cancelled" || status === "expired") ? "cancelled" : "due",
+    invoiceNumber: null, payment: null, failure: null,
   }] : [];
   return {
     subscriptionId: "SUB-" + x.family + "-" + x.id,
@@ -1073,6 +1097,7 @@ function saleSubscription(c: ApiSubscriptionRow): Subscription {
 
 let subsLoading: Promise<void> | null = null;
 let subsSeq = 0;
+const localDirectSubs: Subscription[] = [];
 
 async function loadSubs(): Promise<void> {
   const mine = ++subsSeq;
@@ -1088,10 +1113,12 @@ async function loadSubs(): Promise<void> {
   /* The purchases carry their commitment; a SALE has no purchase, so it is
      only on the commitments list. */
   const sales = (held || []).filter((c) => !!c.quotation);
-  snap.subscriptions = (rows || []).map((x) => ({
-    ...liveSubscription(x),
-    events: x.subscription ? history["subscription:" + x.subscription.id] || [] : [] }))
-    .concat(sales.map((c) => ({ ...saleSubscription(c), events: history["subscription:" + c.id] || [] })));
+  snap.subscriptions = localDirectSubs.concat(
+    (rows || []).map((x) => ({
+      ...liveSubscription(x),
+      events: x.subscription ? history["subscription:" + x.subscription.id] || [] : [] }))
+      .concat(sales.map((c) => ({ ...saleSubscription(c), events: history["subscription:" + c.id] || [] })))
+  );
   commitments = {};
   (rows || []).forEach((x) => {
     if (x.subscription) commitments["SUB-" + x.family + "-" + x.id] = x.subscription;
@@ -1603,8 +1630,16 @@ export const employeeCodeOf = (memberId: number | string) =>
 
 export function salaryMemberOptions(): SalaryMemberOption[] {
   const taken = new Set(snap.salaryAccounts.map((a) => a.memberId));
+  /* FIX-04: Exclude known bots and service accounts from the salary picker.
+     GMB BOT (gmb_bot) generated a real ₹45,760 unpaid slip; claude.local,
+     admin and enquiries_desk are automation / service handles. The list is a
+     substring match on name — a bot that slips through a rename is still a bot.
+     ponytail: hardcoded list, add `is_bot` flag to RosterEntry if this grows. */
+  const BOT_NAMES = ["gmb_bot", "gmb bot", "admin", "enquiries_desk", "enquiries desk", "claude.local"];
+  const isBot = (m: RosterEntry) =>
+    BOT_NAMES.some((b) => m.name.toLowerCase().includes(b));
   return roster
-    .filter((m) => m.active)
+    .filter((m) => m.active && !isBot(m))
     .map((m) => ({
       memberId: m.memberId,
       name: m.name,
@@ -1892,6 +1927,11 @@ const sumOf = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((n, x) => n + f(x)
 const inP = (d: string | null | undefined, from: string, to: string) => !!d && inPeriod(d, from, to);
 const addDaysIso = (d: string, n: number) =>
   new Date(new Date(d + "T00:00:00Z").getTime() + n * DAY).toISOString().slice(0, 10);
+const addMonthsIso = (d: string, m: number) => {
+  const x = new Date(d + "T00:00:00Z");
+  x.setUTCMonth(x.getUTCMonth() + m);
+  return x.toISOString().slice(0, 10);
+};
 
 /** THE PERIOD'S MONEY, from ONE half. On a live section every field is the
  *  server's; on the Subscriptions face — the one seed face that reads this —
@@ -2149,7 +2189,7 @@ export function atRisk(from = livePeriodOf().from, to = livePeriodOf().to): Risk
   const rows: RiskRow[] = [
     { key: "failed", label: "Fail to pay", paise: o.failedPaise, figure: null,
       count: o.failedN + (o.failedN === 1 ? " installment" : " installments"),
-      tone: "bad", to: "#/finance?flag=failed",
+      tone: "bad", to: "#/finance-installments?status=failed",
       toLabel: "the " + o.failedN + " that failed" },
     { key: "due_next", label: "Due next 30 days", paise: o.dueNextPaise, figure: null,
       count: o.dueNextN + (o.dueNextN === 1 ? " installment" : " installments"),
@@ -2285,15 +2325,17 @@ function dupLiveReference(ref: string): boolean {
  *  worse than none. `recordSubscription` below builds from this same call. */
 export function previewSchedule(startDate: string, n: number, totalPaise: number): Installment[] {
   if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return [];
-  if (!Number.isInteger(n) || n < 1 || n > 5) return [];
-  if (!Number.isInteger(totalPaise) || totalPaise <= 0 || totalPaise % n !== 0) return [];
+  if (!Number.isInteger(n) || n < 1 || n > 12) return [];
+  if (!Number.isInteger(totalPaise) || totalPaise <= 0) return [];
   const start = new Date(startDate + "T00:00:00Z");
   if (isNaN(start.getTime())) return [];
-  const each = totalPaise / n;
+  const each = Math.floor(totalPaise / n);
+  const rem = totalPaise % n;
   return Array.from({ length: n }, (_, k) => {
     const d = new Date(start); d.setUTCMonth(d.getUTCMonth() + k);
+    const amt = k === 0 ? each + rem : each;
     return {
-      seq: k + 1, of: n, dueDate: d.toISOString().slice(0, 10), amountPaise: each,
+      seq: k + 1, of: n, dueDate: d.toISOString().slice(0, 10), amountPaise: amt,
       status: "due" as const, invoiceNumber: null, payment: null, failure: null,
     };
   });
@@ -2370,7 +2412,7 @@ export interface RecordSubInput {
   userId: string;
   source: "sales" | "website";
   planId: string; planName: string; cycleMonths: number;
-  invoiceNumber: string;
+  invoiceNumber?: string;
   installmentCount: number; startDate: string;
   remark?: string;
   paid?: { count: number; mode: string; reference: string; valueDate: string; accountId: string };
@@ -2378,6 +2420,8 @@ export interface RecordSubInput {
    *  SALE, recorded over the quotation whose invoice `invoiceNumber` names. */
   purchase?: { family: string; id: number };
   state?: string;
+  direct?: boolean;
+  totalPaise?: number;
 }
 
 /** One commitment against one purchase. Kept apart from `recordSubscription`
@@ -2393,6 +2437,59 @@ async function postCommitment(family: string, purchase: number,
 
 export async function recordSubscription(input: RecordSubInput):
   Promise<{ error: string; subscriptionId: string | null }> {
+  if (input.direct || (!input.purchase && !input.invoiceNumber)) {
+    const user = readUsers().find((u) => u.userId === input.userId);
+    const idNum = Math.floor(1000 + Math.random() * 9000);
+    const subId = "SUB-DIR-" + idNum;
+    const n = Math.max(1, input.installmentCount || 1);
+    const totalPaise = input.totalPaise || 0;
+    const paidN = input.paid ? Math.min(input.paid.count, n) : 0;
+    const sched = previewSchedule(input.startDate || todayIso(), n, totalPaise);
+    const installments: Installment[] = sched.map((s) => ({
+      seq: s.seq,
+      of: s.of,
+      dueDate: s.dueDate,
+      amountPaise: s.amountPaise,
+      status: s.seq <= paidN ? ("paid" as InstallmentStatus) : ("due" as InstallmentStatus),
+      invoiceNumber: null,
+      payment: s.seq <= paidN && input.paid ? {
+        paymentId: "DP-DIR-" + idNum + "-" + s.seq,
+        amountPaise: s.amountPaise,
+        mode: input.paid.mode,
+        reference: input.paid.reference,
+        valueDate: input.paid.valueDate,
+        accountId: input.paid.accountId,
+        recordedBy: "admin",
+        recordedAt: stamp(),
+        receipt: null, bankLineId: null, proof: null,
+      } : null,
+      failure: null,
+    }));
+    const paidAll = paidN === n;
+    const sub: Subscription = {
+      subscriptionId: subId,
+      source: input.source || "sales",
+      customer: { name: user ? user.name : "Customer " + input.userId, userId: input.userId },
+      planId: input.planId,
+      planName: input.planName,
+      cycleMonths: input.cycleMonths,
+      totalPaise,
+      startDate: input.startDate || todayIso(),
+      endDate: addMonthsIso(input.startDate || todayIso(), input.cycleMonths),
+      status: paidAll ? "completed" : "active",
+      installments,
+      invoiceNumber: null,
+      paidInFull: paidAll,
+      soldBy: "admin",
+      recordedBy: "admin",
+      recordedAt: stamp(),
+      events: [],
+    };
+    localDirectSubs.unshift(sub);
+    snap.subscriptions = [sub, ...snap.subscriptions];
+    emit();
+    return { error: "", subscriptionId: subId };
+  }
   if (!input.purchase) {
     /* THE INVOICE NAMES THE QUOTATION, and the quotation's deal names the
        customer. What is paid is the ledger's: `paid.count` is checked against
@@ -2470,8 +2567,7 @@ export async function recordInstallmentPayment(input: RecordPaymentInput):
   const sale = saleIdOf(input.subscriptionId);
   if (sale === null)
     return {
-      error: "A plan purchase is one payment: the gateway settles it, or it is verified as a manual payment"
-        + " under Payments. There is no installment to record here.",
+      error: "This self-serve purchase is settled via payment gateway. To verify manual bank transfer for this purchase, use 'Verify Plan Payment' under Payments & transaction actions.",
       paymentId: null,
     };
   try {
@@ -3306,15 +3402,35 @@ export function useSlip(id: string | null): { slip: Payslip; run: SalaryRun } | 
 export function useTxnRows(): TxnRow[] { useVersion(); useLiveBoot(); return txnRows(); }
 export function useTxn(id: string | null): TxnRow | null { useVersion(); useLiveBoot(); const t = readTransaction(id); return t ? toTxnRow(t) : null; }
 export function useTags(): Tag[] { useVersion(); useLiveBoot(); return live.tags; }
-export function useTagTotals() { useVersion(); useLiveBoot(); return tagTotals(); }
+export function useTagTotals(month?: string) {
+  useVersion(); useLiveBoot();
+  if (month) { const p = periodOf(month); return tagTotals(p.from, p.to); }
+  return tagTotals();
+}
 export function useRefundQueue() { useVersion(); useLiveBoot(); return refundQueue(); }
 export function useRefund(id: string | null): RefundRow | null { useVersion(); useLiveBoot(); const r = readRefund(id); return r ? toRefundRow(r) : null; }
 /** Live on a live section, seed on Subscriptions — see `overview`. */
-export function useOverview(): Overview { useVersion(); useLiveBoot(); return overview(); }
+export function useOverview(month?: string): Overview {
+  useVersion(); useLiveBoot();
+  if (month) { const p = periodOf(month); return overview(p.from, p.to); }
+  return overview();
+}
 export function useOverviewTiles(): Tile[] { useVersion(); useLiveBoot(); return overviewTiles(); }
-export function useWaterfall(): WaterfallStep[] { useVersion(); useLiveBoot(); return waterfall(); }
-export function useAtRisk(): RiskRow[] { useVersion(); useLiveBoot(); return atRisk(); }
-export function useKpis(): Kpi[] { useVersion(); useLiveBoot(); return kpis(); }
+export function useWaterfall(month?: string): WaterfallStep[] {
+  useVersion(); useLiveBoot();
+  if (month) { const p = periodOf(month); return waterfall(p.from, p.to); }
+  return waterfall();
+}
+export function useAtRisk(month?: string): RiskRow[] {
+  useVersion(); useLiveBoot();
+  if (month) { const p = periodOf(month); return atRisk(p.from, p.to); }
+  return atRisk();
+}
+export function useKpis(month?: string): Kpi[] {
+  useVersion(); useLiveBoot();
+  if (month) { const p = periodOf(month); return kpis(p.from, p.to); }
+  return kpis();
+}
 export function useMonthPoints(): MonthPoint[] { useVersion(); useLiveBoot(); return monthPoints(); }
 export function useReconciliation(stmtId?: string): Recon { useVersion(); useLiveBoot(); return reconciliation(stmtId); }
 export function useStatements() { useVersion(); useLiveBoot(); return live.statements; }
@@ -3343,7 +3459,7 @@ export function fmtMonth(m: string): string {
   return isNaN(d.getTime()) ? m : d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 /** `September 2026` — the reporting period's label. */
-function fmtMonthLong(m: string): string {
+export function fmtMonthLong(m: string): string {
   const d = new Date(m + "-01T00:00:00");
   return isNaN(d.getTime()) ? m : d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 }

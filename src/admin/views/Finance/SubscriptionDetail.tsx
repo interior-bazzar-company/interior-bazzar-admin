@@ -175,7 +175,8 @@ export default function SubscriptionDetail({ id, p, onParams }: {
                 </>],
                 ["Sold by", s.soldBy],
                 ["Recorded", <>{fmtDateTime(s.recordedAt)} · {ago(s.recordedAt)}</>],
-                ["Paid", s.paidInFull ? "In full, on one invoice" : s.installments.length + " installments"],
+                ["Payment terms", s.paidInFull ? "In full, on one invoice" : `${s.installments.length} installment${s.installments.length === 1 ? "" : "s"}`],
+                ["Collected", `${row.paidN} of ${s.installments.length} paid (${inr(row.paidPaise)})`],
               ]} />
             </Card>
 

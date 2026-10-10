@@ -66,7 +66,13 @@ export default function Slip({ id, p }: {
   }
 
   const { slip, run } = hit;
-  const draft = run.state === "open" || slip.issuedAt === null;
+  /* FIX-03: A slip is NOT a draft if it already has a recorded payment.
+     The old check `run.state === "open"` branded every slip in an open run
+     as draft — even fully paid transfers. A slip with paidAt or a reference
+     is settled fact; the run container being open is an admin oversight, not
+     a fact about this slip's state. */
+  const isPaid = !!slip.paidAt || !!slip.reference;
+  const draft = !isPaid && (run.state === "open" || slip.issuedAt === null);
 
   /* Computed here, from the slip's own arrays, and never taken on trust from
      the totals stored beside them. Integer paise throughout: gross is the sum

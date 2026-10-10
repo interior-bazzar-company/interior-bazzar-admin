@@ -12,23 +12,28 @@ import AdminOpsService from "../../../api/modules/adminOps";
 import type { InstallmentRow, DealPersonRef } from "../../../api/modules/adminOps";
 import { useShell } from "../../shell/ShellContext";
 import {
+  Alert,
   Button,
+  DateInput,
   EmptyState,
   FilterBar,
   FilterChips,
   Icon,
+  Input,
   Pagination,
   Pill,
   ReasonModal,
   SearchField,
   Select,
+  SelectInput,
   StatStrip,
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { inr, todayIso } from "./store";
+import { MODES, inr, todayIso } from "./store";
+import { Cancel, Dlg, Field, Fs } from "./dialog";
 
 const PAGE_SIZE = 50;
 
@@ -38,6 +43,139 @@ const FILTER_LABELS: Record<string, string> = {
   flag: "Queue",
   owner: "Sales Owner",
 };
+
+function RecordReceivablePaymentModal({
+  r,
+  onClose,
+  onSuccess,
+}: {
+  r: InstallmentRow;
+  onClose: () => void;
+  onSuccess: (msg: string) => void;
+}) {
+  const [amountRupees, setAmountRupees] = useState<string>(
+    r.amountPaise ? (r.amountPaise / 100).toString() : ""
+  );
+  const [mode, setMode] = useState<string>(MODES[0] || "NEFT");
+  const [reference, setReference] = useState<string>("");
+  const [date, setDate] = useState<string>(todayIso());
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    setErr(null);
+    const amtNum = parseFloat(amountRupees);
+    if (isNaN(amtNum) || amtNum <= 0) {
+      setErr("Enter a valid payment amount greater than zero.");
+      return;
+    }
+    if (!reference.trim()) {
+      setErr("Enter a transaction reference or UTR number.");
+      return;
+    }
+    if (!r.invoiceId) {
+      setErr("This installment has no linked invoice ID. Open the deal to raise the invoice first.");
+      return;
+    }
+
+    setSubmitting(true);
+    const amountPaise = Math.round(amtNum * 100);
+    try {
+      const res = await AdminOpsService.recordDealPayment({
+        invoiceId: r.invoiceId,
+        amountPaise,
+        mode,
+        reference: reference.trim(),
+        idempotencyKey: `DP-REC-${r.invoiceId}-${r.seq}-${Date.now()}`,
+        date,
+      });
+      if (res.response === false) {
+        setErr((res.data as { message?: string })?.message || "Failed to record payment in deal ledger.");
+        setSubmitting(false);
+        return;
+      }
+      onSuccess(`Payment of ${inr(amountPaise)} recorded for installment #${r.seq}.`);
+    } catch (e: any) {
+      setErr(e?.message || "An unexpected error occurred while recording payment.");
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dlg
+      title={`Record Payment · Installment #${r.seq}`}
+      sub={`Record settlement in deal ledger for ${r.contactName || r.businessName || r.dealRef}`}
+      err={err}
+      onClose={onClose}
+      footer={
+        <>
+          <Cancel onClose={onClose} />
+          <Button
+            color="primary"
+            onClick={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? "Recording..." : "Record payment"}
+          </Button>
+        </>
+      }
+    >
+      <div className="rounded-lg border border-secondary bg-surface-secondary p-3 text-xs">
+        <div className="grid grid-cols-2 gap-2">
+          <div><span className="text-secondary">Deal:</span> <b className="font-mono text-primary">{r.dealRef}</b></div>
+          <div><span className="text-secondary">Client:</span> <b className="text-primary">{r.contactName || r.businessName || "—"}</b></div>
+          <div><span className="text-secondary">Due Date:</span> <b className="font-mono text-primary">{r.dueDate}</b></div>
+          <div><span className="text-secondary">Invoice:</span> <b className="font-mono text-primary">{r.invoiceNumber || "—"}</b></div>
+        </div>
+      </div>
+
+      {!r.invoiceId && (
+        <Alert tone="warn" title="No invoice linked to this installment">
+          Deal ledger payments require an invoice ID. Please verify or raise an invoice under deal{" "}
+          <span className="font-mono">{r.dealRef}</span>.
+        </Alert>
+      )}
+
+      <Fs legend="Payment Details" req>
+        <Field label="Amount (₹)">
+          <Input
+            type="number"
+            mono
+            value={amountRupees}
+            onChange={setAmountRupees}
+            ariaLabel="Amount in Rupees"
+            ph="e.g. 50000"
+          />
+        </Field>
+        <Field label="Payment Mode">
+          <SelectInput
+            ariaLabel="Payment Mode"
+            value={mode}
+            onChange={setMode}
+            options={MODES.map((m) => ({ v: m, l: m }))}
+          />
+        </Field>
+        <Field label="Reference / UTR">
+          <Input
+            mono
+            value={reference}
+            onChange={setReference}
+            ariaLabel="Reference or UTR"
+            ph="e.g. UTR123456789"
+          />
+        </Field>
+        <Field label="Value Date">
+          <DateInput
+            value={date}
+            max={todayIso()}
+            ariaLabel="Value date"
+            onChange={setDate}
+          />
+        </Field>
+      </Fs>
+    </Dlg>
+  );
+}
 
 export default function Installments({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
@@ -216,6 +354,31 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
       />
     );
   };
+
+  /* FIX-02: Record payment directly in-situ from the Receivables cockpit.
+     Executes AdminOpsService.recordDealPayment against the linked invoice,
+     updates local installment status optimistically, and refreshes data. */
+  const handleRecordPaymentModal = (r: InstallmentRow) => {
+    modal(
+      <RecordReceivablePaymentModal
+        r={r}
+        onClose={closeLayer}
+        onSuccess={(msg) => {
+          setRows((prev) =>
+            prev.map((row) =>
+              row.id === r.id || (row.dealRef === r.dealRef && row.seq === r.seq)
+                ? { ...row, status: { key: "paid", label: "Paid", tone: "ok" }, paidAt: todayIso() }
+                : row
+            )
+          );
+          closeLayer();
+          toast(msg, "ok");
+          loadData();
+        }}
+      />
+    );
+  };
+
 
   const statCells: (StatCell | "sep")[] = [
     {
@@ -506,6 +669,17 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
                             >
                               <Icon name="phone" size="xs" />
                             </a>
+                          )}
+                          {!isPaid && statusKey !== "cancelled" && (
+                            <Button
+                              size="sm"
+                              color="primary"
+                              ico="check"
+                              onClick={() => handleRecordPaymentModal(r)}
+                              title={`Record payment for installment ${r.seq} of ${r.count} — ${r.contactName || r.dealRef}`}
+                            >
+                              Record payment
+                            </Button>
                           )}
                           {r.id && !isPaid && statusKey !== "failed" && (
                             <Button

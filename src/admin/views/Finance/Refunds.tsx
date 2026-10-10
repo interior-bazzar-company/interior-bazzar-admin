@@ -25,7 +25,7 @@
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
 import {
-  Button, EmptyState, FilterBar, FilterChips, ListTable, Pagination, qs, Rail,
+  Button, EmptyState, FilterBar, FilterChips, ListTable, MoreMenu, Pagination, qs, Rail,
   SearchField, Select, StatStrip,
 } from "../../ui";
 import type { StatCell } from "../../ui";
@@ -133,12 +133,28 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter, onParams }:
           <span className="label-mono">as of {fmtDate(todayIso())}</span>
         </>
       }
-      /* ONE PRIMARY ACTION. Raising by hand is the door that always works —
-         a refund against a recorded payment is the ordinary case and sits in
-         the filter row's own control, where it does not compete with it. */
-      actions={writable
-        ? <Button color="primary" ico="plus" onClick={openManual}>Raise a manual refund</Button>
-        : null}
+      /* FIX-11: ONE CONSOLIDATED ACTION. Replaces the confusing dual triggers
+         ("Raise a manual refund" in header and "Request a refund" in filter bar)
+         with a single dropdown clearly distinguishing ledger-linked vs. manual refunds. */
+      actions={writable ? (
+        <MoreMenu
+          label="New refund"
+          items={[
+            {
+              icon: "cash",
+              label: "Refund ledger payment",
+              title: "Linked to an existing installment payment",
+              act: openRequest,
+            },
+            {
+              icon: "plus",
+              label: "Direct manual payout",
+              title: "Standalone unlinked refund",
+              act: openManual,
+            },
+          ]}
+        />
+      ) : null}
       cmd={
         <FilterBar
           /* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
@@ -151,9 +167,6 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter, onParams }:
             <Select key={"state" + (p.state || "")} name="state" label="State" value={p.state}
               onFilter={onFilter} options={REFUND_STATES.map((s) => ({ v: s.key, l: s.label, dot: s.tone }))} />
           </>}
-          right={writable
-            ? <Button color="secondary" ico="cash" onClick={openRequest}>Request a refund</Button>
-            : null}
           chips={
             <FilterChips
               params={(["q", "origin", "state", "flag"] as const)

@@ -20,12 +20,14 @@
    write, and none of them ask "are you sure" — the consequences are stated
    before the button, which is the same question asked once and answered.
    ============================================================================= */
-import { useMemo, useState } from "react";
-import { Alert, Button, DateInput, Input, Pill, SelectInput, Textarea } from "../../ui";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Button, DateInput, Input, Pill, Segmented, SelectInput, Textarea } from "../../ui";
 import { Check, Derived, DocCard, Fine, Ledger, LedgerRow, PickList, PickRow, Picked } from "./bits";
 import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick } from "./dialog";
 import type { Done } from "./dialog";
+import AdminOpsService from "../../../api/modules/adminOps";
+import type { PlanRow } from "../../../api/modules/adminOps";
 import {
   COMPANY_ACCOUNTS, FAILURE_REASONS, MODES,
   cancelSubscription, fmtDate, inr, markFailToPay,
@@ -61,20 +63,50 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   const [remark, setRemark] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
-  /* ONLY BUSINESSES WITH A RECORDABLE CHAIN APPEAR — an accepted quotation
-     whose invoice is raised and not already carried. A business the write
-     would refuse is not offered; the sale that never went through the chain
-     is recorded once its documents exist, not before. */
+  /* Direct Plan Subscription state */
+  const [plans, setPlans] = useState<PlanRow[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [directMode, setDirectMode] = useState<boolean | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  const [termMonths, setTermMonths] = useState<number>(12);
+  const [installmentCount, setInstallmentCount] = useState<number>(1);
+  const [customAmountRupees, setCustomAmountRupees] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    AdminOpsService.plans()
+      .then((r) => {
+        if (cancelled) return;
+        if (r.response !== false && r.data?.plans) {
+          const activePlans = r.data.plans.filter((p) => p.isActive && !p.isArchived);
+          setPlans(activePlans);
+          if (activePlans.length > 0 && !selectedPlanId) {
+            setSelectedPlanId(String(activePlans[0].id));
+            setCustomAmountRupees(activePlans[0].payableAmount || activePlans[0].amount || "");
+            const m = parseInt(activePlans[0].duration || "12", 10);
+            if (!isNaN(m) && m > 0) setTermMonths(m);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setPlansLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  /* ANY ACTIVE USER CAN BE SELECTED. If a chain (accepted quotation + invoice)
+     exists for the chosen user it is auto-attached in pickUser(); if not, the
+     operator will pick a plan directly. The old withChain pre-filter that
+     blocked users without a prior quotation is removed — operators can now
+     record direct cash/bank subscriptions without first completing the
+     Deals → Quotations → Invoices chain. */
   const shownUsers = useMemo(() => {
-    const withChain = users.filter((u) =>
-      chainsFor(u.userId).some((c) => !!c.attachable && !c.recordedAs));
     const q = uq.trim().toLowerCase();
     const list = q
-      ? withChain.filter((u) => u.name.toLowerCase().includes(q)
+      ? users.filter((u) => u.name.toLowerCase().includes(q)
         || (u.business || "").toLowerCase().includes(q)
         || u.userId.toLowerCase().includes(q)
         || u.email.toLowerCase().includes(q))
-      : withChain;
+      : users;
     return list.slice(0, 8);
   }, [users, uq]);
   const chosenUser = users.filter((u) => u.userId === userId)[0] || null;
@@ -84,80 +116,101 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      the chain's invoice — so the common case is one pick and one press.
      Nothing is locked by the pick that was not already locked by the chain:
      the block keeps its Change link, so a different quotation is one press
-     away. Every listed business has at least one open chain, by the filter
-     above. */
+     away. If no chain exists, directMode is enabled automatically. */
   const pickUser = (uid: string) => {
     setUserId(uid);
     setErr(null);
     setPaidStr("0");
     const opens = chainsFor(uid).filter((c) => !!c.attachable && !c.recordedAs);
-    setQuotationNumber(opens.length ? opens[0].quotation.quotationNumber : "");
+    if (opens.length) {
+      setQuotationNumber(opens[0].quotation.quotationNumber);
+      setDirectMode(false);
+    } else {
+      setQuotationNumber("");
+      setDirectMode(true);
+    }
   };
 
   /* ------------------------------------------------------- the chain ---
      deal → quotation → invoice. Picking the business resolves it, and the
      quotation then answers every question below: what was sold, for how long,
-     for how much, and in how many installments. Nothing on this dialog is
-     typed once a quotation is chosen, which is the whole point — a figure
-     retyped beside a document is a figure that can disagree with it.
-
-     Only ACCEPTED quotations appear. A rejected one is not offered rather
-     than offered and refused, because a subscription cannot be recorded on a
-     sale that did not happen. */
+     for how much, and in how many installments. */
   const chains = userId ? chainsFor(userId) : [];
   const open = chains.filter((c) => !!c.attachable && !c.recordedAs);
-  const chain = chains.filter((c) => c.quotation.quotationNumber === quotationNumber)[0] || null;
-  const quote = chain ? chain.quotation : null;
+  const isDirect = directMode !== null ? directMode : open.length === 0;
 
-  /* The chain's invoice IS the invoice. Not a default the operator can drift
-     away from — it is the installment this subscription is being recorded
-     on, and the reason only chained businesses are offered at all. */
+  const chain = !isDirect ? chains.filter((c) => c.quotation.quotationNumber === quotationNumber)[0] || null : null;
+  const quote = chain ? chain.quotation : null;
   const invoice = chain && chain.attachable ? chain.attachable : null;
 
-  /* THE SCHEDULE IS WHAT THE DOCUMENTS AGREED — the count is never re-split.
-     What the team picks is how much of it is ALREADY collected: the covered
-     rows are written paid in the same write, and the rest are collected one
-     by one on the subscription, each payment naming its row. */
-  const fullN = quote ? quote.installments : 1;
+  const currPlan = plans.find((p) => String(p.id) === selectedPlanId) || plans[0] || null;
+  const directAmountStr = customAmountRupees !== "" ? customAmountRupees : (currPlan?.payableAmount || currPlan?.amount || "0");
+  const directPaise = Math.round((parseFloat(directAmountStr) || 0) * 100);
+
+  const fullN = isDirect ? installmentCount : (quote ? quote.installments : 1);
   const n = fullN;
-  const paidN = Math.min(Math.max(Number(paidStr) || 0, 0), fullN);
+  const paidN = Math.min(Math.max(Number(paidStr) || 0, 0), n);
 
-  /* One invoice per installment, each for the same amount — so the total is
-     the invoice times the agreed count, and nobody types a figure that could
-     disagree with the document. */
-  const per = invoice ? invoice.grandTotalPaise : null;
-  const paise = per !== null ? per * fullN : null;
-  /* The exact rows recordSubscription will write. Asking the store rather than
-     re-deriving them means the preview cannot drift from the commit, and it
-     returns nothing at all when the total will not divide — the same condition
-     the store refuses on. */
-  const sched = paise !== null ? previewSchedule(startDate, n, paise) : [];
+  const per = !isDirect && invoice ? invoice.grandTotalPaise : null;
+  const paise = isDirect ? directPaise : (per !== null ? per * fullN : null);
+  const sched = paise !== null && paise > 0 ? previewSchedule(startDate, n, paise) : [];
 
-  const months = quote ? quote.termMonths : 0;
-  const planName = quote ? quote.planName : "";
-  /* A quotation names a plan but carries no catalogue id — it is a document,
-     not a catalogue row. Slugged from the name so the id reads like every other
-     one in the module rather than announcing where it came from. */
-  const planId = quote
-    ? "PL-" + quote.planName.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "")
-    : "PL-MANUAL";
+  const months = isDirect ? termMonths : (quote ? quote.termMonths : 0);
+  const planName = isDirect ? (currPlan ? currPlan.title : "Direct Plan") : (quote ? quote.planName : "");
+  const planId = isDirect
+    ? "PL-" + (currPlan ? currPlan.title.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "") : "DIRECT")
+    : (quote ? "PL-" + quote.planName.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "") : "PL-MANUAL");
 
-  /* THE ONE PLACE THE QUOTATION AND THE INVOICE CAN DISAGREE, and it is worth
-     saying out loud rather than silently trusting one. The quotation agreed a
-     total; the invoices raised against it are what the customer was actually
-     billed. They differ legitimately — a quotation's installments need not be
-     equal, and 00147 in the seed proves it — so this is a note, never a block. */
-  const quotedVsBilled = quote && paise !== null && quote.grandTotalPaise !== paise
+  const quotedVsBilled = !isDirect && quote && paise !== null && quote.grandTotalPaise !== paise
     ? { quoted: quote.grandTotalPaise, billed: paise }
     : null;
 
   const submit = async () => {
+    if (isDirect) {
+      if (!currPlan && !selectedPlanId) {
+        setErr("Select a plan from the catalogue.");
+        return;
+      }
+      if (paise === null || paise <= 0) {
+        setErr("Total subscription amount must be greater than zero.");
+        return;
+      }
+      if (paidN > 0 && !payRef.trim()) {
+        setErr("A payment reference or UTR is required for recorded payments.");
+        return;
+      }
+      const r = await recordSubscription({
+        userId,
+        source: "sales",
+        planId,
+        planName,
+        cycleMonths: months,
+        installmentCount: n,
+        startDate,
+        remark: remark.trim() || undefined,
+        direct: true,
+        totalPaise: paise,
+        paid: paidN > 0
+          ? { count: paidN, mode: payMode, reference: payRef.trim(), valueDate: payDate, accountId: payAccount }
+          : undefined,
+      });
+      if (r.error) { setErr(r.error); return; }
+      const nextDue = sched.filter((i) => i.seq > paidN)[0] || null;
+      onDone(
+        r.subscriptionId + " recorded · " + planName + " · " + inr(paise)
+        + " (Direct Plan Subscription). "
+        + (chosenUser ? chosenUser.name : "The customer") + " is entitled from "
+        + fmtDate(startDate) + ", "
+        + (paidN > 0
+          ? (paidN === n ? "and every installment is collected." : paidN + " of " + n + " collected — installment " + (paidN + 1) + " is due " + fmtDate(nextDue ? nextDue.dueDate : startDate) + ".")
+          : "and the first installment is due " + fmtDate(sched[0] ? sched[0].dueDate : startDate) + "."), "ok");
+      return;
+    }
+
     if (!invoice) {
       setErr("Attach the invoice this subscription was raised on. It is what says how much the customer owes, and nothing here types that figure.");
       return;
     }
-    /* A quotation is what a salesperson closed, and only chained sales are
-       recordable here — so the channel is a fact, not a question. */
     const r = await recordSubscription({
       userId,
       source: "sales",
@@ -201,7 +254,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
               {chosenUser.business ? " · " + chosenUser.business : ""}
               {chosenUser.status !== "active" ? " · " + chosenUser.status : ""}
             </>}
-            onChange={() => { setUserId(""); setUq(""); setQuotationNumber(""); }} />
+            onChange={() => { setUserId(""); setUq(""); setQuotationNumber(""); setDirectMode(null); }} />
         ) : (
           <>
             <Input value={uq} autoFocus ariaLabel="Search for the business"
@@ -217,211 +270,352 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
                 ))}
               </PickList>
             ) : (
-              <Fine>No business with an accepted quotation and a raised invoice matches that. A subscription is recorded on its documents — raise them first.</Fine>
+              <Fine>No active user matches that search. Try name, business name, email or user id.</Fine>
             )}
           </>
         )}
       </Fs>
 
-      {/* THE CHAIN. Everything below this fieldset is read from the quotation
-          and the invoice it was billed on — the plan, the term, the total and
-          the number of installments. It is the difference between recording a
-          sale and re-describing one. */}
-      {userId ? (
-        <Fs legend="The sale it came from">
-          {chain ? (
-            <DocCard
-              number={chain.quotation.quotationNumber}
-              pill={<Pill xs tone="ok" text="accepted" />}
-              action={<Button color="link-color" size="sm"
-                onClick={() => { setQuotationNumber(""); setPaidStr("0"); }}>Change</Button>}
-              pairs={[
-                ["Deal", <span className="font-mono tnum">{chain.quotation.dealRef}</span>],
-                ["Plan", <>{chain.quotation.planName} · {chain.quotation.termMonths} month{chain.quotation.termMonths === 1 ? "" : "s"}</>],
-                ["Agreed", <span className="font-mono tnum">{inr(chain.quotation.grandTotalPaise)}</span>],
-                ["Paid as", chain.quotation.installments === 1
-                  ? "Complete payment"
-                  : chain.quotation.installments + " installments, " + chain.quotation.installmentGapMonths + " month apart"],
-                ["Invoices raised", chain.invoices.length
-                  ? chain.invoices.map((i) => i.invoiceNumber + " · " + inr(i.grandTotalPaise)
-                    + (i.status === "cancelled" ? " (cancelled)" : "")).join("  ·  ")
-                  : "none yet"],
-              ]} />
-          ) : open.length ? (
-            <PickList>
-              {open.map((c) => (
-                <PickRow key={c.quotation.quotationNumber}
-                  onPick={() => { setQuotationNumber(c.quotation.quotationNumber); setPaidStr("0"); }}
-                  id={<span className="font-mono tnum">{c.quotation.quotationNumber}</span>}
-                  sub={c.quotation.planName + " · " + c.quotation.termMonths + "m · "
-                    + (c.quotation.installments === 1 ? "complete payment" : c.quotation.installments + " installments")
-                    + " · " + c.quotation.dealRef}
-                  right={inr(c.quotation.grandTotalPaise)} />
-              ))}
-            </PickList>
-          ) : (
-            <Alert tone="info" ico="doc"
-              title={"No open quotation for " + (chosenUser ? chosenUser.name : "this business") + " any more."}>
-              Every accepted quotation of theirs is already recorded as a subscription, or its
-              invoice has not been raised yet. Raise the documents first — a subscription is
-              recorded on them, not beside them.
+      {/* METHOD SWITCHER: QUOTATION CHAIN vs DIRECT PLAN */}
+      {userId && open.length > 0 && (
+        <div className="flex items-center justify-between gap-2 border-b border-secondary pb-3">
+          <span className="text-sm font-medium text-secondary">Recording method:</span>
+          <Segmented
+            label="Recording method"
+            value={isDirect ? "direct" : "chain"}
+            onPick={(v) => { setDirectMode(v === "direct"); setErr(null); setPaidStr("0"); }}
+            options={[
+              { v: "chain", l: `Quotation chain (${open.length})` },
+              { v: "direct", l: "Direct plan" },
+            ]}
+          />
+        </div>
+      )}
+
+      {userId && !isDirect ? (
+        <>
+          <Fs legend="The sale it came from">
+            {chain ? (
+              <DocCard
+                number={chain.quotation.quotationNumber}
+                pill={<Pill xs tone="ok" text="accepted" />}
+                action={<Button color="link-color" size="sm"
+                  onClick={() => { setQuotationNumber(""); setPaidStr("0"); }}>Change</Button>}
+                pairs={[
+                  ["Deal", <span className="font-mono tnum">{chain.quotation.dealRef}</span>],
+                  ["Plan", <>{chain.quotation.planName} · {chain.quotation.termMonths} month{chain.quotation.termMonths === 1 ? "" : "s"}</>],
+                  ["Agreed", <span className="font-mono tnum">{inr(chain.quotation.grandTotalPaise)}</span>],
+                  ["Paid as", chain.quotation.installments === 1
+                    ? "Complete payment"
+                    : chain.quotation.installments + " installments, " + chain.quotation.installmentGapMonths + " month apart"],
+                  ["Invoices raised", chain.invoices.length
+                    ? chain.invoices.map((i) => i.invoiceNumber + " · " + inr(i.grandTotalPaise)
+                      + (i.status === "cancelled" ? " (cancelled)" : "")).join("  ·  ")
+                    : "none yet"],
+                ]} />
+            ) : open.length ? (
+              <PickList>
+                {open.map((c) => (
+                  <PickRow key={c.quotation.quotationNumber}
+                    onPick={() => { setQuotationNumber(c.quotation.quotationNumber); setPaidStr("0"); }}
+                    id={<span className="font-mono tnum">{c.quotation.quotationNumber}</span>}
+                    sub={c.quotation.planName + " · " + c.quotation.termMonths + "m · "
+                      + (c.quotation.installments === 1 ? "complete payment" : c.quotation.installments + " installments")
+                      + " · " + c.quotation.dealRef}
+                    right={inr(c.quotation.grandTotalPaise)} />
+                ))}
+              </PickList>
+            ) : (
+              <Alert tone="info" ico="doc"
+                title={"No open quotation for " + (chosenUser ? chosenUser.name : "this business") + " any more."}>
+                Every accepted quotation of theirs is already recorded as a subscription, or its
+                invoice has not been raised yet. Raise the documents first — a subscription is
+                recorded on them, not beside them.
+              </Alert>
+            )}
+          </Fs>
+
+          <Fs legend="What was sold" req
+            hint={quote ? "From " + quote.quotationNumber + "." : undefined}>
+            {quote ? (
+              <Derived>
+                <b className="font-semibold">{quote.planName}</b>
+                <span className="ml-1">· {quote.termMonths} month{quote.termMonths === 1 ? "" : "s"}</span>
+              </Derived>
+            ) : (
+              <Fine>Pick the quotation above.</Fine>
+            )}
+            <Field label="Starts on">
+              <DateInput value={startDate} max={todayIso()} ariaLabel="Starts on"
+                onChange={setStartDate} />
+            </Field>
+          </Fs>
+
+          <Fs legend="The invoice" req
+            hint={quote ? "Raised on " + quote.quotationNumber + "." : undefined}>
+            {!userId ? (
+              <Fine>Pick the business first — the invoice has to be one of theirs.</Fine>
+            ) : invoice ? (
+              <DocCard
+                number={invoice.invoiceNumber}
+                pill={<Pill xs tone={invoice.paymentStatus === "paid" ? "ok" : "warn"} text={invoice.paymentStatus} />}
+                pairs={[
+                  ["Raised for", invoice.customer.name + (invoice.customer.business ? " · " + invoice.customer.business : "")],
+                  ["Description", invoice.description],
+                  ["Invoice date", <>{fmtDate(invoice.invoiceDate)} · due {fmtDate(invoice.dueDate)}</>],
+                  ["Taxable", <span className="font-mono tnum">{inr(invoice.taxablePaise)}</span>],
+                  ["Tax", <span className="font-mono tnum">{inr(invoice.grandTotalPaise - invoice.taxablePaise)} · {invoice.placeOfSupply}</span>],
+                  ["Invoice total", <span className="font-mono font-semibold tnum">{inr(invoice.grandTotalPaise)}</span>],
+                ]} />
+            ) : (
+              <Fine>The chain's invoice appears here once a quotation is attached.</Fine>
+            )}
+          </Fs>
+
+          <Fs legend="How it is paid" req>
+            <Field label="Payment plan">
+              {quote && per !== null ? (
+                <Derived>
+                  {fullN === 1
+                    ? <><b className="font-semibold">Complete payment</b> · {inr(per)}</>
+                    : <><b className="font-semibold">{fullN} installments</b> · {fullN} × {inr(per)}, {quote.installmentGapMonths} month apart — as agreed</>}
+                </Derived>
+              ) : (
+                <Derived faint>attach a quotation first</Derived>
+              )}
+            </Field>
+            <Field label="Subscription total">
+              <Derived>
+                <span className="font-mono tnum">
+                  {per !== null
+                    ? (fullN === 1
+                      ? <b className="font-semibold">{inr(per)}</b>
+                      : <>{inr(per)} × {fullN} = <b className="font-semibold">{inr(per * fullN)}</b></>)
+                    : "attach an invoice"}
+                </span>
+              </Derived>
+            </Field>
+            {quote && per !== null ? (
+              <Field label="Paid so far">
+                <SelectInput ariaLabel="Paid so far" value={String(paidN)} onChange={setPaidStr}
+                  options={[{ v: "0", l: "Nothing yet — all " + fullN + " due" }].concat(
+                    Array.from({ length: fullN }, (_, i) => i + 1).map((k) => ({
+                      v: String(k),
+                      l: k === fullN
+                        ? "Complete payment — all " + fullN + " paid · " + inr(per * fullN)
+                        : k === 1
+                          ? "1st installment paid · " + inr(per)
+                          : "First " + k + " installments paid · " + k + " × " + inr(per),
+                    })))} />
+              </Field>
+            ) : null}
+            {paidN > 0 && quote ? (
+              <>
+                <Field label="Paid via">
+                  <SelectInput ariaLabel="Paid via" value={payMode} onChange={setPayMode} options={MODES.slice()} />
+                </Field>
+                <Field label="Credited to">
+                  <SelectInput ariaLabel="Credited to" value={payAccount} onChange={setPayAccount} options={accountOptions()} />
+                </Field>
+                <Field label="Reference / UTR">
+                  <Input mono value={payRef} ph="NEFT0019AUG2213" ariaLabel="Reference or UTR" onChange={setPayRef} />
+                </Field>
+                <Field label="Value date">
+                  <DateInput value={payDate} max={todayIso()} ariaLabel="Value date" onChange={setPayDate} />
+                </Field>
+              </>
+            ) : null}
+
+            {quotedVsBilled ? (
+              <Alert tone="warn" title="The quotation and the invoices do not add up to the same figure.">
+                {quote?.quotationNumber} agreed {inr(quotedVsBilled.quoted)}; this records{" "}
+                {inr(quotedVsBilled.billed)} — {inr(invoice ? invoice.grandTotalPaise : 0)} × {n}.
+                The invoice wins, because it is what was billed. Check it was meant to.
+              </Alert>
+            ) : null}
+
+            <Ledger>
+              {sched.length ? (
+                <>
+                  {sched.map((i) => (
+                    <LedgerRow key={i.seq}
+                      label={<>
+                        {i.of === 1 ? "Complete payment" : "Installment " + i.seq + " of " + i.of}
+                        {" · "}
+                        {i.seq <= paidN
+                          ? <b className="font-semibold text-success-primary">paid</b>
+                          : <>due {fmtDate(i.dueDate)}</>}
+                      </>}>
+                      {inr(i.amountPaise)}
+                    </LedgerRow>
+                  ))}
+                  <LedgerRow label="Total" grand>{inr(sched.reduce((t, i) => t + i.amountPaise, 0))}</LedgerRow>
+                </>
+              ) : (
+                <p className="py-1.5 text-sm text-tertiary">
+                  {paise === null || paise <= 0
+                    ? "Attach an invoice and the schedule appears here, dated, before anything is written."
+                    : "The schedule could not be built for " + inr(paise) + " over " + n + " installments."}
+                </p>
+              )}
+            </Ledger>
+          </Fs>
+        </>
+      ) : userId && isDirect ? (
+        <>
+          {open.length === 0 && (
+            <Alert tone="info" ico="doc" title="No unrecorded quotations found">
+              Recording via Direct Plan Subscription. Select a catalogue plan and payment terms below.
             </Alert>
           )}
-        </Fs>
+
+          <Fs legend="Catalogue plan" req>
+            <Field label="Plan">
+              {plansLoading ? (
+                <Fine>Loading catalogue plans...</Fine>
+              ) : plans.length === 0 ? (
+                <Fine>No active plans found in catalogue.</Fine>
+              ) : (
+                <SelectInput
+                  ariaLabel="Select Plan"
+                  value={selectedPlanId}
+                  onChange={(val) => {
+                    setSelectedPlanId(val);
+                    const p = plans.find((x) => String(x.id) === val);
+                    if (p) {
+                      setCustomAmountRupees(p.payableAmount || p.amount || "");
+                      const m = parseInt(p.duration || "12", 10);
+                      if (!isNaN(m) && m > 0) setTermMonths(m);
+                    }
+                  }}
+                  options={plans.map((p) => ({
+                    v: String(p.id),
+                    l: `${p.title} · ₹${p.payableAmount || p.amount} (${p.duration || "12m"})`,
+                  }))}
+                />
+              )}
+            </Field>
+            <Field label="Starts on">
+              <DateInput value={startDate} max={todayIso()} ariaLabel="Starts on" onChange={setStartDate} />
+            </Field>
+          </Fs>
+
+          <Fs legend="Terms & pricing" req>
+            <Field label="Billing term (months)">
+              <SelectInput
+                ariaLabel="Billing Term"
+                value={String(termMonths)}
+                onChange={(v) => setTermMonths(Number(v) || 12)}
+                options={[
+                  { v: "1", l: "1 month" },
+                  { v: "3", l: "3 months (Quarterly)" },
+                  { v: "6", l: "6 months (Half-yearly)" },
+                  { v: "12", l: "12 months (Annual)" },
+                  { v: "24", l: "24 months (2 Years)" },
+                  { v: "36", l: "36 months (3 Years)" },
+                ]}
+              />
+            </Field>
+            <Field label="Total amount (₹)">
+              <Input
+                mono
+                type="number"
+                value={customAmountRupees}
+                onChange={setCustomAmountRupees}
+                ariaLabel="Total Amount in Rupees"
+                ph="e.g. 50000"
+              />
+            </Field>
+            <Field label="Payment schedule">
+              <SelectInput
+                ariaLabel="Installments"
+                value={String(installmentCount)}
+                onChange={(v) => {
+                  setInstallmentCount(Number(v) || 1);
+                  setPaidStr("0");
+                }}
+                options={[
+                  { v: "1", l: "1 installment (Complete payment)" },
+                  { v: "2", l: "2 installments (50% each)" },
+                  { v: "3", l: "3 installments" },
+                  { v: "4", l: "4 installments (Quarterly)" },
+                  { v: "6", l: "6 installments (Bi-monthly)" },
+                  { v: "12", l: "12 installments (Monthly)" },
+                ]}
+              />
+            </Field>
+          </Fs>
+
+          <Fs legend="How it is paid" req>
+            <Field label="Paid so far">
+              <SelectInput
+                ariaLabel="Paid so far"
+                value={String(paidN)}
+                onChange={setPaidStr}
+                options={[{ v: "0", l: "Nothing yet — all " + n + " due" }].concat(
+                  Array.from({ length: n }, (_, i) => i + 1).map((k) => ({
+                    v: String(k),
+                    l: k === n
+                      ? "Complete payment — all " + n + " paid · " + inr(paise || 0)
+                      : k === 1
+                        ? "1st installment paid · " + inr(sched[0]?.amountPaise || 0)
+                        : "First " + k + " installments paid · " + inr(sched.slice(0, k).reduce((s, x) => s + x.amountPaise, 0)),
+                  }))
+                )}
+              />
+            </Field>
+            {paidN > 0 && (
+              <>
+                <Field label="Paid via">
+                  <SelectInput ariaLabel="Paid via" value={payMode} onChange={setPayMode} options={MODES.slice()} />
+                </Field>
+                <Field label="Credited to">
+                  <SelectInput ariaLabel="Credited to" value={payAccount} onChange={setPayAccount} options={accountOptions()} />
+                </Field>
+                <Field label="Reference / UTR">
+                  <Input mono value={payRef} ph="NEFT0019AUG2213" ariaLabel="Reference or UTR" onChange={setPayRef} />
+                </Field>
+                <Field label="Value date">
+                  <DateInput value={payDate} max={todayIso()} ariaLabel="Value date" onChange={setPayDate} />
+                </Field>
+              </>
+            )}
+
+            <Ledger>
+              {sched.length ? (
+                <>
+                  {sched.map((i) => (
+                    <LedgerRow key={i.seq}
+                      label={<>
+                        {i.of === 1 ? "Complete payment" : "Installment " + i.seq + " of " + i.of}
+                        {" · "}
+                        {i.seq <= paidN
+                          ? <b className="font-semibold text-success-primary">paid</b>
+                          : <>due {fmtDate(i.dueDate)}</>}
+                      </>}>
+                      {inr(i.amountPaise)}
+                    </LedgerRow>
+                  ))}
+                  <LedgerRow label="Total" grand>{inr(sched.reduce((t, i) => t + i.amountPaise, 0))}</LedgerRow>
+                </>
+              ) : (
+                <p className="py-1.5 text-sm text-tertiary">
+                  {paise === null || paise <= 0
+                    ? "Configure the plan and total amount above to generate the installment schedule."
+                    : "The schedule could not be built for " + inr(paise) + " over " + n + " installments."}
+                </p>
+              )}
+            </Ledger>
+          </Fs>
+        </>
       ) : null}
 
-      {/* WHAT, FROM THE QUOTATION. The document carries the plan and the term,
-          so there is no second field for either that could disagree with it. */}
-      {userId ? (
-        <Fs legend="What was sold" req
-          hint={quote ? "From " + quote.quotationNumber + "." : undefined}>
-          {quote ? (
-            <Derived>
-              <b className="font-semibold">{quote.planName}</b>
-              <span className="ml-1">· {quote.termMonths} month{quote.termMonths === 1 ? "" : "s"}</span>
-            </Derived>
-          ) : (
-            <Fine>Pick the quotation above.</Fine>
-          )}
-          <Field label="Starts on">
-            <DateInput value={startDate} max={todayIso()} ariaLabel="Starts on"
-              onChange={setStartDate} />
-          </Field>
-        </Fs>
-      ) : null}
-
-      {/* THE INVOICE CARRIES THE MONEY. Nobody types a total: the invoice is
-          the document the customer owes against, and a figure typed beside it
-          could only ever be a second opinion on the same money. */}
-      <Fs legend="The invoice" req
-        hint={quote ? "Raised on " + quote.quotationNumber + "." : undefined}>
-        {!userId ? (
-          <Fine>Pick the business first — the invoice has to be one of theirs.</Fine>
-        ) : invoice ? (
-          <DocCard
-            number={invoice.invoiceNumber}
-            pill={<Pill xs tone={invoice.paymentStatus === "paid" ? "ok" : "warn"} text={invoice.paymentStatus} />}
-            pairs={[
-              ["Raised for", invoice.customer.name + (invoice.customer.business ? " · " + invoice.customer.business : "")],
-              ["Description", invoice.description],
-              ["Invoice date", <>{fmtDate(invoice.invoiceDate)} · due {fmtDate(invoice.dueDate)}</>],
-              ["Taxable", <span className="font-mono tnum">{inr(invoice.taxablePaise)}</span>],
-              ["Tax", <span className="font-mono tnum">{inr(invoice.grandTotalPaise - invoice.taxablePaise)} · {invoice.placeOfSupply}</span>],
-              ["Invoice total", <span className="font-mono font-semibold tnum">{inr(invoice.grandTotalPaise)}</span>],
-            ]} />
-        ) : (
-          <Fine>The chain's invoice appears here once a quotation is attached.</Fine>
-        )}
-      </Fs>
-
-      <Fs legend="How it is paid" req>
-        <Field label="Payment plan">
-          {quote && per !== null ? (
-            <Derived>
-              {fullN === 1
-                ? <><b className="font-semibold">Complete payment</b> · {inr(per)}</>
-                : <><b className="font-semibold">{fullN} installments</b> · {fullN} × {inr(per)}, {quote.installmentGapMonths} month apart — as agreed</>}
-            </Derived>
-          ) : (
-            <Derived faint>attach a quotation first</Derived>
-          )}
+      {/* Written once everything above is settled */}
+      {userId && (
+        <Field label="Remark">
+          <Input value={remark} ph="Recorded late — signed on the 1st" ariaLabel="Remark" onChange={setRemark} />
         </Field>
-        <Field label="Subscription total">
-          <Derived>
-            <span className="font-mono tnum">
-              {per !== null
-                ? (fullN === 1
-                  ? <b className="font-semibold">{inr(per)}</b>
-                  : <>{inr(per)} × {fullN} = <b className="font-semibold">{inr(per * fullN)}</b></>)
-                : "attach an invoice"}
-            </span>
-          </Derived>
-        </Field>
-        {/* WHICH INSTALLMENTS ARE ALREADY PAID, the team's call: none, the
-            1st, the first two, … or all — a complete payment. The covered
-            rows are written paid with this write; the rest are collected
-            one by one on the subscription. */}
-        {quote && per !== null ? (
-          <Field label="Paid so far">
-            <SelectInput ariaLabel="Paid so far" value={String(paidN)} onChange={setPaidStr}
-              options={[{ v: "0", l: "Nothing yet — all " + fullN + " due" }].concat(
-                Array.from({ length: fullN }, (_, i) => i + 1).map((k) => ({
-                  v: String(k),
-                  l: k === fullN
-                    ? "Complete payment — all " + fullN + " paid · " + inr(per * fullN)
-                    : k === 1
-                      ? "1st installment paid · " + inr(per)
-                      : "First " + k + " installments paid · " + k + " × " + inr(per),
-                })))} />
-          </Field>
-        ) : null}
-        {/* The transfer behind what was collected — the same facts the
-            one-by-one payment write demands, asked once and applied to
-            every covered row. */}
-        {paidN > 0 && quote ? (
-          <>
-            <Field label="Paid via">
-              <SelectInput ariaLabel="Paid via" value={payMode} onChange={setPayMode} options={MODES.slice()} />
-            </Field>
-            <Field label="Credited to">
-              <SelectInput ariaLabel="Credited to" value={payAccount} onChange={setPayAccount} options={accountOptions()} />
-            </Field>
-            <Field label="Reference / UTR">
-              <Input mono value={payRef} ph="NEFT0019AUG2213" ariaLabel="Reference or UTR" onChange={setPayRef} />
-            </Field>
-            <Field label="Value date">
-              <DateInput value={payDate} max={todayIso()} ariaLabel="Value date" onChange={setPayDate} />
-            </Field>
-          </>
-        ) : null}
-
-        {/* THE QUOTATION AND THE INVOICES CAN LEGITIMATELY DIFFER. A quotation
-            agrees a total; the invoices raised against it need not be equal
-            slices of it. So this is stated, never blocked — and the invoice
-            wins, because it is what the customer was actually billed. */}
-        {quotedVsBilled ? (
-          <Alert tone="warn" title="The quotation and the invoices do not add up to the same figure.">
-            {quote?.quotationNumber} agreed {inr(quotedVsBilled.quoted)}; this records{" "}
-            {inr(quotedVsBilled.billed)} — {inr(invoice ? invoice.grandTotalPaise : 0)} × {n}.
-            The invoice wins, because it is what was billed. Check it was meant to.
-          </Alert>
-        ) : null}
-
-        {/* THE SCHEDULE, BEFORE IT EXISTS. Every installment carries a due date
-            from day one, so this is the whole record — not a preview of the
-            first row with the rest implied. */}
-        <Ledger>
-          {sched.length ? (
-            <>
-              {sched.map((i) => (
-                <LedgerRow key={i.seq}
-                  label={<>
-                    {i.of === 1 ? "Complete payment" : "Installment " + i.seq + " of " + i.of}
-                    {" · "}
-                    {i.seq <= paidN
-                      ? <b className="font-semibold text-success-primary">paid</b>
-                      : <>due {fmtDate(i.dueDate)}</>}
-                  </>}>
-                  {inr(i.amountPaise)}
-                </LedgerRow>
-              ))}
-              <LedgerRow label="Total" grand>{inr(sched.reduce((t, i) => t + i.amountPaise, 0))}</LedgerRow>
-            </>
-          ) : (
-            <p className="py-1.5 text-sm text-tertiary">
-              {paise === null || paise <= 0
-                ? "Attach an invoice and the schedule appears here, dated, before anything is written."
-                : "The schedule could not be built for " + inr(paise) + " over " + n + " installments."}
-            </p>
-          )}
-        </Ledger>
-      </Fs>
-
-      {/* Written once everything above is settled, like a note on the bottom
-          of a voucher — the pay dialog's remark, same place, same weight. */}
-      <Field label="Remark">
-        <Input value={remark} ph="Recorded late — signed on the 1st" ariaLabel="Remark" onChange={setRemark} />
-      </Field>
+      )}
 
       <Alert tone="info" ico="lock" title="Recording this entitles the customer now.">
         Every installment is created <em>due</em>; none counts as collected until a payment is

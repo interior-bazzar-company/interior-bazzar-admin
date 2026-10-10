@@ -30,7 +30,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { qs, TbTitle } from "../../ui";
 import type { Params } from "./store";
-import { PERIOD, RECORD_TYPES, inr, useActiveCount, useSalaryRows, useSalaryTotals, useSubTotals } from "./store";
+import { PERIOD, RECORD_TYPES, inr, useActiveCount, useOverview, useSalaryRows, useSalaryTotals, useSubTotals } from "./store";
 import { ROUTE_OF, VIEW_OF } from "./Frame";
 import Subscriptions from "./Subscriptions";
 import Installments from "./Installments";
@@ -86,7 +86,9 @@ export default function Finance() {
 
   /* The section is the route, and the route is the first path segment — the
      same thing ViewHost keyed the module on to get here. */
-  const route = (location.pathname.split("/").filter(Boolean)[0] || "finance").toLowerCase();
+  const pathPart = location.pathname.split("/").filter(Boolean)[0];
+  const hashPart = location.hash ? location.hash.replace(/^#[/]?/, "").split("/").filter(Boolean)[0] : "";
+  const route = (pathPart || hashPart || "finance").toLowerCase();
   const view = VIEW_OF[route] || "subscriptions";
 
   const p = useMemo(() => {
@@ -113,6 +115,8 @@ export default function Finance() {
   const totals = useSalaryTotals();
   /* All time, and the one definition the strip and the Analytics tab read too. */
   const subs = useSubTotals();
+  /* Live overview figures across all modules (installments, transactions, refunds, analytics). */
+  const ov = useOverview();
   const crumbs = useMemo(() => (
     <>
       {/* The title says WHICH SECTION you are in — each is its own sidebar
@@ -175,6 +179,18 @@ export default function Finance() {
                   + inr(subs.failedPaise) + " that did not clear."
                 : "Every installment that exists has been settled."} />
           </>
+        ) : view === "installments" ? (
+          <TbStat k="Overdue" v={inr(ov.failedPaise)} tone={ov.failedN > 0 ? "warn" : "ok"}
+            title={ov.failedN + " installment" + (ov.failedN === 1 ? " is" : "s are") + " overdue or failed to pay across all deals."} />
+        ) : view === "transactions" ? (
+          <TbStat k="Monthly spend" v={inr(ov.otherOutPaise)} tone="ok"
+            title={"Total spent on transactions in " + PERIOD.label + " across " + ov.otherOutN + " entries."} />
+        ) : view === "refunds" ? (
+          <TbStat k="Refunds owed" v={ov.refundsOwedPaise ? inr(ov.refundsOwedPaise) : "—"} tone={ov.refundsOwedN ? "warn" : undefined}
+            title={ov.refundsOwedN ? inr(ov.refundsOwedPaise) + " approved and waiting for transfer." : "No refunds awaiting payout."} />
+        ) : view === "analytics" ? (
+          <TbStat k="Net cash" v={inr(ov.netPaise)} tone={ov.netPaise >= 0 ? "ok" : "warn"}
+            title={"Net cash flow in " + PERIOD.label + " (income minus all expenses)."} />
         ) : (
           <TbStat k="Active subscriptions" v={activeN}
             title="Subscriptions running right now — a level, read at this moment, not a total for any period." />
@@ -182,7 +198,7 @@ export default function Finance() {
       </span>
     </>
   ), [view, activeN, membersN, subs, totals.membersAll, totals.paidPaise,
-    totals.paidAllPaise, totals.unpaidPaise, totals.unpaidPeople]);
+    totals.paidAllPaise, totals.unpaidPaise, totals.unpaidPeople, ov]);
 
   usePageChrome(
     { crumbs, right: null, parent: id ? listHash(view) : null },
@@ -190,7 +206,7 @@ export default function Finance() {
        first render, and without them in the key the topbar keeps the zeros it
        mounted with. */
     (id ? "rec" : view) + ":" + activeN + "/" + membersN + "/" + totals.unpaidPaise
-      + "/" + subs.collectedPaise + "/" + subs.outstandingPaise,
+      + "/" + subs.collectedPaise + "/" + subs.outstandingPaise + "/" + ov.failedPaise + "/" + ov.otherOutPaise,
   );
 
   const timer = useRef<number | undefined>(undefined);
@@ -218,7 +234,7 @@ export default function Finance() {
     if (/^SAL-|^RUN-/.test(id)) return <SalaryDetail id={id} p={p} onParams={onRec} />;
     if (/^TXN-/.test(id)) return <TxnDetail id={id} p={p} onParams={onRec} />;
     if (/^RF-/.test(id)) return <RefundDetail id={id} p={p} onParams={onRec} />;
-    return <SubscriptionDetail id={id} p={p} onParams={onRec} />;
+    if (/^SUB-/.test(id) || view === "subscriptions") return <SubscriptionDetail id={id} p={p} onParams={onRec} />;
   }
 
   const shared = { p, onFilter, onSearch, onUnfilter, onParams };
