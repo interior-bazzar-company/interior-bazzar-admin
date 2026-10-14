@@ -1465,12 +1465,6 @@ export class AdminOpsService {
     return apiService.getGetApiResponse<AuditResponse>(
       `${base}/audit/user/${encodeURIComponent(String(ref))}/${qs(params)}`);
   }
-  /** The labels, verbs, modules and roles the trail is drawn and filtered
-   *  from, so the panel hard-codes none of them. */
-  static auditVocabularies() {
-    return apiService.getGetApiResponse<AuditVocabularies>(`${base}/audit/vocabularies/`);
-  }
-
   // ── Revenue ──
   static revenue(params: { start?: string; end?: string } = {}) {
     return apiService.getGetApiResponse<RevenueOverview>(`${base}/revenue/${qs(params)}`);
@@ -1478,10 +1472,6 @@ export class AdminOpsService {
   static addExpense(data: ExpenseInput) {
     return apiService.getPostApiResponse<any>(`${base}/revenue/expense/`, data);
   }
-  static setAssumptions(data: Partial<RevenueAssumptions>) {
-    return apiService.getPutApiResponse<RevenueAssumptions>(`${base}/revenue/assumptions/`, data);
-  }
-
   // ── Plans & pricing ──
   static plans() {
     return apiService.getGetApiResponse<{ families: Record<string, PlanRow[]>; plans: PlanRow[] }>(`${base}/plans/`);
@@ -1518,52 +1508,9 @@ export class AdminOpsService {
   }
 
   // ── House banners (real HomeHeroBanner hero slides) ──
-  static bannersHouse(page?: string) {
-    return apiService.getGetApiResponse<{ banners: BannerRow[] }>(`${base}/banners-house/${qs({ page })}`);
-  }
-  static createBanner(data: BannerInput) {
-    return apiService.getPostApiResponse<BannerRow>(`${base}/banners-house/`, data);
-  }
-  static updateBanner(id: number, data: BannerInput) {
-    return apiService.getPutApiResponse<BannerRow>(`${base}/banners-house/${id}/`, data);
-  }
-  static toggleBanner(id: number) {
-    return apiService.getPostApiResponse<BannerRow>(`${base}/banners-house/${id}/toggle/`, {});
-  }
-  static deleteBanner(id: number) {
-    return apiService.getDeleteApiResponse<any>(`${base}/banners-house/${id}/`);
-  }
-  static moveBanner(id: number, direction: "up" | "down") {
-    return apiService.getPostApiResponse<{ banners: BannerRow[] }>(`${base}/banners-house/${id}/move/`, { direction });
-  }
-
   // ── Banner ads moderation ──
-  static bannersAd(params: { status?: string; pageNo?: number; pageSize?: number } = {}) {
-    return apiService.getGetApiResponse<any>(`${base}/banners-ad/${qs(params)}`);
-  }
-  static approveAd(id: number) {
-    return apiService.getPostApiResponse<any>(`${base}/banners-ad/${id}/approve/`, {});
-  }
-  static rejectAd(id: number, reason: string) {
-    return apiService.getPostApiResponse<any>(`${base}/banners-ad/${id}/reject/`, { reason });
-  }
   // House/fallback ad (AdCampaign with no advertiser, auto-approved to live).
-  static createFallbackAd(data: {
-    placement: string; page?: string; image?: string; eyebrow?: string;
-    heading?: string; sub?: string; features?: string[]; ctaLabel?: string;
-    ctaLink?: string; theme?: string;
-  }) {
-    return apiService.getPostApiResponse<any>(`${base}/banners-ad/fallback/`, data);
-  }
-
   // ── Buyers ──
-  static buyers(params: { search?: string; pageNo?: number; pageSize?: number } = {}) {
-    return apiService.getGetApiResponse<any>(`${base}/buyers/${qs(params)}`);
-  }
-  static toggleBuyer(id: number) {
-    return apiService.getPostApiResponse<any>(`${base}/buyers/${id}/toggle/`, {});
-  }
-
   // ── Users (the platform's own accounts, not the admin team) ──
   static usersVocabularies() {
     return apiService.getGetApiResponse<UsersVocabularies>(`${base}/users/vocabularies/`);
@@ -1622,14 +1569,7 @@ export class AdminOpsService {
   static businesses(params: { search?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<any>(`${base}/businesses/${qs(params)}`);
   }
-  static toggleBusinessVerified(id: number) {
-    return apiService.getPostApiResponse<any>(`${base}/businesses/${id}/toggle-verified/`, {});
-  }
   // Catalog & Trust > Businesses Moderation (distinct shape from the Users list).
-  static businessModeration(params: { search?: string; pageNo?: number; pageSize?: number } = {}) {
-    return apiService.getGetApiResponse<any>(`${base}/businesses/moderation/${qs(params)}`);
-  }
-
   // ── Payments ──
   /** `status` takes a comma list (PAID,REFUNDED); `start`/`end` filter on verifiedAt's date. */
   static payments(params: { status?: string; refunded?: boolean; paymentMethod?: string; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
@@ -1650,87 +1590,19 @@ export class AdminOpsService {
   }
 
   // ── Support ──
-  static supportTickets(params: { status?: string; pageNo?: number; pageSize?: number } = {}) {
-    return apiService.getGetApiResponse<any>(`${base}/support/${qs(params)}`);
-  }
-  static supportTicket(id: number) {
-    return apiService.getGetApiResponse<any>(`${base}/support/${id}/`);
-  }
-  static replyTicket(id: number, body: string) {
-    return apiService.getPostApiResponse<any>(`${base}/support/${id}/reply/`, { body });
-  }
-  static closeTicket(id: number) {
-    return apiService.getPostApiResponse<any>(`${base}/support/${id}/close/`, {});
-  }
-
   // ── Templates ──
   static templates() {
     return apiService.getGetApiResponse<any>(`${base}/templates/`);
   }
-  static createTemplate(data: any) {
-    return apiService.getPostApiResponse<any>(`${base}/templates/`, data);
-  }
-  static updateTemplate(id: number, data: any) {
-    return apiService.getPutApiResponse<any>(`${base}/templates/${id}/`, data);
-  }
-  static deleteTemplate(id: number) {
-    return apiService.getDeleteApiResponse<any>(`${base}/templates/${id}/`);
-  }
-
   // ── Brand assets ──
-  static brandLogo() {
-    return apiService.getGetApiResponse<any>(`${base}/brand-logo/`);
-  }
-  static setBrandLogo(data: { logoUrl?: string; faviconUrl?: string; tagline?: string }) {
-    return apiService.getPutApiResponse<any>(`${base}/brand-logo/`, data);
-  }
   // Scheduled seasonal logos (task 27)
-  static listLogos() { return apiService.getGetApiResponse<any>(`${base}/brand-logo/logos/`); }
-  static createLogo(data: any) { return apiService.getPostApiResponse<any>(`${base}/brand-logo/logos/`, data); }
-  static updateLogo(id: number, data: any) { return apiService.getPutApiResponse<any>(`${base}/brand-logo/logos/${id}/`, data); }
-  static deleteLogo(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/brand-logo/logos/${id}/`); }
-
   // ── Slots ──
-  static slots() {
-    return apiService.getGetApiResponse<any>(`${base}/slots/`);
-  }
-  static overrideSlot(id: number, data: { capacity?: number; holderId?: number; priority?: number }) {
-    return apiService.getPutApiResponse<any>(`${base}/slots/${id}/`, data);
-  }
-
   // ── Weights ──
-  static weights() {
-    return apiService.getGetApiResponse<any>(`${base}/weights/`);
-  }
-  static setWeights(weights: Record<string, number>, merge = true) {
-    return apiService.getPutApiResponse<any>(`${base}/weights/`, { weights, merge });
-  }
-
   // ── Testimonials ──
-  static testimonials() {
-    return apiService.getGetApiResponse<any>(`${base}/testimonials/`);
-  }
-  static createTestimonial(data: any) {
-    return apiService.getPostApiResponse<any>(`${base}/testimonials/`, data);
-  }
-  static updateTestimonial(id: number, data: any) {
-    return apiService.getPutApiResponse<any>(`${base}/testimonials/${id}/`, data);
-  }
-  static deleteTestimonial(id: number) {
-    return apiService.getDeleteApiResponse<any>(`${base}/testimonials/${id}/`);
-  }
-  static reorderTestimonial(id: number, index: number) {
-    return apiService.getPostApiResponse<any>(`${base}/testimonials/${id}/reorder/`, { index });
-  }
-
   // ── Reports ──
   static reports(params: { status?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<any>(`${base}/reports/${qs(params)}`);
   }
-  static resolveReport(id: number, status: string) {
-    return apiService.getPutApiResponse<any>(`${base}/reports/${id}/`, { status });
-  }
-
   // ── Subscriptions ──
   /** The PURCHASES, each carrying whatever commitment stands over it. */
   static subs(params: { family?: string; status?: string; pageNo?: number; pageSize?: number } = {}) { return apiService.getGetApiResponse<SubsListResponse>(`${base}/subs/${qs(params)}`); }
@@ -1773,44 +1645,14 @@ export class AdminOpsService {
   }
 
   // ── Routing / Quarantine (LeadQuery) ──
-  static routing(params: { status?: string; tier?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/routing/${qs(params)}`); }
-  static routingAction(id: number, status: string) { return apiService.getPostApiResponse<any>(`${base}/routing/${id}/action/`, { status }); }
   // Admin add/edit lead (LeadQuery via the v2 admin lead endpoints — NOT the GMB system).
-  static createLead(data: Record<string, any>) { return apiService.getPostApiResponse<any>(`${base}/v2/query/`, data); }
-  static updateLead(id: number, data: Record<string, any>) { return apiService.getPutApiResponse<any>(`${base}/v2/query/${id}/`, data); }
-  static quarantine(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/quarantine/${qs(params)}`); }
-  static quarantineAction(id: number, status: string) { return apiService.getPostApiResponse<any>(`${base}/quarantine/${id}/action/`, { status }); }
-
   // ── Web analytics ──
-  static webAnalytics(params: { start?: string; end?: string } = {}) { return apiService.getGetApiResponse<any>(`${base}/web-analytics/${qs(params)}`); }
-
   // ── Reviews ──
-  static reviews(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/reviews/${qs(params)}`); }
-  static hideReview(id: number) { return apiService.getPostApiResponse<any>(`${base}/reviews/${id}/hide/`, {}); }
-  static reviewsQA(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/reviews/qa/${qs(params)}`); }
-  static hideQuestion(id: number) { return apiService.getPostApiResponse<any>(`${base}/reviews/qa/${id}/hide/`, {}); }
-
   // ── Taxonomy (cat-region) ──
   static taxonomy() { return apiService.getGetApiResponse<any>(`${base}/taxonomy/`); }
-  static addCategory(value: string, label: string, trending = false) { return apiService.getPostApiResponse<any>(`${base}/taxonomy/`, { value, label, trending }); }
-  static updateCategory(id: number, data: { label?: string; value?: string; trending?: boolean; index?: number; isActive?: boolean }) { return apiService.getPutApiResponse<any>(`${base}/taxonomy/category/${id}/`, data); }
-  static deleteCategory(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/taxonomy/category/${id}/`); }
-  static addSegment(data: { value: string; label: string; trending?: boolean; categoryIds?: number[] }) { return apiService.getPostApiResponse<any>(`${base}/taxonomy/segment/`, data); }
-  static updateSegment(id: number, data: { value?: string; label?: string; trending?: boolean; isActive?: boolean; categoryIds?: number[] }) { return apiService.getPutApiResponse<any>(`${base}/taxonomy/segment/${id}/`, data); }
-  static deleteSegment(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/taxonomy/segment/${id}/`); }
-  static addState(data: { name: string; value?: string; countryId?: number }) { return apiService.getPostApiResponse<any>(`${base}/taxonomy/state/`, data); }
-  static updateState(id: number, data: { name?: string; value?: string; countryId?: number }) { return apiService.getPutApiResponse<any>(`${base}/taxonomy/state/${id}/`, data); }
-  static deleteState(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/taxonomy/state/${id}/`); }
-
   // ── Feedback ──
   static feedback(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/feedback/${qs(params)}`); }
-  static setFeedbackStatus(id: number, status: string) { return apiService.getPostApiResponse<any>(`${base}/feedback/${id}/status/`, { status }); }
-
   // ── Plan requests ──
-  static planRequests(params: { stage?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/plan-requests/${qs(params)}`); }
-  static setPlanRequestStage(id: number, stage: string) { return apiService.getPostApiResponse<any>(`${base}/plan-requests/${id}/stage/`, { stage }); }
-  static verifyPlanRequest(id: number, data: { subscriptionId: number; entityType: string }) { return apiService.getPostApiResponse<any>(`${base}/plan-requests/${id}/verify/`, data); }
-
   // ── Deals (interior_admin DealsViews — read AND write) ──
   static deals(params: {
     stage?: string; priority?: string; owner?: string | number; tag?: string;
@@ -2446,10 +2288,6 @@ export class AdminOpsService {
 
   // ── Content (blog) ──
   static content(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/content/${qs(params)}`); }
-  static toggleBlogFeatured(id: number) { return apiService.getPostApiResponse<any>(`${base}/content/${id}/feature/`, {}); }
-  static createBlog(data: any) { return apiService.getPostApiResponse<any>(`${base}/content/`, data); }
-  static updateBlog(id: number, data: any) { return apiService.getPutApiResponse<any>(`${base}/content/${id}/`, data); }
-  static deleteBlog(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/content/${id}/`); }
 }
 
 export default AdminOpsService;

@@ -79,17 +79,4 @@ export class CommonService {
     }
   }
 
-  static async subscribeToNewsletter(
-    email: string
-  ): Promise<ApiResponseType<any>> {
-    try {
-      const url = `${appUrl.common}/subscribe-newsletter/`;
-      const response: ApiResponseType<any> =
-        await apiService.getPostApiResponse(url, { email });
-      return response;
-    } catch (error) {
-      logger.error("Error subscribing to newsletter", error);
-      throw error;
-    }
-  }
 }
