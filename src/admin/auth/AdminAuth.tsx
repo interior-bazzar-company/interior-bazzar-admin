@@ -124,6 +124,11 @@ export default function AdminAuth() {
     setBusy(true);
     try {
       const res = await AuthService.signinAdmin({ username: who.trim(), password: pass });
+      /* A refusal arrives as HTTP 200 + response:false. Treat it as the refusal it
+         is, before any token is stored: storing `undefined` tokens is what fired
+         me/permissions with "Bearer undefined" and a refresh with "undefined"
+         after every wrong password (F-AD-55), and hid the deactivated code (F-AD-42). */
+      if (res.response === false) throw new AppExceptions(res.message || "", res.code);
       const data = res.data as LoginFormResponse;
       TokenService.setTokens(data.accessToken, data.refreshToken);
       const s = await loadSession(true);
@@ -144,7 +149,9 @@ export default function AdminAuth() {
         return;
       }
       clearSession();
-      setBanner(e instanceof AppExceptions && e.code === 423 ? LOCKED_BANNER : INVALID_BANNER);
+      /* 423 locked; 403 = the server's "deactivated" refusal for a suspended or deleted account */
+      setBanner(e instanceof AppExceptions && e.code === 423 ? LOCKED_BANNER
+        : e instanceof AppExceptions && e.code === 403 ? WITHDRAWN_BANNER : INVALID_BANNER);
     } finally {
       setBusy(false);
     }
