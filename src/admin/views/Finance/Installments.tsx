@@ -187,7 +187,7 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
     setLoading(true);
     Promise.all([
       AdminOpsService.installments({ pageSize: 500 }),
-      AdminOpsService.dealAssignees().catch(() => ({ response: false, data: { assignees: [] } })),
+      AdminOpsService.dealAssignees().catch(() => ({ response: false, data: { people: [] } })),
     ])
       .then(([instRes, assRes]) => {
         setLoading(false);
@@ -196,9 +196,9 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
         } else {
           setRows([]);
         }
-        if (assRes && assRes.data && (assRes.data as { assignees?: DealPersonRef[] }).assignees) {
-          setAssignees((assRes.data as { assignees: DealPersonRef[] }).assignees);
-        }
+        /* deals/assignees/ answers `people` (DealsController.Assignees). */
+        const people = (assRes?.data as { people?: DealPersonRef[] } | undefined)?.people;
+        if (people) setAssignees(people);
       })
       .catch((err) => {
         setLoading(false);

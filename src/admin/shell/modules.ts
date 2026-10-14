@@ -299,7 +299,7 @@ export function getModules(): ModuleGroup[] {
   if (s) {
     const seen = new Set(mods.map((m) => m.key));
     PROTO_ROWS.forEach((r) => {
-      if (!seen.has(r.key) && PROTO_MODULES.has(r.key)) put(r.key, r.label, r.group);
+      if (!seen.has(r.key) && PROTO_MODULES.has(r.key) && can(r.key)) put(r.key, r.label, r.group);
     });
   }
   /* A row keeps its PROTO_ROWS place inside its group when the server starts

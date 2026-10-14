@@ -73,6 +73,9 @@ export const HIDDEN_MODULES = new Set(["design", "payments", "finance-bank", "ba
  *  refuses nothing and leaks nothing; a key in this set refuses nothing and
  *  leaks everything. */
 export const PROTO_MODULES = new Set<string>(["finance-installments"]);
+/** Screens served by another module's API: `finance-installments` reads
+ *  installments/ and payments/deal-ledger/, both gated on `payments`. */
+const BACKED_BY: Record<string, string> = { "finance-installments": "payments" };
 
 export function getSession(): MePermissions | null {
   return session;
@@ -155,10 +158,10 @@ export const EDIT_MEANS: Record<string, string[]> = {
 
 export function can(moduleKey: string, action?: string): boolean {
   if (!session) return false;
-  /* Empty, and the set's own comment says why it must stay that way. Kept as
-     a one-line escape hatch rather than deleted so the next frontend-first
-     module reaches for a Module row instead of reinventing this. */
-  if (PROTO_MODULES.has(moduleKey)) return true;
+  /* A screen with no Module row of its own answers with the module its API is
+     gated on, so the nav never offers a screen whose every request would 403. */
+  const backing = BACKED_BY[moduleKey];
+  if (backing) return can(backing, action);
   if (session.isFullAccess) return true;
   const held = session.modules.find((m) => m.key === moduleKey)?.actions || [];
   /* `view` is the gate: without it the module is not this session's at all, so
