@@ -17,7 +17,7 @@ import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import { Check, Fine, Ledger, LedgerRow, Money, PaidReceipt, ProofField, TagChip } from "./bits";
 import {
-  COMPANY_ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
+  BILL_THRESHOLD_PAISE, COMPANY_ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
   PROOF_MAX_BYTES, addTag, cancelTransaction, deactivateTag, fileSize,
   isSuperAdmin, proofAccepted, proofTooBig, recordTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
@@ -207,6 +207,11 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
   const isIn = f.direction === "in";
   const account = COMPANY_ACCOUNTS.filter((x) => x.accountId === f.accountId)[0] || null;
   const paise = toPaise(f.amount);
+  /* A bill is needed for money IN (the income row's receipt is required), for a tag
+     marked proofRequired, and for a debit at or over the panel's threshold --
+     not for every transaction (F-AD-11). The server enforces its own part. */
+  const pickedTag = tags.find((t) => t.tagKey === f.tagKey.trim() || t.label.toLowerCase() === f.tagKey.trim().toLowerCase());
+  const needsBill = isIn || !!pickedTag?.proofRequired || (paise ?? 0) >= BILL_THRESHOLD_PAISE;
 
   /* ============================================== done: the receipt === */
   if (done) {
@@ -268,7 +273,7 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
       footer={<><Cancel onClose={onClose} />
         {/* Disabled without the receipt, because the store refuses without it —
             a button that is going to say no is better off saying so first. */}
-        <Button color="primary" isDisabled={!f.bill} onClick={submit}>Record</Button></>}>
+        <Button color="primary" isDisabled={needsBill && !f.bill} onClick={submit}>Record</Button></>}>
 
       {/* EVERY CHOICE IS A DROPDOWN AND EVERY FIELD IS ON ITS OWN LINE — the
           pay-salary dialog's rhythm. The three segmented pickers this had
