@@ -2074,12 +2074,14 @@ export function correctDay(input: {
   if (!input.reason.trim()) return Promise.resolve(err("reason_required", "A reason is required for the audit log."));
   return live(
     () => AdminOpsService.correctAttendanceDay({
+      /* The server's CorrectionSchema reads `date` and `note` (F-AD-6). An empty
+         endedAt means "still open"; null is sent as "" so it type-checks. */
       member: Number(input.memberId),
-      businessDate: input.businessDate,
+      date: input.businessDate,
       startedAt: input.startedAt || undefined,
-      endedAt: input.endedAt === undefined ? undefined : input.endedAt,
-      breakMinutes: input.breakMinutes === undefined ? undefined : input.breakMinutes,
-      reason: input.reason.trim(),
+      endedAt: input.endedAt === undefined ? undefined : (input.endedAt || ""),
+      breakMinutes: input.breakMinutes ?? undefined,
+      note: input.reason.trim(),
     }),
     (d) => {
       const day = toDay(d);

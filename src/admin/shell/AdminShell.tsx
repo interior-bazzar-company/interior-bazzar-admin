@@ -94,6 +94,9 @@ export function hashToPath(hash: string): string {
   return h;
 }
 
+/** Auto open-day request already sent on this page load. */
+let autoOpenSent = false;
+
 export default function AdminShell() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -149,7 +152,11 @@ export default function AdminShell() {
      this would pull all of it, plus its ~23-request boot, onto every panel load
      including the ones that never open a Team route. */
   useEffect(() => {
-    if (!getSession()?.user) return;
+    /* Once per page load (StrictMode and remounts fired it twice, F-AD-28), and
+       only for a session that holds attendance -- without it the server answers
+       403 (BUG-11). */
+    if (autoOpenSent || !getSession()?.user || !can("attendance")) return;
+    autoOpenSent = true;
     void call(AdminOpsService.attendanceDayAction("open", true)).catch(() => undefined);
   }, []);
 
