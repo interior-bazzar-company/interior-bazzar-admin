@@ -208,10 +208,10 @@ function ReassignOrphanModal({ target, members, onClose, onDone }: {
     setErr(null);
     try {
       await call(AdminOpsService.reassignOrphans({
-        toUserId: Number(toUserId),
+        reassignTo: Number(toUserId),
         reason: reason.trim() || "Reassigning orphaned records",
         refs: target.kind === "deal" ? [target.ref] : undefined,
-        fromId: target.kind === "owner" ? target.fromId : undefined,
+        fromUserId: target.kind === "owner" ? target.fromId : undefined,
         unassignedOnly: target.kind === "unassigned" ? true : undefined,
       }));
       toast("Records reassigned.");
@@ -250,7 +250,7 @@ function ReassignOrphanModal({ target, members, onClose, onDone }: {
           />
         </FormField>
         <FormField id="orpReason" label="Reason" req>
-          <Input id="orpReason" value={reason} onChange={(e) => setReason(e.target.value)} ph="Reason for reassignment" />
+          <Input id="orpReason" value={reason} onChange={setReason} ph="Reason for reassignment" />
         </FormField>
       </FormSection>
     </ModalShell>
