@@ -58,7 +58,7 @@ export default function NewEnquiryModal({ onClose, onDone }: {
     projectType: "", intent: "", urgency: "", text: "",
   });
   const [assignToBusinessId, setAssignToBusinessId] = useState<string>("");
-  const [isPreQualified, setIsPreQualified] = useState<boolean>(true);
+  const [isPreQualified, setIsPreQualified] = useState<boolean>(false); // opt-in: ticking it writes a "verified" contact log and all four checks (F-AD-19)
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
