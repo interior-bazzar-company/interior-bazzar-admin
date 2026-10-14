@@ -91,6 +91,8 @@ export interface Member {
   joiningDate: string;
   /** The scope axis, in one column. One level deep, never transitive. */
   reportsTo: string | null;
+  /** Same as reportsTo; the Reports screen reads this name (F-AD-34). */
+  reportsToId: string | null;
   workLocation: string;
   expectedHoursPerDay: number;
   dayStartsAt: string;
@@ -588,6 +590,7 @@ function toMember(u: AdminUserRow, s: WorkSettingsRow | undefined): Member {
     employmentType: employment ? employment.key : "",
     joiningDate: (s && s.joiningDate) || "",
     reportsTo: boss ? String(boss.id) : null,
+    reportsToId: boss ? String(boss.id) : null,
     workLocation: "",
     expectedHoursPerDay: s ? s.expectedHoursPerDay : 0,
     dayStartsAt: s ? s.dayStartsAt : "",
