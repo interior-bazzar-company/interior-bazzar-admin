@@ -102,10 +102,9 @@ export default function InvoiceDetail({ id, tab, params }: {
       ? { icon: "x", label: "Cancel draft", title: "Consumes no number, so nothing dangles", tone: "bad", act: openCancel }
       : { icon: "x", label: "Cancel invoice", title: "The number stays spent — a correction is a new invoice", tone: "bad", act: openCancel });
 
-  /* Issued means the ledger row is already written, in the same transaction
-     (InvoicesController.Issue) -- so received is the whole grand total or it is
-     nothing, and the balance is the rest. No figure here is estimated. */
-  const received = inv.status === "issued" ? inv.grandTotalPaise : 0;
+  /* Issue writes no ledger row; a recorded payment does. `receivedPaise` is the
+     server's sum over the live ledger rows, so it is the only honest figure. */
+  const received = inv.receivedPaise || 0;
   const balance = inv.grandTotalPaise - received;
   const over = inv.status === "draft" ? Math.max(0, -daysFrom(inv.dueDate)) : 0;
 

@@ -20,9 +20,7 @@ export function blockersOf(inv: InvoiceRow): string[] {
   if (!inv.billing.name || !inv.billing.address) out.push("The billing block is incomplete.");
   if (!inv.dueDate) out.push("A due date is required.");
   if (inv.grandTotalPaise <= 0) out.push("The grand total must be greater than zero.");
-  if (!(inv.proofs || []).filter((p) => !p.removed).length)
-    out.push("Payment proof is required \u2014 attach evidence of the payment before issuing.");
-  if (!(inv.paymentReference || "").trim())
-    out.push("A payment reference / UTR is required to log the payment this invoice raises.");
+  /* No proof or UTR check: Issue no longer records a payment (InvoicesController.Issue),
+     so the server does not ask for them. They belong to Record payment. */
   return out;
 }
