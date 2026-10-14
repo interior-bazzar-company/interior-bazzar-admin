@@ -30,32 +30,44 @@ import { ErrSlot, RolePicks, errOf, readRolePicks, val } from "../teamShared";
 import type { EngineErr, Member, Ops, Role } from "../teamShared";
 
 /* ------------------------------------------------------- create member -- */
-export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
+export function MemberNewModal({ roles, members = [], ops }: { roles: Role[]; members?: Member[]; ops: Ops }) {
   const [err, setErr] = useState<EngineErr | null>(null);
+  const [fieldErrs, setFieldErrs] = useState<{ name?: string; email?: string; username?: string }>({});
+  const [reportsTo, setReportsTo] = useState<string>("");
   const [busy, setBusy] = useState(false);
-  /* ASSIGNING A ROLE IS ITS OWN GRANT, and the server checks it on the PAYLOAD
-     rather than on the method: `POST users/` passes on `team.create`, then
-     refuses with 403 if the body carries a role and the caller lacks
-     `team.roles` (AdminUserViews). So a role holder with create-but-not-roles
-     met an enabled form, a role picker, and a refusal on every attempt — the
-     grid says `create` is ticked and has no column that could have said
-     otherwise, because a checkbox per verb cannot express a gate that depends
-     on what you typed.
-
-     The picker is ABSENT rather than disabled, like every other locked control
-     in this panel, and the member is created with no role — which the server
-     does allow — with a line saying who can finish the job. */
   const mayAssign = can("team", "roles");
+
+  const managerOptions = [
+    { v: "", l: "No manager (reports to nobody)" },
+    ...members
+      .filter((m) => m.isActive !== false)
+      .map((m) => ({ v: String(m.id), l: m.name || m.username || m.email || ("#" + m.id) })),
+  ];
 
   async function create() {
     if (busy) return;
+    const nameVal = val("tmName").trim();
+    const emailVal = val("tmEmail").trim();
+    const userVal = val("tmUser").trim();
+    const nextErrs: { name?: string; email?: string; username?: string } = {};
+
+    if (!nameVal) nextErrs.name = "Name is required.";
+    if (!emailVal) nextErrs.email = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) nextErrs.email = "Enter a valid email address.";
+    if (!userVal) nextErrs.username = "Username is required.";
+    else if (!/^[a-zA-Z0-9._-]+$/.test(userVal)) nextErrs.username = "Username may only contain letters, numbers, dots, underscores, or hyphens.";
+
+    setFieldErrs(nextErrs);
+    if (Object.keys(nextErrs).length > 0) return;
+
     setBusy(true);
     setErr(null);
     try {
       await call(AdminOpsService.createUser({
-        username: val("tmUser"), password: val("tmPass"),
-        name: val("tmName"), email: val("tmEmail"), phone: val("tmPhone"),
+        username: userVal, password: val("tmPass"),
+        name: nameVal, email: emailVal, phone: val("tmPhone").trim(),
         roles: mayAssign ? readRolePicks() : [],
+        reportsTo: reportsTo ? Number(reportsTo) : null,
       }));
       ops.done("Member created.");
     } catch (e) {
@@ -81,12 +93,12 @@ export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
       <ErrSlot err={err} />
       <div className="flex flex-col gap-6">
         <FormSection title="Team member">
-          <FormField id="tmName" label="Name" req>
-            <Input id="tmName" ph="Rhea Menon" autoFocus />
+          <FormField id="tmName" label="Name" req err={fieldErrs.name}>
+            <Input id="tmName" ph="Rhea Menon" autoFocus invalid={!!fieldErrs.name} onChange={() => fieldErrs.name && setFieldErrs((p) => ({ ...p, name: undefined }))} />
           </FormField>
           <FieldRow>
-            <FormField id="tmEmail" label="Email" req>
-              <Input id="tmEmail" type="email" ph="rhea@interiorbazzar.com" />
+            <FormField id="tmEmail" label="Email" req err={fieldErrs.email}>
+              <Input id="tmEmail" type="email" ph="rhea@interiorbazzar.com" invalid={!!fieldErrs.email} onChange={() => fieldErrs.email && setFieldErrs((p) => ({ ...p, email: undefined }))} />
             </FormField>
             <FormField id="tmPhone" label="Phone" req>
               <Input id="tmPhone" ph="+91 98100 00000" />
@@ -96,17 +108,20 @@ export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
 
         <FormSection title="Account">
           <FieldRow>
-            <FormField id="tmUser" label="Username" req>
-              <Input id="tmUser" ph="rhea.menon" />
+            <FormField id="tmUser" label="Username" req err={fieldErrs.username}>
+              <Input id="tmUser" ph="rhea.menon" autoComplete="off" invalid={!!fieldErrs.username} onChange={() => fieldErrs.username && setFieldErrs((p) => ({ ...p, username: undefined }))} />
             </FormField>
             <FormField id="tmPass" label="Password" req
               hint="Set it here and pass it on yourself — there is no generated, shown-once password on this endpoint.">
-              <Input id="tmPass" type="password" ph="At least 8 characters" />
+              <Input id="tmPass" type="password" ph="At least 8 characters" autoComplete="new-password" />
             </FormField>
           </FieldRow>
         </FormSection>
 
-        <FormSection title="Role" desc="Effective access is the union of every role held.">
+        <FormSection title="Role & reporting line" desc="Effective access is the union of every role held.">
+          <FormField id="tmReportsTo" label="Reports To" hint="Who reviews this member's attendance, leave, and daily reports.">
+            <SelectInput id="tmReportsTo" value={reportsTo} onChange={setReportsTo} options={managerOptions} />
+          </FormField>
           {mayAssign ? <RolePicks roles={roles} /> : null}
           <Notice ico="shield" text={mayAssign
             ? <><b>A member with no role can sign in and do nothing.</b> That is deliberate — a successful
@@ -123,17 +138,45 @@ export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
 }
 
 /* --------------------------------------------------------- edit member -- */
-export function MemberEditModal({ u, ops }: { u: Member; ops: Ops }) {
+export function MemberEditModal({ u, roles = [], members = [], ops }: { u: Member; roles?: Role[]; members?: Member[]; ops: Ops }) {
   const [err, setErr] = useState<EngineErr | null>(null);
   const [busy, setBusy] = useState(false);
+  const mayAssign = can("team", "roles");
+  const initialRoleId = u.roles && u.roles.length ? String(u.roles[0].id) : "";
+  const [roleId, setRoleId] = useState<string>(initialRoleId);
+  const [reportsTo, setReportsTo] = useState<string>(u.reportsTo && u.reportsTo.id ? String(u.reportsTo.id) : "");
+
+  const roleOptions = [
+    { v: "", l: "No role" },
+    ...roles
+      .filter((r) => r.isActive || (u.roles || []).some((ur) => ur.id === r.id))
+      .map((r) => ({ v: String(r.id), l: r.name })),
+  ];
+
+  const managerOptions = [
+    { v: "", l: "No manager (reports to nobody)" },
+    ...members
+      .filter((m) => m.id !== u.id && (m.isActive !== false || (u.reportsTo && u.reportsTo.id === m.id)))
+      .map((m) => ({ v: String(m.id), l: m.name || m.username || m.email || ("#" + m.id) })),
+  ];
+
   async function save() {
     if (busy) return;
     setBusy(true);
     setErr(null);
     try {
-      await call(AdminOpsService.updateUser(u.id, {
-        name: val("tmName"), email: val("tmEmail"), phone: val("tmPhone"), username: val("tmUser"),
-      }));
+      const payload: Parameters<typeof AdminOpsService.updateUser>[1] = {
+        name: val("tmName").trim(),
+        email: val("tmEmail").trim(),
+        phone: val("tmPhone").trim(),
+        username: val("tmUser").trim(),
+        reportsTo: reportsTo ? Number(reportsTo) : null,
+      };
+      if (mayAssign && roles.length > 0) {
+        const extraRoles = (u.roles || []).slice(1).map((r) => r.id);
+        payload.roles = roleId ? [Number(roleId), ...extraRoles.filter((id) => id !== Number(roleId))] : [];
+      }
+      await call(AdminOpsService.updateUser(u.id, payload));
       ops.done("Member updated.", "#/team/" + u.id);
     } catch (e) {
       setErr(errOf(e));
@@ -170,13 +213,28 @@ export function MemberEditModal({ u, ops }: { u: Member; ops: Ops }) {
             <Input id="tmPhone" defaultValue={u.phone || ""} />
           </FormField>
           <FormField id="tmUser" label="Username">
-            <Input id="tmUser" mono defaultValue={u.username || ""} />
+            <Input id="tmUser" mono defaultValue={u.username || ""} autoComplete="off" />
           </FormField>
         </FieldRow>
-        <Notice ico="shield" text={
-          <><b>Roles are not on this form.</b> Changing what somebody may access is a different
-            decision from fixing their phone number, so it has its own button.</>
-        } />
+        <FieldRow>
+          <FormField id="edRole" label="Role">
+            <SelectInput
+              id="edRole"
+              value={roleId}
+              onChange={setRoleId}
+              disabled={!mayAssign || roles.length === 0}
+              options={roleOptions}
+            />
+          </FormField>
+          <FormField id="edReportsTo" label="Reports To">
+            <SelectInput
+              id="edReportsTo"
+              value={reportsTo}
+              onChange={setReportsTo}
+              options={managerOptions}
+            />
+          </FormField>
+        </FieldRow>
       </FormSection>
     </ModalShell>
   );

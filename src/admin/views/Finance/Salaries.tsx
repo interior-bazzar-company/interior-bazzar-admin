@@ -40,7 +40,7 @@ import { PaySalaryModal, SalaryAccountModal } from "./SalaryModals";
 import {
   ENGAGEMENTS, FILTER_LABELS, applySalaryFilters, dueOf, engagementMeta,
   filterValueLabel, fmtDate, fmtMonth, inr, isSuperAdmin, superAdminOnly, todayIso,
-  useRuns, useSalaryRows,
+  usePayrollLoad, useRuns, useSalaryRows,
 } from "./store";
 import type { Params, SalaryRow } from "./store";
 
@@ -60,6 +60,7 @@ function recHash(id: string, p: Params): string {
 export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
   const rows = useSalaryRows();
+  const payrollLoad = usePayrollLoad();
 
   const active = rows.filter((r) => r.a.active);
   /* Monthly payroll is what the ACTIVE accounts come to today — a forward
@@ -72,7 +73,10 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
      outstanding — the rule this module already applies to every other figure. */
   const dues = rows.map((r) => ({ r, d: dueOf(r) }));
   const owing = dues.filter((x) => x.d.pendingPaise > 0);
+  const heldAccounts = dues.filter((x) => x.d.heldPaise > 0);
+  const paidAccounts = dues.filter((x) => x.d.pendingPaise === 0 && x.d.heldPaise === 0 && !!x.r.lastPaidAt);
   const owedPaise = owing.reduce((n, x) => n + x.d.pendingPaise, 0);
+  const heldPaise = heldAccounts.reduce((n, x) => n + x.d.heldPaise, 0);
   const inArrears = owing.filter((x) => x.d.arrears.length);
 
   const filtered = applySalaryFilters(rows, p);
@@ -146,9 +150,15 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
       to: accHash({ active: offK("active", "no"), due: undefined }),
       tip: <>Kept for their slips. No run picks a closed account up again.</> },
     "sep",
+    { k: "Paid", v: paidAccounts.length, dot: "ok", on: p.due === "paid",
+      to: accHash({ due: offK("due", "paid"), active: undefined }),
+      tip: <>Paid up for the current month with nothing owed or on hold.</> },
     { k: "Unpaid", v: owing.length, dot: "warn", on: p.due === "unpaid",
       to: accHash({ due: offK("due", "unpaid"), active: undefined }),
-      tip: <>Owed right now — {owedPaise ? inr(owedPaise) : "nothing"} across everybody, arrears included.</> },
+      tip: <>Owed right now — {owedPaise ? inr(owedPaise) : "nothing"} pending across {owing.length} people ({inr(owedPaise + heldPaise)} total unpaid including {inr(heldPaise)} on hold).</> },
+    { k: "On hold", v: heldAccounts.length, dot: "bad", on: p.due === "held",
+      to: accHash({ due: offK("due", "held"), active: undefined }),
+      tip: <>Accounts with a held slip ({inr(heldPaise)} held across {heldAccounts.length} people).</> },
     { k: "In arrears", v: inArrears.length, dot: "bad", on: p.due === "arrears",
       to: accHash({ due: offK("due", "arrears"), active: undefined }),
       tip: <>Owed for more than the current month. The debt that is ageing.</> },
@@ -160,17 +170,17 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
 
   const txCells: (StatCell | "sep")[] = [
     { k: "Total", v: slips.length, on: !p.status, to: txHash({ status: undefined }),
-      tip: <>Every slip ever issued, paid and unpaid alike. The cells beside it are its parts.</> },
+      tip: <>Every slip ever issued across all runs, paid and unpaid alike. The cells beside it are its parts.</> },
     "sep",
     { k: "Paid", v: slips.filter((x) => x.paidAt).length, dot: "ok", on: p.status === "paid",
       to: txHash({ status: offStatus("paid") }),
-      tip: <>Stamped, numbered and frozen. Nothing on a paid slip can change.</> },
+      tip: <>Stamped, numbered and frozen across all runs ({paidAccounts.length} accounts paid in the current month). Nothing on a paid slip can change.</> },
     { k: "Unpaid", v: slips.filter((x) => !x.paidAt && !x.held).length, dot: "warn",
       on: p.status === "unpaid", to: txHash({ status: offStatus("unpaid") }),
-      tip: <>Issued and owed. Paying a person clears every unpaid month they have, oldest first.</> },
+      tip: <>Issued and owed ({inr(owedPaise)} across {owing.length} people). Paying a person clears every unpaid month they have, oldest first.</> },
     { k: "On hold", v: heldN, dot: "bad", on: p.status === "held",
       to: txHash({ status: offStatus("held") }),
-      tip: <>Out of what is owed until somebody releases it. A hold is about a month, not a person.</> },
+      tip: <>Out of what is owed ({inr(heldPaise)}) until somebody releases it. Together with Unpaid ({inr(owedPaise)}), total unpaid is {inr(owedPaise + heldPaise)}.</> },
   ];
 
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
@@ -190,19 +200,23 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
       onUnfilter={onUnfilter} />
   );
 
+  const isLoading = payrollLoad.state === "loading" && rows.length === 0;
+
   return (
     <Frame toast={toast}
       title="Salaries A/C"
       meta={
         <>
           <span className="label-mono">
-            {tab === "analytics"
-              ? "January to December " + year
-              : tab === "accounts"
-                ? (filtered.length === rows.length
-                  ? rows.length + (rows.length === 1 ? " account" : " accounts")
-                  : filtered.length + " of " + rows.length)
-                : slips.length + (slips.length === 1 ? " slip" : " slips")}
+            {isLoading
+              ? "Loading payroll…"
+              : tab === "analytics"
+                ? "January to December " + year
+                : tab === "accounts"
+                  ? (filtered.length === rows.length
+                    ? rows.length + (rows.length === 1 ? " account" : " accounts")
+                    : filtered.length + " of " + rows.length)
+                  : slips.length + (slips.length === 1 ? " slip" : " slips")}
           </span>
           <span className="label-mono">as of {fmtDate(todayIso())}</span>
         </>
@@ -242,7 +256,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
       ) : tab === "accounts" ? (
         <FilterBar
           /* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
-             clearing a chip otherwise leaves the old text in the box. */
+             clearing a chip otherwise left the old text in the box. */
           search={<SearchField key={"q" + (p.q || "")} ph="Name, employee code, designation…"
             val={p.q} onFilter={onSearch} />}
           filters={<>
@@ -250,7 +264,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
               value={p.engagement} onFilter={onFilter}
               options={ENGAGEMENTS.map((e) => ({ v: e.key, l: e.label }))} />
             <Select key={"due" + (p.due || "")} name="due" label="This month" value={p.due}
-              onFilter={onFilter} options={[{ v: "unpaid", l: "Unpaid" }, { v: "paid", l: "Paid" }]} />
+              onFilter={onFilter} options={[{ v: "paid", l: "Paid" }, { v: "unpaid", l: "Unpaid" }, { v: "held", l: "On hold" }]} />
             <Select key={"active" + (p.active || "")} name="active" label="Account" value={p.active}
               onFilter={onFilter} options={[{ v: "yes", l: "Active" }, { v: "no", l: "Closed" }]} />
           </>}
@@ -282,7 +296,11 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
         <StatStrip cells={tab === "transactions" ? txCells : accCells} />
       )}>
 
-      {tab === "analytics" ? (
+      {isLoading ? (
+        <EmptyState icon="clock"
+          title="Loading salary accounts…"
+          body="Fetching salary accounts and monthly payroll runs." />
+      ) : tab === "analytics" ? (
         <Payroll year={year} p={p} onParams={onParams} />
       ) : tab === "transactions" ? (
         <SalaryTransactions p={p} onUnfilter={onUnfilter} onParams={onParams} />
@@ -336,8 +354,8 @@ function PersonRow({ r, p, onPay }: {
 
   /* The rail speaks once, and about the only thing on this row that needs
      somebody: money owed. Amber for the current month, red once a month older
-     than it is still outstanding. */
-  const rail = d.arrears.length ? "bad" : d.pendingPaise ? "warn" : undefined;
+     than it is still outstanding or a slip is held. */
+  const rail = d.arrears.length || d.heldPaise ? "bad" : d.pendingPaise ? "warn" : undefined;
 
   return (
     <tr className={a.active ? "clickable" : "clickable opacity-60"} tabIndex={0} role="link"
@@ -369,6 +387,11 @@ function PersonRow({ r, p, onPay }: {
                 : null}
             </div>
           </>
+        ) : d.held.length > 0 ? (
+          <>
+            <Pill dot tone="bad" text="On hold" />
+            <div className="cell-2">{fmtMonth(d.held[0].month)} · {inr(d.heldPaise)} held</div>
+          </>
         ) : d.state === "paid" ? (
           <>
             <Pill dot tone="ok" text="Paid" />
@@ -395,6 +418,8 @@ function PersonRow({ r, p, onPay }: {
               </div>
             ) : null}
           </>
+        ) : d.heldPaise ? (
+          <span className="text-xs font-medium text-error-primary tnum">{inr(d.heldPaise)} held</span>
         ) : <span className="text-quaternary">—</span>}
       </td>
 

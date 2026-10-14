@@ -181,6 +181,7 @@ export interface AdminUserInput {
   email: string;
   phone: string;
   roles: number[];
+  reportsTo?: number | null;
 }
 export interface AuditEntry {
   /** Null on the synthesised registration line — there is no row to link to. */
@@ -1401,6 +1402,9 @@ export class AdminOpsService {
   static orphans() {
     return apiService.getGetApiResponse<OrphansResponse>(`${base}/users/orphans/`);
   }
+  static reassignOrphans(data: { reassignTo: number; reason?: string; refs?: string[]; fromUserId?: number; unassignedOnly?: boolean }) {
+    return apiService.getPostApiResponse<{ moved: OwnedCounts; orphans: OrphansResponse }>(`${base}/users/orphans/`, data);
+  }
 
   // ── Audit ──
   /** `search` matches the actor, the action key, the module and the detail —
@@ -2303,8 +2307,8 @@ export class AdminOpsService {
   static attendanceDayAction(action: "open" | "break" | "resume" | "end", auto?: boolean) {
     return apiService.getPostApiResponse<AttendanceDayRow>(`${base}/attendance/day/${action}/`, auto ? { auto: true } : {});
   }
-  /** Full access only. Times are HH:MM in the member's local time. */
-  static correctAttendanceDay(data: { member: number; date: string; startedAt: string; endedAt?: string; breakMinutes?: number; note: string }) {
+  /** Full access / attendance manager. Times are HH:MM in the member's local time. */
+  static correctAttendanceDay(data: { member: number; date: string; startedAt?: string; endedAt?: string; breakMinutes?: number; note: string }) {
     return apiService.getPostApiResponse<AttendanceDayRow>(`${base}/attendance/days/correct/`, data);
   }
   static putAttendanceSettings(userId: number, data: {

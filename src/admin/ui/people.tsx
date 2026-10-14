@@ -55,12 +55,15 @@ export function Avatar({
 
 /* A PERSON: the face, the name, and what they are. */
 export function Person({ name, sub, src, lg, sm, to, className }: { name?: string | null; sub?: ReactNode; src?: string | null; lg?: boolean; sm?: boolean; to?: string; className?: string }) {
+    const cleanSub = typeof sub === "string"
+        ? sub.split(/\s*·\s*/).map((s) => s.trim()).filter((s) => s && s !== "—").join(" · ")
+        : sub;
     const inner = (
         <>
             <Avatar name={name} src={src} lg={lg} sm={sm} xs={sm} />
             <span className="flex min-w-0 flex-col leading-tight">
                 <span className={cx("truncate font-medium text-primary", lg ? "text-md" : "text-sm")}>{name || "—"}</span>
-                {sub ? <span className="truncate text-xs text-tertiary">{sub}</span> : null}
+                {cleanSub ? <span className="truncate text-xs text-tertiary">{cleanSub}</span> : null}
             </span>
         </>
     );

@@ -14,6 +14,7 @@
    ============================================================================= */
 import { useEffect } from "react";
 import { Alert, Button, Card, ListTable, Pill } from "../../../ui";
+import { go } from "../../../ui/nav";
 import { cx } from "@/utils/cx";
 import { useShell } from "../../../shell/ShellContext";
 import {
@@ -49,21 +50,24 @@ export default function LeavePage({ m, viewer }: { m: Member; viewer: Viewer }) 
       <OpHead
         title="Leave"
         desc="Requested, decided, and the days an approval covers."
-        right={viewer === "self"
-          ? (
-            <Button color="primary" ico="plus"
-              onClick={() => shell.modal(<LeaveRequestModal memberId={m.memberId} />)}>
-              Request leave
+        right={
+          <>
+            <Button color="secondary" ico="ext" onClick={() => go("#/attendance?face=requests")}>
+              Leave queue
             </Button>
-          )
-          : viewer === "admin"
-            ? (
+            {viewer === "self" ? (
+              <Button color="primary" ico="plus"
+                onClick={() => shell.modal(<LeaveRequestModal memberId={m.memberId} />)}>
+                Request leave
+              </Button>
+            ) : viewer === "admin" ? (
               <Button color="primary" ico="plus"
                 onClick={() => shell.modal(<LeaveRecordModal memberId={m.memberId} />)}>
                 Record leave
               </Button>
-            )
-            : null} />
+            ) : null}
+          </>
+        } />
 
       {waiting.length && canDecide ? (
         <Alert tone="warn" ico="clock"

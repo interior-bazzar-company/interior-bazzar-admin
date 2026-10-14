@@ -41,6 +41,7 @@ export function niceScale(max: number, ticks = 4): { max: number; steps: number[
 
 const pctOf = (n: number, max: number) => (max > 0 ? Math.max(n > 0 ? 1.5 : 0, (n / max) * 100) : 0);
 const fmt = (n: number) => n.toLocaleString("en-IN");
+export const fmtLakh = (n: number) => (n < 0 ? "−₹" : "₹") + Math.abs(n).toFixed(2) + "L";
 
 /* the slots, as fill/stroke utilities — never a literal */
 const SLOT_FILL = ["", "fill-chart-1", "fill-chart-2", "fill-chart-3", "fill-chart-4", "fill-chart-5", "fill-chart-6", "fill-chart-7", "fill-chart-8"];
@@ -73,34 +74,35 @@ export function ColumnChart({ series, points, unit, labelSeries, height = 220 }:
   const data = points.map((p) => ({ name: p.label, key: p.key, ...p.values }));
   const peak = Math.max(1, ...points.flatMap((p) => series.map((s) => p.values[s.key] || 0)));
   const scale = niceScale(peak);
-  const last = points.length - 1;
+  const isLakh = unit.startsWith("₹ lakh");
+  const fmtVal = (v: number) => (isLakh ? fmtLakh(v) : fmt(v));
   return (
     <figure aria-labelledby={id + "-cap"} className="flex min-w-0 flex-col gap-2">
       {series.length > 1 ? <ChartLegend items={series.map((s) => ({ label: s.label, cls: SLOT_BG[s.slot] }))} /> : null}
       <div style={{ height }} className="min-w-0">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: 0 }} barCategoryGap="28%" barGap={3}>
+          <BarChart data={data} margin={{ top: 18, right: 8, bottom: 0, left: 0 }} barCategoryGap="28%" barGap={3}>
             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={AXIS_TICK} interval="preserveStartEnd" />
             <YAxis axisLine={false} tickLine={false} tick={AXIS_TICK} width={AXIS_W} ticks={scale.steps} domain={[0, scale.max]} tickFormatter={fmt} />
-            <RTooltip cursor={{ className: "fill-bg-secondary" }} content={<ChartTooltipContent />} formatter={(v) => fmt(Number(v))} />
+            <RTooltip cursor={{ className: "fill-bg-secondary" }} content={<ChartTooltipContent />} formatter={(v) => fmtVal(Number(v))} />
             {scale.steps.map((s) => (
               <ReferenceLine key={s} y={s} className={GRID} strokeWidth={1} />
             ))}
             {series.map((s) => (
               <Bar key={s.key} dataKey={s.key} name={s.label} className={SLOT_FILL[s.slot]} radius={[3, 3, 0, 0]} maxBarSize={40} isAnimationActive={false}>
-                {labelSeries === s.key ? (
+                {labelSeries && (series.length <= 2 || labelSeries === s.key) ? (
                   <LabelList
                     dataKey={s.key}
                     position="top"
                     className="fill-text-secondary font-mono"
                     fontSize={11}
-                    formatter={(v: ReactNode) => fmt(Number(v))}
+                    formatter={(v: ReactNode) => fmtVal(Number(v))}
                     content={(props) => {
-                      const { x, y, width, value, index } = props as { x?: number; y?: number; width?: number; value?: number; index?: number };
-                      if (index !== last || x === undefined || y === undefined) return null;
+                      const { x, y, width, value } = props as { x?: number; y?: number; width?: number; value?: number };
+                      if (!value || Number(value) === 0 || x === undefined || y === undefined) return null;
                       return (
                         <text x={(x || 0) + (width || 0) / 2} y={(y || 0) - 6} textAnchor="middle" className="fill-text-secondary font-mono" fontSize={11}>
-                          {fmt(Number(value || 0))}
+                          {fmtVal(Number(value || 0))}
                         </text>
                       );
                     }}
@@ -157,18 +159,28 @@ export function Waterfall({ steps, unit, height = 240 }: { steps: WaterStep[]; u
   /* A CLOSING FIGURE CAN BE NEGATIVE, and it has to look it. Everything is
      plotted as a distance above `floor` — recharts stacks a negative member of
      a stack into its own downward stack, so a −₹75,800 total used to come out
-     as a bar of the same height pointing UP. Shifting the whole chart keeps
-     every value non-negative; the axis prints the true figure, and the zero
-     rule below says where nothing is. `floor` is 0 whenever nothing dips, so
-     a chart that never went negative is drawn exactly as before. */
-  const floor = Math.min(0, ...laid.map((l) => l.lo));
-  const scale = niceScale(peak - floor);
+     as a bar of the same height pointing UP. Snap both `floor` and `top` to
+     multiples of the same nice step so 0 is always a tick and every axis label
+     is a round number. */
+  const rawFloor = Math.min(0, ...laid.map((l) => l.lo));
+  const rawSpan = Math.max(1, peak - rawFloor) / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawSpan)));
+  const norm = rawSpan / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+  const floor = rawFloor < 0 ? Math.floor((rawFloor - step * 0.2) / step) * step : 0;
+  const top = Math.max(step, Math.ceil(peak / step) * step);
+  const scaleSteps: number[] = [];
+  for (let v = 0; v <= top - floor + 1e-9; v += step) scaleSteps.push(Math.round(v * 100) / 100);
+  const scale = { max: top - floor, steps: scaleSteps };
+  const isLakh = unit.startsWith("₹ lakh");
   const data = laid.map((l) => ({
     name: l.s.label, base: l.lo - floor, delta: Math.max(l.hi - l.lo, 0), kind: l.s.kind,
     /* A closing figure below zero is money the period LOST: red, like the
        steps that took it there, never the neutral "total" hue. */
     down: l.s.kind === "total" && l.to < 0,
-    display: l.s.display ?? fmt(l.s.value), sub: l.s.sub,
+    display: l.s.display ?? (isLakh ? fmtLakh(l.s.value) : fmt(l.s.value)),
+    barLabel: isLakh ? fmtLakh(l.s.value) : (l.s.display ?? fmt(l.s.value)),
+    sub: l.s.sub,
   }));
   const fillOf = (d: { kind: string; down: boolean }) =>
     (d.kind === "in" ? "fill-chart-pos" : d.kind === "out" || d.down ? "fill-chart-neg" : "fill-chart-1");
@@ -176,7 +188,7 @@ export function Waterfall({ steps, unit, height = 240 }: { steps: WaterStep[]; u
     <figure aria-labelledby={id + "-cap"} className="flex min-w-0 flex-col gap-2">
       <div style={{ height }} className="min-w-0">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 18, right: 8, bottom: 0, left: 0 }} barCategoryGap="30%">
+          <BarChart data={data} margin={{ top: 18, right: 8, bottom: 4, left: 0 }} barCategoryGap="30%">
             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={AXIS_TICK} interval={0} />
             <YAxis axisLine={false} tickLine={false} tick={AXIS_TICK} width={AXIS_W} ticks={scale.steps} domain={[0, scale.max]} tickFormatter={(v: number) => fmt(Math.round((v + floor) * 100) / 100)} />
             {scale.steps.map((s) => (
@@ -212,12 +224,14 @@ export function Waterfall({ steps, unit, height = 240 }: { steps: WaterStep[]; u
                 <Cell key={i} className={fillOf(d)} />
               ))}
               <LabelList
-                dataKey="display"
+                dataKey="barLabel"
                 position="top"
                 content={(props) => {
-                  const { x, y, width, value } = props as { x?: number; y?: number; width?: number; value?: string };
+                  const { x, y, width, height: h, value, index } = props as { x?: number; y?: number; width?: number; height?: number; value?: string; index?: number };
+                  const isDown = index !== undefined && data[index]?.down;
+                  const ty = isDown ? (y || 0) + (h || 0) + 13 : (y || 0) - 6;
                   return (
-                    <text x={(x || 0) + (width || 0) / 2} y={(y || 0) - 6} textAnchor="middle" className="fill-text-secondary font-mono" fontSize={11}>
+                    <text x={(x || 0) + (width || 0) / 2} y={ty} textAnchor="middle" className="fill-text-secondary font-mono" fontSize={11}>
                       {value}
                     </text>
                   );
@@ -256,17 +270,30 @@ export interface SignedPoint {
  *  the last point. */
 export function SignedColumns({ points, unit, groups, height = 200 }: { points: SignedPoint[]; unit: string; groups?: { label: string; n: number }[]; height?: number }) {
   const id = useId();
-  const data = points.map((p) => ({ name: p.label, value: p.value, display: p.display ?? fmt(p.value) }));
-  const idxHi = points.reduce((b, p, i) => (p.value > points[b].value ? i : b), 0);
-  const idxLo = points.reduce((b, p, i) => (p.value < points[b].value ? i : b), 0);
-  const labelled = new Set([idxHi, idxLo, points.length - 1]);
+  const isLakh = unit.startsWith("₹ lakh");
+  const data = points.map((p) => ({
+    name: p.label,
+    value: p.value,
+    display: p.display ?? (isLakh ? fmtLakh(p.value) : fmt(p.value)),
+    barLabel: isLakh ? fmtLakh(p.value) : (p.display ?? fmt(p.value)),
+  }));
   return (
     <figure aria-labelledby={id + "-cap"} className="flex min-w-0 flex-col gap-2">
       <div style={{ height }} className="min-w-0">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: 0 }} barCategoryGap="30%">
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={AXIS_TICK} interval="preserveStartEnd" />
-            <YAxis axisLine={false} tickLine={false} tick={AXIS_TICK} width={AXIS_W} tickFormatter={fmt} />
+          <BarChart data={data} margin={{ top: 18, right: 12, bottom: 6, left: 0 }} barCategoryGap="30%">
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={AXIS_TICK} tickMargin={6} interval={0} />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={AXIS_TICK}
+              width={AXIS_W}
+              domain={[
+                (dataMin: number) => (dataMin < 0 ? Math.floor(dataMin * 1.25) : 0),
+                (dataMax: number) => (dataMax > 0 ? Math.ceil(dataMax * 1.18) : 1),
+              ]}
+              tickFormatter={fmt}
+            />
             <ReferenceLine y={0} className="stroke-chart-axis" strokeWidth={1} />
             <RTooltip
               cursor={{ className: "fill-bg-secondary" }}
@@ -286,10 +313,10 @@ export function SignedColumns({ points, unit, groups, height = 200 }: { points: 
                 <Cell key={i} className={d.value >= 0 ? "fill-chart-pos" : "fill-chart-neg"} />
               ))}
               <LabelList
-                dataKey="display"
+                dataKey="barLabel"
                 content={(props) => {
                   const { x, y, width, height: h, value, index } = props as { x?: number; y?: number; width?: number; height?: number; value?: string; index?: number };
-                  if (index === undefined || !labelled.has(index)) return null;
+                  if (index === undefined || !data[index]?.value) return null;
                   const up = (data[index]?.value ?? 0) >= 0;
                   /* recharts hands a bar below the axis either as (y at the
                      axis, negative height) or (y at the bar's bottom, positive
@@ -406,6 +433,7 @@ export interface BarRow {
   key: string;
   label: ReactNode;
   value: number;
+  display?: ReactNode;
   /** `o1..o5` an ordinal step, `s1..s8` a slot, `st-ok|warn|bad|mute` a status */
   tone?: string;
   hint?: ReactNode;
@@ -435,10 +463,13 @@ const ROW_TONE: Record<string, string> = {
  *  category names are words. */
 export function BarRows({ rows, unit, max }: { rows: BarRow[]; unit?: string; max?: number }) {
   const top = max ?? Math.max(1, ...rows.map((r) => r.value));
+  const isLakh = !!unit && unit.startsWith("₹ lakh");
+  const isRupee = !isLakh && !!unit && unit.startsWith("₹");
   return (
     <figure className="flex min-w-0 flex-col gap-2">
       <ol className="flex flex-col gap-2">
         {rows.map((r) => {
+          const valText = r.display !== undefined ? r.display : isLakh ? fmtLakh(r.value) : isRupee ? "₹" + fmt(r.value) : fmt(r.value);
           const row = (
             <li key={r.key} className="grid grid-cols-[minmax(6rem,11rem)_1fr_auto] items-center gap-3 rounded-md outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2" tabIndex={r.title ? 0 : undefined}>
               <span className="min-w-0 truncate text-sm text-secondary">{r.label}</span>
@@ -446,7 +477,7 @@ export function BarRows({ rows, unit, max }: { rows: BarRow[]; unit?: string; ma
                 <i className={cx("block h-full rounded-r-[3px]", ROW_TONE[r.tone || "s1"] || ROW_TONE.s1)} style={{ width: pctOf(r.value, top) + "%" }} />
               </span>
               <span className="flex flex-col items-end leading-tight">
-                <span className="text-sm font-medium text-primary tnum">{fmt(r.value)}</span>
+                <span className="text-sm font-medium text-primary tnum">{valText}</span>
                 {r.hint ? <span className="text-2xs text-quaternary">{r.hint}</span> : null}
               </span>
             </li>

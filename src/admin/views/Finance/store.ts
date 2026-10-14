@@ -181,7 +181,7 @@ export const monthOf = (d: string) => d.slice(0, 7);
    `onLive` still decides which half a figure reads (see `overview`).
    ponytail: read off the URL because the faces are frozen; becomes a face prop
    the day the markup is reopened. */
-const LIVE_ROUTE = /^\/?finance-(installments|transactions|refunds|analytics|salaries)(\/|\?|$)/i;
+const LIVE_ROUTE = /^\/?finance(-(installments|transactions|refunds|analytics|salaries))?(\/|\?|$)/i;
 const onLive = () => {
   if (typeof window === "undefined") return false;
   const p = (window.location?.pathname || "").replace(/^\/+/, "/");
@@ -222,8 +222,16 @@ export const inPeriod = (d: string, from = PERIOD.from, to = PERIOD.to) =>
   d.slice(0, 10) >= from && d.slice(0, 10) <= to;
 /** India-time date on `clockNow`. */
 export const todayIso = () => IST_DAY.format(new Date(clockNow()));
+/** Calendar day midnight UTC for an ISO date or timestamp in India time. */
+const dayTs = (iso: string | null | undefined): number => {
+  if (!iso) return NaN;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ts(iso + "T00:00:00Z");
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return NaN;
+  return ts(IST_DAY.format(dt) + "T00:00:00Z");
+};
 /** Positive when the date has passed. The only definition of "late". */
-export const daysPast = (d: string) => daysBetween(ts(d), clockNow());
+export const daysPast = (d: string) => daysBetween(dayTs(d), ts(todayIso() + "T00:00:00Z"));
 /** The real length of a month. Loss of pay is a fraction of the month a
  *  person was actually employed for, not of a notional thirty. */
 export const daysInMonth = (m: string) => new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0).getDate();
@@ -270,7 +278,7 @@ export const useVersion = () => useSyncExternalStore(subscribe, getVersion, getV
 
 /** Empty the local snapshot; everything that was read is read again. */
 export function resetStore() {
-  snap = seed(); seq = 0; emit();
+  snap = seed(); seq = 0; subsLoaded = false; emit();
   if (loading) void bootFinanceLive(true);
   if (payrollLoading) void bootPayroll(true);
   if (subsLoading) void bootSubs(true);
@@ -478,6 +486,7 @@ async function loadLive(): Promise<void> {
     historyOf("finance-refunds"),
     historyOf("finance-transactions"),
     loadCompany(),
+    bootSubs(),
   ]);
   /* ponytail: one read per statement; fine at a statement a month. */
   const details = bank
@@ -678,6 +687,17 @@ interface RosterEntry {
 let roster: RosterEntry[] = [];
 const rosterOf = (id: number) => roster.filter((m) => m.memberId === id)[0] || null;
 
+export function normDept(raw: string): string {
+  const parts = (raw || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) return "";
+  const pick = parts.find((p) => !/^admin$/i.test(p)) || parts[0];
+  return pick.replace(/\b\w+/g, (w) =>
+    /^(hr|it|ui|ux|qa|pr|crm|erp)$/i.test(w)
+      ? w.toUpperCase()
+      : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+  );
+}
+
 function toRoster(u: AdminUserRow, s: WorkSettingsRow | undefined): RosterEntry {
   const designation = (s && s.designation) || u.designation;
   const employment = (s && s.employmentType) || u.employmentType;
@@ -685,9 +705,9 @@ function toRoster(u: AdminUserRow, s: WorkSettingsRow | undefined): RosterEntry 
     memberId: u.id,
     name: u.name || u.username,
     designation: designation ? designation.label : "",
-    /* The panel's "department" IS the member's rbac roles (team/d1) — one
-       spelling, on the member, rather than a second one typed into Finance. */
-    department: (u.roles || []).map((r) => r.name).join(", "),
+    /* The panel's "department" IS the member's primary rbac role (team/d1),
+       normalized so "Admin, sales team" and "Sales Team" group under one label. */
+    department: normDept((u.roles || []).map((r) => r.name).join(", ")),
     employmentType: employment ? employment.key : "",
     joiningDate: (s && s.joiningDate) || "",
     active: u.isActive !== false,
@@ -973,14 +993,31 @@ export function resolveSubscriptionStatus(status: SubscriptionStatus, expireDate
   return status;
 }
 
+const UNLINKED_PLAN_NAME = "Custom / Unlinked Plan";
+export const cleanPlanName = (name: string | null | undefined): string => {
+  let s = (name || "").trim();
+  if (!s) return UNLINKED_PLAN_NAME;
+  if (s.includes("·")) s = s.split("·").pop()!.trim();
+  s = s.replace(/^AutoGrowth\s+/i, "").trim();
+  if (/^Automation\s+Signature\s+Plan$/i.test(s)) return "Signature";
+  if (/^Shop\s+Regional\s+Plan$/i.test(s)) return "Regional";
+  if (/^(Architect\s+)?Portfolio\+(\s+Plan)?$/i.test(s)) return "Architect Portfolio+";
+  return s || UNLINKED_PLAN_NAME;
+};
+
+/** The plan filter's key: canonical slug by plan name so website purchases
+ *  and quotation sales of the same plan share one key. */
+const planKeyOf = (name: string) =>
+  "PL-" + cleanPlanName(name).toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "");
+
 function liveSubscription(x: SubPurchaseRow): Subscription {
-  const startDate = dateOnly(x.startedAt) || "";
+  const held = x.subscription || null;
+  const startDate = dateOnly(held?.startedOn) || dateOnly(x.recordedAt) || dateOnly(x.startedAt) || "";
   const endDate = dateOnly(x.expireDate) || "";
   const totalPaise = paiseOfRupees(x.amount);
   /* WHERE IT STANDS is the commitment's when one has been recorded, and the
      purchase's own status otherwise — `defaulting` and a cancellation exist
      only on the commitment, because only it can carry the reason. */
-  const held = x.subscription || null;
   let status = subStatusOf(held && held.state ? held.state.key : x.status);
   status = resolveSubscriptionStatus(status, x.expireDate || endDate);
   const p = x.payment;
@@ -1020,13 +1057,14 @@ function liveSubscription(x: SubPurchaseRow): Subscription {
     status: (status === "cancelled" || status === "expired") ? "cancelled" : "due",
     invoiceNumber: null, payment: null, failure: null,
   }] : [];
+  const planName = cleanPlanName(x.planTitle);
   return {
     subscriptionId: "SUB-" + x.family + "-" + x.id,
     /* How the sale happened — the server's rule, off the purchase's buyIntent. */
     source: x.source,
     customer: { name: x.customer || x.user || "", userId: x.userId === null ? null : String(x.userId) },
-    planId: x.planId === null ? "" : String(x.planId),
-    planName: x.planTitle || "",
+    planId: planKeyOf(planName),
+    planName,
     cycleMonths: x.durationMonths || 0,
     totalPaise,
     startDate, endDate,
@@ -1043,11 +1081,6 @@ function liveSubscription(x: SubPurchaseRow): Subscription {
 
 /** `SUB-QT-12` → 12, or null for a purchase's id. */
 const saleIdOf = (id: string): number | null => idIn(id || "", QSUB);
-
-/** The plan filter's key for a sale: the plan named on its quotation — the
- *  same slug the record dialog builds. */
-const planKeyOf = (name: string) =>
-  "PL-" + name.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** ONE SALE, as this tab reads it: the quotation says what was sold and for
  *  how much; its rows say what is paid, due, failed or cancelled. Where it
@@ -1076,11 +1109,12 @@ function saleSubscription(c: ApiSubscriptionRow): Subscription {
     : open.some((i) => i.status === "fail_to_pay") ? "defaulting"
       : paidAll ? "completed" : subStatusOf(state);
   const status = resolveSubscriptionStatus(rawStatus, c.renewsOn);
+  const planName = cleanPlanName(q.planName);
   return {
     subscriptionId: QSUB + c.id,
     source: "sales",
     customer: { name: c.customer || "", userId: c.userId === null ? null : String(c.userId) },
-    planId: planKeyOf(q.planName), planName: q.planName,
+    planId: planKeyOf(planName), planName,
     cycleMonths: c.cycleMonths || q.termMonths,
     totalPaise: q.grandTotalPaise,
     startDate: c.startedOn || "", endDate: c.renewsOn || "",
@@ -1097,6 +1131,7 @@ function saleSubscription(c: ApiSubscriptionRow): Subscription {
 
 let subsLoading: Promise<void> | null = null;
 let subsSeq = 0;
+let subsLoaded = false;
 const localDirectSubs: Subscription[] = [];
 
 async function loadSubs(): Promise<void> {
@@ -1125,6 +1160,7 @@ async function loadSubs(): Promise<void> {
   });
   sales.forEach((c) => { commitments[QSUB + c.id] = c; });
   chains = chainRows || [];
+  subsLoaded = true;
   emit();
 }
 
@@ -1135,6 +1171,11 @@ export function bootSubs(force = false): Promise<void> {
 }
 function useSubsBoot() {
   useEffect(() => { void bootSubs(); }, []);
+}
+export function useSubsLoading(): boolean {
+  useVersion();
+  useSubsBoot();
+  return !subsLoaded;
 }
 
 /* ============================================================= readers === */
@@ -1458,6 +1499,8 @@ export function startedOptions(rows: SubRow[]): { v: string; l: string }[] {
 export interface SubTotals {
   subs: number; activeN: number;
   agreedPaise: number;
+  grossAgreedPaise: number;
+  cancelledPaise: number;
   collectedPaise: number; collectedN: number;
   duePaise: number; dueN: number;
   failedPaise: number; failedN: number;
@@ -1467,13 +1510,18 @@ export interface SubTotals {
 export function subTotals(): SubTotals {
   const rows = subRows();
   const sum = (f: (r: SubRow) => number) => rows.reduce((n, r) => n + f(r), 0);
+  const collectedPaise = sum((r) => r.paidPaise);
   const duePaise = sum((r) => r.duePaise);
   const failedPaise = sum((r) => r.failedPaise);
+  const grossAgreedPaise = sum((r) => r.s.totalPaise);
+  const agreedPaise = collectedPaise + duePaise + failedPaise;
   return {
     subs: rows.length,
     activeN: rows.filter((r) => r.s.status === "active").length,
-    agreedPaise: sum((r) => r.s.totalPaise),
-    collectedPaise: sum((r) => r.paidPaise), collectedN: sum((r) => r.paidN),
+    agreedPaise,
+    grossAgreedPaise,
+    cancelledPaise: Math.max(0, grossAgreedPaise - agreedPaise),
+    collectedPaise, collectedN: sum((r) => r.paidN),
     duePaise, dueN: sum((r) => r.dueN),
     failedPaise, failedN: sum((r) => r.failedN),
     outstandingPaise: duePaise + failedPaise,
@@ -1560,7 +1608,7 @@ export function toSalaryRow(a: SalaryAccount): SalaryRow {
   const slips = snap.salaryRuns
     .flatMap((r) => r.slips.filter((s) => s.salaryAccountId === a.salaryAccountId).map((s) => ({ s, r })))
     .sort((x, y) => y.r.month.localeCompare(x.r.month));
-  const paid = slips.filter((x) => x.r.state === "paid")[0] || null;
+  const paid = slips.filter((x) => !!x.s.paidAt)[0] || null;
   /* THE SERVER'S OWN FIGURES FIRST. `_account_dict` sends `deductionsPaise`
      and `monthlyNetPaise` as separate, settled fields; Σ the deduction
      COMPONENTS is only a fallback, and an account whose components never came
@@ -1698,7 +1746,8 @@ export function applySalaryFilters(rows: SalaryRow[], p: Params): SalaryRow[] {
   if (p.active === "no") out = out.filter((r) => !r.a.active);
   if (p.engagement) out = out.filter((r) => r.a.engagement === p.engagement);
   if (p.due === "unpaid") out = out.filter((r) => dueOf(r).pendingPaise > 0);
-  if (p.due === "paid") out = out.filter((r) => dueOf(r).pendingPaise === 0 && !!r.lastPaidAt);
+  if (p.due === "held") out = out.filter((r) => dueOf(r).heldPaise > 0);
+  if (p.due === "paid") out = out.filter((r) => { const d = dueOf(r); return d.pendingPaise === 0 && d.heldPaise === 0 && !!r.lastPaidAt; });
   /* Owed for more than the current month — the strip's red cell. */
   if (p.due === "arrears") out = out.filter((r) => dueOf(r).arrears.length > 0);
   if (p.q) {
@@ -1724,6 +1773,9 @@ export function applySalaryFilters(rows: SalaryRow[], p: Params): SalaryRow[] {
 export interface SalaryDue {
   /** Every unpaid slip, newest first. Empty means nothing is owed. */
   unpaid: Payslip[];
+  /** Held unpaid slips on this account, newest first. */
+  held: Payslip[];
+  heldPaise: number;
   /** The newest unpaid month — what the Pay button pays first. */
   current: Payslip | null;
   /** Unpaid months BEFORE the newest one. The reason a row can read
@@ -1752,7 +1804,8 @@ export interface SalaryDue {
  *  was scheduled: a month nobody has been paid for contributes nothing. */
 export function salaryTotals(): {
   paidPaise: number; paidAllPaise: number; unpaidPaise: number;
-  unpaidPeople: number; membersAll: number;
+  pendingPaise: number; heldPaise: number;
+  unpaidPeople: number; pendingPeople: number; heldPeople: number; membersAll: number;
 } {
   let paidPaise = 0;
   /* ALL TIME, alongside the period figure: every rupee that ever left as
@@ -1764,12 +1817,20 @@ export function salaryTotals(): {
     if (s.paidAt >= PERIOD.from && s.paidAt <= PERIOD.to + "T23:59:59") paidPaise += s.netPaise;
   }));
   const rows = salaryRows();
-  const owing = rows.map(dueOf).filter((d) => d.pendingPaise > 0);
+  const dues = rows.map(dueOf);
+  const owing = dues.filter((d) => d.pendingPaise > 0);
+  const heldList = dues.filter((d) => d.heldPaise > 0);
+  const pendingPaise = owing.reduce((n, d) => n + d.pendingPaise, 0);
+  const heldPaise = heldList.reduce((n, d) => n + d.heldPaise, 0);
   return {
     paidPaise,
     paidAllPaise,
-    unpaidPaise: owing.reduce((n, d) => n + d.pendingPaise, 0),
-    unpaidPeople: owing.length,
+    unpaidPaise: pendingPaise + heldPaise,
+    pendingPaise,
+    heldPaise,
+    unpaidPeople: dues.filter((d) => d.pendingPaise > 0 || d.heldPaise > 0).length,
+    pendingPeople: owing.length,
+    heldPeople: heldList.length,
     /* Every account of every kind, closed ones included — a total, not a
        head-count of who gets the next run. */
     membersAll: rows.length,
@@ -1780,16 +1841,19 @@ export function dueOf(r: SalaryRow): SalaryDue {
   /* A HELD SLIP IS NOT DUE. It is out of the pending figure, out of the pay
      write, and out of the arrears count until somebody releases it — the
      Transactions tab is where it stays visible. */
-  const unpaid = snap.salaryRuns
+  const allUnpaid = snap.salaryRuns
     .flatMap((run) => run.slips.filter((s) =>
-      s.salaryAccountId === r.a.salaryAccountId && !s.paidAt && !s.held))
+      s.salaryAccountId === r.a.salaryAccountId && !s.paidAt))
     .sort((a, b) => b.month.localeCompare(a.month));
+  const unpaid = allUnpaid.filter((s) => !s.held);
+  const held = allUnpaid.filter((s) => s.held);
+  const heldPaise = held.reduce((n, s) => n + s.netPaise, 0);
   const current = unpaid[0] || null;
   const arrears = unpaid.slice(1);
   const arrearsPaise = arrears.reduce((n, s) => n + s.netPaise, 0);
   const currentPaise = current ? current.netPaise : 0;
   return {
-    unpaid, current, arrears, arrearsPaise, currentPaise,
+    unpaid, held, heldPaise, current, arrears, arrearsPaise, currentPaise,
     pendingPaise: arrearsPaise + currentPaise,
     state: unpaid.length ? "unpaid" : r.lastPaidAt ? "paid" : "none",
   };
@@ -1947,8 +2011,8 @@ export function overview(from = PERIOD.from, to = PERIOD.to): Overview {
 function seedOverview(from: string, to: string): Overview {
   const pays = countedPayments().filter((r) => inPeriod(r.pay.valueDate, from, to));
   const collectedPaise = sumOf(pays, (r) => r.pay.amountPaise);
-  const runs = snap.salaryRuns.filter((r) => r.state === "paid" && r.month >= monthOf(from) && r.month <= monthOf(to));
-  const salaryPaise = sumOf(runs, (r) => r.totalNetPaise);
+  const paidSlips = snap.salaryRuns.flatMap((r) => r.slips).filter((s) => !!s.paidAt && inP(dateOnly(s.paidAt), from, to));
+  const salaryPaise = sumOf(paidSlips, (s) => s.netPaise);
   const horizon = addDaysIso(todayIso(), 30);
   /* AT MOST ONE PER SUBSCRIPTION, and none at all from a defaulting one —
      see nextDue. */
@@ -1956,7 +2020,7 @@ function seedOverview(from: string, to: string): Overview {
   const failed = installmentRows().filter((x) => x.i.status === "fail_to_pay");
   return {
     collectedPaise, collectedN: pays.length,
-    salaryPaise, salaryN: sumOf(runs, (r) => r.slips.length),
+    salaryPaise, salaryN: paidSlips.length,
     otherOutPaise: 0, otherOutN: 0, otherInPaise: 0, otherInN: 0,
     refundsPaidPaise: 0, refundsPaidN: 0, refundsOwedPaise: 0, refundsOwedN: 0,
     dueNextPaise: sumOf(due, (i) => i.amountPaise), dueNextN: due.length,
@@ -1973,6 +2037,9 @@ const planNet = (from: string, to: string) => live.plans
   .map((x) => ({ at: dateOnly(x.verifiedAt), net: planCashPaise(x, live.settledRefunds) }))
   .filter((x) => x.net > 0 && inP(x.at, from, to));
 
+const runPaidDate = (r: SalaryRunRow) =>
+  dateOnly(r.paidAt || r.lastPaidAt) || (r.paidPaise ? r.month + "-01" : "");
+
 /** THE SERVER'S MONEY FOR A WINDOW, on the same rules as the Overview
  *  section (Overview/financeLive.ts):
  *    in   deal-ledger payments not reversed, by paymentDate, + plan purchases
@@ -1988,7 +2055,7 @@ function liveOverview(from: string, to: string): Overview {
   const operating = out.filter((t) => tagOf(t.tagKey)?.kind !== "excluded");
   const excluded = out.filter((t) => tagOf(t.tagKey)?.kind === "excluded");
   const inn = counted.filter((t) => t.direction === "in");
-  const runs = live.runs.filter((r) => inP(dateOnly(r.paidAt), from, to));
+  const runs = live.runs.filter((r) => (r.paidPaise || r.paidAt) && inP(runPaidDate(r), from, to));
   const rfPaid = live.refunds.filter((r) => !!r.settlement && inP(dateOnly(r.settlement.paidAt), from, to));
   const rfOwed = live.refunds.filter((r) => r.state === "approved" && !r.settlement);
   const today = liveToday();
@@ -1998,13 +2065,14 @@ function liveOverview(from: string, to: string): Overview {
   const failed = live.installments.filter((x) => x.status?.key === "failed");
 
   const collectedPaise = sumOf(deal, (x) => x.amountPaise) + sumOf(plans, (x) => x.net);
-  const salaryPaise = sumOf(runs, (r) => r.totalNetPaise);
+  const salaryPaise = sumOf(runs, (r) => r.paidPaise ?? (r.paidAt ? r.totalNetPaise : 0));
+  const salaryN = sumOf(runs, (r) => r.paidSlips ?? (r.paidAt ? r.slips : 0));
   const otherOutPaise = sumOf(operating, (t) => t.amountPaise);
   const otherInPaise = sumOf(inn, (t) => t.amountPaise);
   const refundsPaidPaise = sumOf(rfPaid, (r) => r.amountPaise);
   return {
     collectedPaise, collectedN: deal.length + plans.length,
-    salaryPaise, salaryN: sumOf(runs, (r) => r.slips),
+    salaryPaise, salaryN,
     otherOutPaise, otherOutN: operating.length,
     otherInPaise, otherInN: inn.length,
     refundsPaidPaise, refundsPaidN: rfPaid.length,
@@ -2021,36 +2089,79 @@ function liveOverview(from: string, to: string): Overview {
  *  check suite asserts the numbers a person actually sees. */
 export function overviewTiles(from = PERIOD.from, to = PERIOD.to): Tile[] {
   const o = overview(from, to);
+  const pLabel = from ? fmtMonthLong(monthOf(from)) : PERIOD.label;
   const t = (key: string, paise: number | null, n: number | null, sub: string, tone: Tile["tone"]): Tile =>
     ({ key, label: metric(key)?.label || key, paise, n, sub, tone, unavailable: null });
   return [
-    t("collected", o.collectedPaise, o.collectedN, o.collectedN + " installment" + (o.collectedN === 1 ? "" : "s") + " · " + PERIOD.label, "ok"),
+    t("collected", o.collectedPaise, o.collectedN, o.collectedN + " installment" + (o.collectedN === 1 ? "" : "s") + " · " + pLabel, "ok"),
     t("salary_cost", o.salaryPaise, o.salaryN, o.salaryN ? o.salaryN + " slips paid" : "no run paid in this period", o.salaryN ? "info" : "mute"),
     t("other_out", o.otherOutPaise, o.otherOutN, o.excludedPaise ? inr(o.excludedPaise) + " excluded, counted apart" : "operating spend only", "info"),
     t("refunds_out", o.refundsPaidPaise, o.refundsPaidN, o.refundsOwedN ? inr(o.refundsOwedPaise) + " approved and not sent" : "nothing awaiting transfer", o.refundsOwedN ? "warn" : "mute"),
     t("net", o.netPaise, null, "collected + other in − salary − spend − refunds", o.netPaise >= 0 ? "ok" : "bad"),
-    t("failed", o.failedPaise, o.failedN, o.failedN + " installment" + (o.failedN === 1 ? "" : "s") + " did not clear", o.failedN ? "bad" : "mute"),
+    t("failed", o.failedPaise, o.failedN, o.failedN + " installment" + (o.failedN === 1 ? "" : "s") + " did not clear (all open)", o.failedN ? "bad" : "mute"),
     t("due_next", o.dueNextPaise, o.dueNextN, "next 30 days · expected, not earned", "mute"),
   ];
 }
 
 /* ============================================================== months === */
 
+function firstCustomerDates(): Map<string, string> {
+  const firstSeen = new Map<string, string>();
+  const nameToUserKey = new Map<string, string>();
+  snap.subscriptions.forEach((s) => {
+    if (s.customer.userId && s.customer.name) {
+      nameToUserKey.set(s.customer.name.trim().toLowerCase(), "u:" + String(s.customer.userId).trim().toLowerCase());
+    }
+  });
+  live.plans.forEach((p) => {
+    const nm = (p.payer?.name || p.payer?.business || "").trim().toLowerCase();
+    if (p.payer?.userId != null && nm) {
+      nameToUserKey.set(nm, "u:" + String(p.payer.userId).trim().toLowerCase());
+    }
+  });
+  const noteCustomer = (uid: string | number | null | undefined, name: string | null | undefined, d: string | null | undefined) => {
+    const dt = (d || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dt)) return;
+    const nm = (name || "").trim().toLowerCase();
+    const key = uid != null && String(uid).trim() !== ""
+      ? "u:" + String(uid).trim().toLowerCase()
+      : nm
+        ? (nameToUserKey.get(nm) || "n:" + nm)
+        : "";
+    if (!key) return;
+    const prev = firstSeen.get(key);
+    if (!prev || dt < prev) firstSeen.set(key, dt);
+  };
+  snap.subscriptions.forEach((s) => {
+    if (s.status === "cancelled") return;
+    noteCustomer(s.customer.userId, s.customer.name, s.startDate);
+  });
+  live.plans.forEach((p) => {
+    if (p.orderStatus !== "PAID") return;
+    noteCustomer(p.payer?.userId, p.payer?.name || p.payer?.business, dateOnly(p.createdAt) || dateOnly(p.verifiedAt));
+  });
+  return firstSeen;
+}
+
 /** Every month the server's records touch inside the windowed reads, oldest
  *  first — derived from the rows themselves, so Analytics cannot contradict a
- *  tab. `newCustomers` is null: no payment on the server names its customer,
- *  so a first payment cannot be told from a repeat. */
+ *  tab. */
 export function monthPoints(): MonthPoint[] {
   const keys = new Set<string>();
   const add = (d: string | null | undefined) => { if (d) keys.add(monthOf(d)); };
   live.ledger.forEach((x) => { if (x.type === "payment" && !x.reversed) add(dateOnly(x.paymentDate)); });
   live.plans.forEach((x) => { if (paiseOf(x.amount) > 0) add(dateOnly(x.verifiedAt)); });
   live.txns.forEach((t) => add(t.valueDate));
-  live.runs.forEach((r) => add(dateOnly(r.paidAt)));
+  live.runs.forEach((r) => add(runPaidDate(r)));
   live.refunds.forEach((r) => add(r.settlement ? dateOnly(r.settlement.paidAt) : null));
   const until = livePeriodOf().key;
+  const firstSeen = firstCustomerDates();
   return Array.from(keys).filter((m) => !!live.sinceMonth && m >= live.sinceMonth && m <= until).sort().map((m) => {
-    const o = liveOverview(m + "-01", monthEnd(m));
+    const f = m + "-01";
+    const t = monthEnd(m);
+    const o = liveOverview(f, t);
+    let newCust = 0;
+    firstSeen.forEach((dt) => { if (inPeriod(dt, f, t)) newCust++; });
     return {
       month: m,
       subscriptionsPaise: o.collectedPaise,
@@ -2059,7 +2170,7 @@ export function monthPoints(): MonthPoint[] {
       otherInPaise: o.otherInPaise,
       refundsPaise: o.refundsPaidPaise,
       netPaise: o.netPaise,
-      newCustomers: null,
+      newCustomers: firstSeen.size ? newCust : null,
     };
   });
 }
@@ -2068,29 +2179,119 @@ export function monthPoints(): MonthPoint[] {
 
 const pctOf = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
 
+function mrrInMonth(f: string, t: string): { mrrPaise: number; arpuPaise: number | null; activeSubs: number } | null {
+  const m = monthOf(f);
+  if (m === livePeriodOf().key && live.revenue && !snap.subscriptions.length) {
+    const activeSubs = live.revenue.activeSubscribers || 0;
+    return {
+      mrrPaise: Math.round(live.revenue.mrr * 100),
+      arpuPaise: activeSubs ? Math.round(live.revenue.arpu * 100) : null,
+      activeSubs,
+    };
+  }
+  if (!snap.subscriptions.length) {
+    if (live.revenue && m === livePeriodOf().key) {
+      const activeSubs = live.revenue.activeSubscribers || 0;
+      return {
+        mrrPaise: Math.round(live.revenue.mrr * 100),
+        arpuPaise: activeSubs ? Math.round(live.revenue.arpu * 100) : null,
+        activeSubs,
+      };
+    }
+    return null;
+  }
+  /* Active subscriptions spanning the month [f, t], or live server snapshot for current month. */
+  if (m === livePeriodOf().key && live.revenue) {
+    const activeSubs = live.revenue.activeSubscribers || 0;
+    return {
+      mrrPaise: Math.round(live.revenue.mrr * 100),
+      arpuPaise: activeSubs ? Math.round(live.revenue.arpu * 100) : null,
+      activeSubs,
+    };
+  }
+  const active = snap.subscriptions.filter((s) =>
+    s.status !== "cancelled" && s.status !== "refunded" && s.totalPaise > 0
+    && !!s.startDate && s.startDate <= t && (!s.endDate || s.endDate >= f)
+  );
+  const mrrPaise = sumOf(active, (s) => Math.round(s.totalPaise / Math.max(1, s.cycleMonths || 1)));
+  const activeSubs = active.length;
+  return {
+    mrrPaise,
+    arpuPaise: activeSubs > 0 ? Math.round(mrrPaise / activeSubs) : null,
+    activeSubs,
+  };
+}
+
 export function kpis(from = livePeriodOf().from, to = livePeriodOf().to): Kpi[] {
   const o = liveOverview(from, to);
   const priorMonth = from ? monthBack(monthOf(from), 1) : "";
+  const priorFrom = priorMonth ? priorMonth + "-01" : "";
+  const priorTo = priorMonth ? monthEnd(priorMonth) : "";
   const priorO = priorMonth && live.sinceMonth && priorMonth >= live.sinceMonth
-    ? liveOverview(priorMonth + "-01", monthEnd(priorMonth)) : null;
+    ? liveOverview(priorFrom, priorTo) : null;
 
-  /* MRR and ARPU are the revenue module's own level, read at a moment. */
-  const rev = live.revenue;
+  const curRev = mrrInMonth(from, to);
+  const priorRev = priorO ? mrrInMonth(priorFrom, priorTo) : null;
   const noRevenue = "The revenue read is not available to this session.";
 
-  const settled = live.installments.filter((x) =>
-    (x.status?.key === "paid" || x.status?.key === "failed") && inP(x.dueDate, from, to));
-  const paidN = settled.filter((x) => x.status.key === "paid").length;
-  const failN = settled.filter((x) => x.status.key === "failed").length;
+  const collectOf = (f: string, t: string, ov: Overview) => {
+    const failedInPeriod = live.installments.filter(
+      (x) => x.status?.key === "failed" && inP(x.dueDate, f, t)
+    );
+    const failedPaise = sumOf(failedInPeriod, (x) => x.amountPaise);
+    const denom = ov.collectedPaise + failedPaise;
+    return {
+      collectionRate: pctOf(ov.collectedPaise, denom),
+      failRate: pctOf(failedPaise, denom),
+      denom,
+    };
+  };
+  const curCol = collectOf(from, to, o);
+  const priorCol = priorO ? collectOf(priorFrom, priorTo, priorO) : null;
 
   const heads = live.activeSalaryAccounts;
-  const openRunRow = live.runs.filter((r) => !r.paidAt)[0] || null;
+  const openRunRow = live.runs.filter((r) => !r.paidAt && !r.paidPaise)[0] || null;
   const websitePaise = sumOf(planNet(from, to), (x) => x.net);
+  const priorWebsitePaise = priorO ? sumOf(planNet(priorFrom, priorTo), (x) => x.net) : null;
 
   const burn = o.salaryPaise + o.otherOutPaise + o.refundsPaidPaise;
   const priorBurn = priorO ? priorO.salaryPaise + priorO.otherOutPaise + priorO.refundsPaidPaise : null;
   const inTotal = o.collectedPaise + o.otherInPaise;
-  const noIdentity = "No payment on the server names its customer yet, so a first payment cannot be told from a repeat.";
+  const priorInTotal = priorO ? priorO.collectedPaise + priorO.otherInPaise : null;
+
+  const firstSeen = firstCustomerDates();
+  const newCustOf = (f: string, t: string) => {
+    let c = 0;
+    firstSeen.forEach((dt) => { if (inPeriod(dt, f, t)) c++; });
+    return c;
+  };
+  const newCust = firstSeen.size ? newCustOf(from, to) : null;
+  const priorNewCust = priorO && firstSeen.size ? newCustOf(priorFrom, priorTo) : null;
+
+  const reinvestOf = (f: string, t: string) => sumOf(
+    live.txns.filter((tx) => tx.state === "recorded" && tx.direction === "out"
+      && tagOf(tx.tagKey)?.kind === "reinvestment" && inP(tx.valueDate, f, t)),
+    (tx) => tx.amountPaise
+  );
+  const reinvestPaise = reinvestOf(from, to);
+  const priorReinvestPaise = priorO ? reinvestOf(priorFrom, priorTo) : null;
+  const cacVal = newCust && newCust > 0 ? Math.round(reinvestPaise / newCust) : null;
+  const priorCacVal = priorNewCust && priorNewCust > 0 && priorReinvestPaise !== null
+    ? Math.round(priorReinvestPaise / priorNewCust) : null;
+
+  const pts = monthPoints();
+  const cashThrough = (mKey: string) =>
+    Math.max(0, sumOf(pts.filter((m) => m.month <= mKey), (m) => m.netPaise));
+  const curCash = cashThrough(monthOf(from));
+  const priorCash = priorMonth ? cashThrough(priorMonth) : 0;
+  const runwayVal = burn > 0 && curCash > 0 ? Math.round((curCash / burn) * 10) / 10 : null;
+  const priorRunwayVal = priorBurn && priorBurn > 0 && priorCash > 0
+    ? Math.round((priorCash / priorBurn) * 10) / 10 : null;
+
+  const curCostHead = heads && (o.salaryPaise + o.otherOutPaise) > 0
+    ? Math.round((o.salaryPaise + o.otherOutPaise) / heads) : null;
+  const priorCostHead = priorO && heads && (priorO.salaryPaise + priorO.otherOutPaise) > 0
+    ? Math.round((priorO.salaryPaise + priorO.otherOutPaise) / heads) : null;
 
   const mk = (key: string, value: number | null, priorV: number | null, why: string | null): Kpi => {
     const d = kpiMeta(key);
@@ -2103,36 +2304,36 @@ export function kpis(from = livePeriodOf().from, to = livePeriodOf().to): Kpi[] 
   };
 
   return [
-    mk("mrr", rev ? Math.round(rev.mrr * 100) : null, null, rev ? null : noRevenue),
-    /* ARPU IS NULL WITH NOBODY ON A PLAN, never zero: an average over an empty
-       denominator is not an average. The server answers 0 there. */
-    mk("arpu", rev && rev.activeSubscribers ? Math.round(rev.arpu * 100) : null, null,
-      !rev ? noRevenue : rev.activeSubscribers ? null : "No plan is active, so there is no average to take."),
-    mk("collection_rate", pctOf(paidN, paidN + failN), null,
-      paidN + failN ? null : "No installment fell due in this period."),
-    mk("fail_rate", pctOf(failN, paidN + failN), null,
-      paidN + failN ? null : "No installment fell due in this period."),
+    mk("mrr", curRev ? curRev.mrrPaise : null, priorRev ? priorRev.mrrPaise : null, curRev ? null : noRevenue),
+    mk("arpu", curRev ? curRev.arpuPaise : null, priorRev ? priorRev.arpuPaise : null,
+      !curRev ? noRevenue : curRev.activeSubs ? null : "No plan is active in this period, so there is no average to take."),
+    mk("collection_rate", curCol.collectionRate, priorCol ? priorCol.collectionRate : null,
+      curCol.denom ? null : "No installment was collected or failed in this period."),
+    mk("fail_rate", curCol.failRate, priorCol ? priorCol.failRate : null,
+      curCol.denom ? null : "No installment was collected or failed in this period."),
     mk("salary_ratio", o.salaryPaise ? pctOf(o.salaryPaise, o.collectedPaise) : null,
       priorO && priorO.salaryPaise ? pctOf(priorO.salaryPaise, priorO.collectedPaise) : null,
       !o.salaryPaise
-        ? "No salary run was paid in this period" + (openRunRow ? " — the " + fmtMonth(openRunRow.month) + " run is still open." : ".")
+        ? "No salary slip was paid in this period" + (openRunRow ? " — the " + fmtMonth(openRunRow.month) + " run is still open." : ".")
         : !o.collectedPaise ? "Nothing was collected in this period." : null),
-    mk("cost_per_head", heads && o.salaryPaise ? Math.round(o.salaryPaise / heads) : null, null,
+    mk("cost_per_head", curCostHead, priorCostHead,
       heads === null ? "The salary accounts are not readable by this session."
-        : !heads ? "No active salary account." : !o.salaryPaise ? "No run was paid in this period." : null),
+        : !heads ? "No active salary account." : !curCostHead ? "No salary or operating spend was paid in this period." : null),
     mk("burn", live.outReadable ? burn : null, live.outReadable ? priorBurn : null,
       live.outReadable ? null : "Spend, salary runs or refunds are not readable by this session."),
-    mk("net_margin", pctOf(o.netPaise, inTotal), null,
+    mk("net_margin", pctOf(o.netPaise, inTotal), priorInTotal ? pctOf(priorO!.netPaise, priorInTotal) : null,
       inTotal ? null : "No money came in, so there is no margin to take."),
-    mk("refund_rate", pctOf(o.refundsPaidPaise, o.collectedPaise), null,
+    mk("refund_rate", pctOf(o.refundsPaidPaise, o.collectedPaise),
+      priorO && priorO.collectedPaise ? pctOf(priorO.refundsPaidPaise, priorO.collectedPaise) : null,
       o.collectedPaise ? null : "Nothing was collected in this period."),
-    /* Deliberately null. Runway needs a reconciled cash balance and several
-       closed months of burn; a placeholder here is a decision made on a wrong
-       number — FN-OD-07. */
-    mk("runway", null, null, "Needs a reconciled cash balance and a burn history the records do not carry yet."),
-    mk("new_customers", null, null, noIdentity),
-    mk("cac", null, null, noIdentity),
-    mk("website_share", pctOf(websitePaise, o.collectedPaise), null,
+    mk("runway", runwayVal, priorRunwayVal,
+      runwayVal !== null ? null : "Needs positive cumulative net cash and monthly burn across recorded periods."),
+    mk("new_customers", newCust, priorNewCust,
+      newCust !== null ? null : "Customer records are still loading."),
+    mk("cac", cacVal, priorCacVal,
+      !newCust ? "No new customers recorded in this period." : null),
+    mk("website_share", pctOf(websitePaise, o.collectedPaise),
+      priorO && priorO.collectedPaise && priorWebsitePaise !== null ? pctOf(priorWebsitePaise, priorO.collectedPaise) : null,
       o.collectedPaise ? null : "Nothing was collected in this period."),
   ];
 }
@@ -2187,7 +2388,7 @@ export function atRisk(from = livePeriodOf().from, to = livePeriodOf().to): Risk
   const over = tagTotals(from, to).rows.filter((r) => r.overBudget);
   const recon = reconciliation();
   const rows: RiskRow[] = [
-    { key: "failed", label: "Fail to pay", paise: o.failedPaise, figure: null,
+    { key: "failed", label: "Fail to pay (all open)", paise: o.failedPaise, figure: null,
       count: o.failedN + (o.failedN === 1 ? " installment" : " installments"),
       tone: "bad", to: "#/finance-installments?status=failed",
       toLabel: "the " + o.failedN + " that failed" },
@@ -2208,9 +2409,10 @@ export function atRisk(from = livePeriodOf().from, to = livePeriodOf().to): Risk
       toLabel: "what is on it" });
   });
   if (recon.bankOnly.length) {
+    const stmtNote = recon.openStmts.length > 1 ? " across " + recon.openStmts.length + " open statements" : "";
     rows.push({ key: "unexplained", label: "Bank lines nothing explains", paise: null,
       figure: "net " + inr(recon.variancePaise), tone: "bad",
-      count: recon.bankOnly.length + (recon.bankOnly.length === 1 ? " line" : " lines"),
+      count: recon.bankOnly.length + (recon.bankOnly.length === 1 ? " line" : " lines") + stmtNote,
       to: null, toLabel: "listed below" });
   }
   return rows;
@@ -2218,14 +2420,18 @@ export function atRisk(from = livePeriodOf().from, to = livePeriodOf().to): Risk
 
 /* ======================================================== kpi history === */
 
-/** THE SHAPE BEHIND A KPI, or null when there is no history to draw. NULL IS
- *  THE POINT: a single reading drawn as a flat line claims a stability the
- *  records do not show. Only burn can be read month by month off the live
- *  records; new customers has no source (see `monthPoints`). */
+/** THE SHAPE BEHIND A KPI, or null when there is no history to draw. */
 export function kpiSeries(key: string): number[] | null {
   const ms = monthPoints();
   if (ms.length < 2) return null;
   if (key === "burn") return ms.map((m) => m.salaryPaise + m.otherOutPaise + m.refundsPaise);
+  if (key === "salary_ratio") return ms.map((m) => (m.subscriptionsPaise > 0 ? Math.round((m.salaryPaise / m.subscriptionsPaise) * 1000) / 10 : 0));
+  if (key === "net_margin") return ms.map((m) => {
+    const inn = m.subscriptionsPaise + m.otherInPaise;
+    return inn > 0 ? Math.round((m.netPaise / inn) * 1000) / 10 : 0;
+  });
+  if (key === "refund_rate") return ms.map((m) => (m.subscriptionsPaise > 0 ? Math.round((m.refundsPaise / m.subscriptionsPaise) * 1000) / 10 : 0));
+  if (key === "new_customers" && ms.every((m) => m.newCustomers !== null)) return ms.map((m) => m.newCustomers || 0);
   return null;
 }
 
@@ -2234,6 +2440,7 @@ export function kpiSeries(key: string): number[] | null {
 export interface BankLine {
   lineId: string; date: string; dir: "credit" | "debit";
   amountPaise: number; reference: string; narration: string; counterparty: string;
+  stmtId?: string; accountId?: string;
 }
 export type LineMatch =
   | { kind: "payment"; id: string; label: string }
@@ -2249,34 +2456,54 @@ export function lineMatch(lineId: string): LineMatch {
 
 export interface Recon {
   stmt: Statement | null;
+  openStmts: Statement[];
   lines: { line: BankLine; match: LineMatch }[];
   bankOnly: { line: BankLine; match: LineMatch }[];
   matchedN: number;
-  /** THIS STATEMENT'S share, to go beside THIS statement's line count. The
-   *  server's `bankMatchedPct` (matchedPct() below) is the aggregate over
-   *  every statement — a different question, and printing it over "0 of 1
-   *  lines" made one of the two look wrong. Null with no lines. */
+  resolvedN: number;
   matchedPct: number | null;
   variancePaise: number;
   canClose: boolean;
   resolutions: Resolution[];
 }
 
-/** One statement: the one asked for, else the open one, else the newest. */
+/** When `stmtId` is given, reconciles that single statement; when omitted,
+ *  aggregates across all open statements (or the newest closed one if none are open)
+ *  so `What needs attention` and `Matched to bank` never hide open statements. */
 export function reconciliation(stmtId?: string): Recon {
   const all = live.statements;
-  const stmt = (stmtId ? all.filter((s) => s.stmtId === stmtId)[0] : all.filter((s) => !s.closed)[0])
-    || all[0] || null;
-  if (!stmt) return { stmt: null, lines: [], bankOnly: [], matchedN: 0, matchedPct: null, variancePaise: 0, canClose: false, resolutions: [] };
-  const lines = stmt.lines.map((line) => ({ line, match: lineMatch(line.lineId) }));
+  const openStmts = all.filter((s) => !s.closed);
+  const picked = stmtId ? all.filter((s) => s.stmtId === stmtId) : (openStmts.length ? openStmts : all.slice(0, 1));
+  const stmt = picked[0] || null;
+  if (!stmt) return { stmt: null, openStmts: [], lines: [], bankOnly: [], matchedN: 0, resolvedN: 0, matchedPct: null, variancePaise: 0, canClose: false, resolutions: [] };
   const resolved = new Set(live.resolutions.map((r) => r.targetId));
+  const seenUnexplained = new Set<string>();
+  const lines = picked.flatMap((s) =>
+    s.lines.map((line) => ({
+      line: { ...line, stmtId: s.stmtId, accountId: s.accountId },
+      match: lineMatch(line.lineId),
+    }))
+  ).filter((l) => {
+    if (picked.length > 1 && l.match.kind === "none" && !resolved.has(l.line.lineId)) {
+      const sig = l.line.dir + ":" + l.line.amountPaise + ":" + norm(l.line.counterparty) + ":" + norm(l.line.narration);
+      if (seenUnexplained.has(sig)) return false;
+      seenUnexplained.add(sig);
+    }
+    return true;
+  });
   const bankOnly = lines.filter((l) => l.match.kind === "none" && !resolved.has(l.line.lineId));
   const matchedN = lines.filter((l) => l.match.kind !== "none").length;
+  const resolvedN = lines.filter((l) => l.match.kind === "none" && resolved.has(l.line.lineId)).length;
   return {
-    stmt, lines, bankOnly, matchedN,
+    stmt,
+    openStmts,
+    lines,
+    bankOnly,
+    matchedN,
+    resolvedN,
     matchedPct: lines.length ? Math.round((matchedN / lines.length) * 1000) / 10 : null,
     variancePaise: bankOnly.reduce((n, l) => n + (l.line.dir === "credit" ? l.line.amountPaise : -l.line.amountPaise), 0),
-    canClose: bankOnly.length === 0,
+    canClose: picked.length === 1 && bankOnly.length === 0,
     resolutions: live.resolutions,
   };
 }
@@ -3431,13 +3658,19 @@ export function useKpis(month?: string): Kpi[] {
   if (month) { const p = periodOf(month); return kpis(p.from, p.to); }
   return kpis();
 }
-export function useMonthPoints(): MonthPoint[] { useVersion(); useLiveBoot(); return monthPoints(); }
+export function useMonthPoints(): MonthPoint[] {
+  useVersion();
+  useEffect(() => { void bootFinanceLive(); }, []);
+  return monthPoints();
+}
 export function useReconciliation(stmtId?: string): Recon { useVersion(); useLiveBoot(); return reconciliation(stmtId); }
 export function useStatements() { useVersion(); useLiveBoot(); return live.statements; }
 export function usePendingImport() { useVersion(); return readPendingImport(); }
 export function useMatchedPct() { useVersion(); useLiveBoot(); return matchedPct(); }
 export function useTaxSummary() { useVersion(); useLiveBoot(); return taxSummary(); }
 export function useActivity(limit = 30) { useVersion(); return snap.activity.slice(0, limit); }
+
+export function useLiveLoading(): boolean { useVersion(); useLiveBoot(); return !server; }
 
 /* ========================================================= formatting === */
 
@@ -3465,7 +3698,7 @@ export function fmtMonthLong(m: string): string {
 }
 export function ago(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const n = daysBetween(ts(iso.length <= 10 ? iso + "T00:00:00" : iso), clockNow());
+  const n = daysBetween(dayTs(iso), ts(todayIso() + "T00:00:00Z"));
   if (isNaN(n)) return "—";
   if (n === 0) return "today";
   if (n === 1) return "yesterday";
@@ -3505,10 +3738,11 @@ export function delta(now: number, before: number | null | undefined): { text: s
 export const FILTER_LABELS: Record<string, string> = {
   q: "Search", source: "Source", status: "Status", plan: "Plan", flag: "Queue",
   dir: "Direction", tag: "Tag", kind: "Rolls up to", state: "State", range: "Period",
-  active: "Account", month: "Month", started: "Started",
+  active: "Account", month: "Month", started: "Started", due: "This month",
 };
 export function filterValueLabel(key: string, value: string): string {
   if (key === "source") return sourceMeta(value)?.label || value;
+  if (key === "plan") return plansSeen().find((p) => p.planId === value)?.planName || value;
   if (key === "status") {
     /* Two vocabularies share the key: subscription statuses, and the slip
        states on the salaries Transactions tab. */
@@ -3531,6 +3765,7 @@ export function filterValueLabel(key: string, value: string): string {
   if (key === "active") return value === "yes" ? "Active" : "Closed";
   if (key === "due") {
     if (value === "arrears") return "In arrears";
+    if (value === "held") return "On hold";
     return value === "unpaid" ? "Unpaid" : value === "paid" ? "Paid" : value;
   }
   if (key === "flag") {

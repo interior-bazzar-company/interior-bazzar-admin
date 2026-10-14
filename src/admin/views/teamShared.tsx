@@ -14,8 +14,55 @@ import type { ReactNode } from "react";
 import type React from "react";
 import { cx } from "@/utils/cx";
 import { Avatar as UIAvatar, Icon, Notice, Pill } from "../ui";
+import { getGroupOf } from "../shell/modules";
 import { AppExceptions } from "../../api/apiService";
 import type { AdminRole, AdminUserRole, AdminUserRow, RoleActionDef, RoleModules, RolesModuleDef } from "../../api/modules/adminOps";
+
+const MODULE_GROUP_FALLBACK: Record<string, string> = {
+  overview: "Overview",
+  deals: "Sales",
+  enquiries: "Sales",
+  quotations: "Sales",
+  invoices: "Sales",
+  projects: "Client Ops",
+  vendors: "Client Ops",
+  boq: "Client Ops",
+  orders: "Client Ops",
+  execution: "Client Ops",
+  users: "Business Ops",
+  "business-enquiries": "Business Ops",
+  team: "Team",
+  roles: "Team",
+  attendance: "Team",
+  work: "Team",
+  reports: "Team",
+  resources: "Resources",
+  agreements: "Resources",
+  finance: "Finance",
+  "finance-installments": "Finance",
+  "finance-salaries": "Finance",
+  "finance-transactions": "Finance",
+  "finance-refunds": "Finance",
+  "finance-analytics": "Finance",
+  plans: "Catalogue",
+  products: "Catalogue",
+  categories: "Catalogue",
+  catalogue: "Catalogue",
+  audit: "Settings",
+  settings: "Settings",
+};
+
+const MATRIX_GROUP_ORDER = [
+  "Overview",
+  "Sales",
+  "Client Ops",
+  "Business Ops",
+  "Team",
+  "Resources",
+  "Finance",
+  "Catalogue",
+  "Settings",
+];
 
 export type Member = AdminUserRow;
 export type Role = AdminRole;
@@ -100,18 +147,6 @@ export function ActionMatrix({ mods, grants, editable }: { mods: RoleModuleDef[]
       </Notice>
     );
 
-  const cols: RoleActionDef[] = [];
-  const seen: Record<string, boolean> = {};
-  mods.forEach((m) =>
-    (m.actions || []).forEach((a) => {
-      if (!seen[a.key]) {
-        seen[a.key] = true;
-        cols.push(a);
-      }
-    }),
-  );
-  cols.sort((a, b) => a.minLevel - b.minLevel || (a.key < b.key ? -1 : 1));
-
   const box = (m: RoleModuleDef, verb: string) => '#rlMatrix input[data-mod="' + m.key + '"][data-verb="' + verb + '"]';
 
   /* Ticking any verb implies view, and clearing view clears the row. */
@@ -148,131 +183,106 @@ export function ActionMatrix({ mods, grants, editable }: { mods: RoleModuleDef[]
     });
   }
 
-  const allBtn = "ml-1 cursor-pointer rounded px-1 font-mono text-2xs font-medium text-quaternary outline-focus-ring hover:text-brand-secondary focus-visible:outline-2";
-
-  /* A VERTICAL WHEEL SCROLLS THIS SIDEWAYS. The browser only does that by
-     itself for a trackpad's horizontal gesture or shift+wheel, and this strip
-     is 28 columns wide — so on a mouse the last seven verbs (approve, cancel,
-     close, decide, pay, reverse, roles) simply could not be reached. Only
-     applied while there IS horizontal overflow and the gesture is not already
-     horizontal, so it never steals a legitimate scroll. */
-  function onWheel(e: React.WheelEvent<HTMLDivElement>) {
-    const el = e.currentTarget;
-    if (el.scrollWidth <= el.clientWidth) return;
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-    const before = el.scrollLeft;
-    el.scrollLeft += e.deltaY;
-    // Only swallow the event if we actually consumed it, or the page stops
-    // scrolling once the strip is at either end.
-    if (el.scrollLeft !== before) e.preventDefault();
-  }
-
-  /* HOME AND END. Arrow keys already work on a focused scroll container, but
-     Chrome maps Home/End to the VERTICAL axis only — and on a strip whose
-     whole problem is that the last seven verbs are off the right edge, "jump
-     to the end" is the gesture somebody reaches for first. Forty pixels a
-     press was the alternative. */
-  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "Home" && e.key !== "End") return;
-    const el = e.currentTarget;
-    if (el.scrollWidth <= el.clientWidth) return;
-    el.scrollLeft = e.key === "End" ? el.scrollWidth : 0;
-    e.preventDefault();
-  }
+  /* Group modules by their sidebar category so permissions are organized into collapsible sections,
+     and within each module only show the verbs applicable to that module (no horizontal scrolling). */
+  const navGroups = getGroupOf();
+  const groups: { key: string; label: string; items: RoleModuleDef[] }[] = [];
+  const byGroup: Record<string, { key: string; label: string; items: RoleModuleDef[] }> = {};
+  mods.forEach((m) => {
+    const resolved =
+      MODULE_GROUP_FALLBACK[m.key] ||
+      navGroups[m.key] ||
+      m.groupLabel ||
+      (m.key.startsWith("finance") ? "Finance" : "Settings");
+    const gKey = resolved.toLowerCase().replace(/\s+/g, "-");
+    if (!byGroup[gKey]) {
+      byGroup[gKey] = { key: gKey, label: resolved, items: [] };
+      groups.push(byGroup[gKey]);
+    }
+    byGroup[gKey].items.push(m);
+  });
+  groups.sort((a, b) => {
+    const ia = MATRIX_GROUP_ORDER.indexOf(a.label);
+    const ib = MATRIX_GROUP_ORDER.indexOf(b.label);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
 
   return (
-    /* THE STRIP HAS TO OVERFLOW BEFORE IT CAN SCROLL. `overflow-x-auto` was
-       already here and did nothing, because the table under it was `w-full`:
-       width:100% tells the table to FIT this box, so 28 columns squashed to
-       fit instead of running past the edge, and there was nothing to scroll.
-       `w-max min-w-full` is the pair that says "as wide as your content, and
-       never narrower than the box".
-
-       `tabIndex`/`role`/`aria-label` make it a focusable scroll region, which
-       is what gives it arrow keys — before this the only way to move it was to
-       tab a checkbox into focus and let the browser reveal it.
-
-       `scrollbar-thin` is the visible bar: the utility exists for exactly this
-       and was never applied here, so on Windows the overflow read as "cut off"
-       rather than "there is more". */
-    <div className="max-h-[70vh] w-full overflow-auto scrollbar-thin rounded-xl bg-primary ring-1 ring-secondary outline-focus-ring focus-visible:outline-2"
-      tabIndex={0} role="region" aria-label="Permissions by module and verb — scrolls horizontally"
-      onWheel={onWheel} onKeyDown={onKeyDown}>
-      {/* border-collapse STAYS. The row dividers below are on `<tr>`, and a
-          separate-border table does not paint those — switching would have
-          silently dropped every line between the modules. Sticky cells inside
-          a collapsed table are supported in the Chrome this panel targets. */}
-      <table className="w-max min-w-full border-collapse text-sm" id={editable ? "rlMatrix" : undefined}>
-        <thead>
-          <tr className="border-b border-secondary bg-secondary">
-            {/* THE CORNER. Pinned on BOTH axes, and above everything else —
-                it is the one cell that has to survive a scroll in either
-                direction. */}
-            <th className="label-mono sticky top-0 left-0 z-30 bg-secondary px-3 py-2 text-left">Module</th>
-            {cols.map((c) => (
-              /* PINNED TO THE TOP. Twenty-one module rows are taller than the
-                 drawer, so reading Agreements meant scrolling the verb names
-                 off the screen and counting columns to work out which tick was
-                 which. The bounded height on the wrapper is what gives these
-                 something to stick to. */
-              <th className="sticky top-0 z-20 bg-secondary px-2 py-2 text-center" key={c.key} title={c.minLevel >= 3 ? "Sensitive" : c.minLevel === 1 ? "Read" : "Write"}>
-                <Pill xs tone={levelTone(c.minLevel)} text={c.key} />
-                {editable ? (
-                  <div>
-                    <button type="button" className={allBtn} data-act="rl-col-all" onClick={(e) => setAll(e.currentTarget, null, c.key)}>
-                      all
-                    </button>
+    <div
+      id={editable ? "rlMatrix" : undefined}
+      className="max-h-[70vh] w-full overflow-y-auto scrollbar-thin rounded-xl bg-primary ring-1 ring-secondary divide-y divide-border-secondary"
+      role="region"
+      aria-label="Permissions by module group"
+    >
+      {groups.map((g) => (
+        <details key={g.key} open className="group/sec">
+          <summary className="flex cursor-pointer list-none items-center justify-between bg-secondary px-4 py-2.5 text-xs font-semibold tracking-wider text-secondary uppercase select-none hover:bg-secondary_hover">
+            <span className="flex items-center gap-2">
+              <Icon name="chevr" size="xs" className="transition-transform group-open/sec:rotate-90" />
+              <span>{g.label}</span>
+              <span className="font-mono text-2xs font-normal text-quaternary">({g.items.length})</span>
+            </span>
+          </summary>
+          <div className="divide-y divide-border-secondary">
+            {g.items.map((m) => {
+              const held = grants![m.key] || [];
+              const actions = (m.actions || [])
+                .slice()
+                .sort((a, b) => (a.key === VIEW ? -1 : b.key === VIEW ? 1 : a.minLevel - b.minLevel || (a.key < b.key ? -1 : 1)));
+              return (
+                <div key={m.key} className="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-start sm:justify-between hover:bg-primary_hover">
+                  <div className="flex shrink-0 items-center gap-2 sm:w-52 sm:pt-0.5">
+                    <b className="text-sm font-medium text-primary">{m.label}</b>
+                    {editable && actions.length ? (
+                      <button
+                        type="button"
+                        className="inline-flex cursor-pointer items-center rounded bg-secondary px-1.5 py-0.5 text-2xs font-semibold text-secondary ring-1 ring-secondary ring-inset transition hover:bg-secondary_hover hover:text-primary"
+                        data-act="rl-row-all"
+                        title={"Grant all verbs for " + m.label}
+                        onClick={(e) => setAll(e.currentTarget, m.key, null)}
+                      >
+                        Grant all
+                      </button>
+                    ) : null}
                   </div>
-                ) : null}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {mods.map((m) => {
-            const held = grants![m.key] || [];
-            const offers: Record<string, boolean> = {};
-            (m.actions || []).forEach((a) => {
-              offers[a.key] = true;
-            });
-            return (
-              <tr key={m.key} className="border-b border-secondary last:border-0 hover:bg-primary_hover">
-                <td className="sticky left-0 z-10 bg-primary px-3 py-2 whitespace-nowrap">
-                  <b className="font-medium text-primary">{m.label}</b>
-                  {editable && (m.actions || []).length ? (
-                    <button
-                      type="button"
-                      className="ml-2 inline-flex cursor-pointer items-center rounded bg-secondary px-1.5 py-0.5 text-2xs font-semibold text-secondary hover:bg-secondary_hover hover:text-primary ring-1 ring-secondary ring-inset transition"
-                      data-act="rl-row-all"
-                      title={"Grant all verbs for " + m.label}
-                      onClick={(e) => setAll(e.currentTarget, m.key, null)}
-                    >
-                      Grant all verbs
-                    </button>
-                  ) : null}
-                </td>
-                {cols.map((c) => (
-                  <td className="px-2 py-2 text-center" key={c.key}>
-                    {!offers[c.key] ? (
-                      <span className="text-quaternary" title="This module has no such action">
-                        —
-                      </span>
-                    ) : editable ? (
-                      <label className="inline-flex cursor-pointer items-center justify-center p-1">
-                        <NativeCheck data-mod={m.key} data-verb={c.key} aria-label={m.label + " " + c.key} defaultChecked={held.indexOf(c.key) >= 0} onChange={(e) => onToggle(m, c.key, e.currentTarget.checked)} />
-                      </label>
-                    ) : held.indexOf(c.key) >= 0 ? (
-                      <Icon name="check" size="sm" className="inline text-fg-success-primary" />
-                    ) : (
-                      <span className="text-quaternary">·</span>
-                    )}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                    {actions.map((a) => {
+                      const isHeld = held.indexOf(a.key) >= 0;
+                      return editable ? (
+                        <label
+                          key={a.key}
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-secondary/60 px-2.5 py-1 text-xs ring-1 ring-secondary ring-inset hover:bg-secondary"
+                          title={a.label || a.key}
+                        >
+                          <NativeCheck
+                            data-mod={m.key}
+                            data-verb={a.key}
+                            aria-label={m.label + " " + a.key}
+                            defaultChecked={isHeld}
+                            onChange={(e) => onToggle(m, a.key, e.currentTarget.checked)}
+                          />
+                          <Pill xs tone={levelTone(a.minLevel)} text={a.key} />
+                        </label>
+                      ) : (
+                        <span
+                          key={a.key}
+                          className={cx(
+                            "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs ring-1 ring-inset",
+                            isHeld ? "bg-secondary text-primary ring-secondary" : "text-quaternary ring-transparent opacity-50"
+                          )}
+                        >
+                          {isHeld ? <Icon name="check" size="xs" className="text-fg-success-primary" /> : null}
+                          <Pill xs tone={isHeld ? levelTone(a.minLevel) : "neutral"} text={a.key} />
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+      ))}
     </div>
   );
 }

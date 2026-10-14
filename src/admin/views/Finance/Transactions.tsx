@@ -113,26 +113,29 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
      a property of the tags money was filed under rather than a column anything
      narrows on, and a cell that looks pressable and does nothing is worse than
      one that plainly is not. */
+  const allInN = txnRows.filter((r) => r.t.direction === "in").length;
+  const allOutN = txnRows.filter((r) => r.t.direction === "out").length;
+
   const txnCells: (StatCell | "sep")[] = [
-    { k: <>Total</>, v: txnRows.length, on: !Object.keys(p).some((k) => p[k] && k !== "tab"),
+    { k: <>Total (all time)</>, v: txnRows.length, on: !Object.keys(p).some((k) => p[k] && k !== "tab"),
       to: "#/finance-transactions",
-      tip: <>Every company transaction ever recorded, money in and money out, before any
-        filter. The figures beside it are for {PERIOD.label}.</> },
+      tip: <>Every company transaction ever recorded ({allInN} credits, {allOutN} debits), before any
+        filter. The period figures beside it are for {PERIOD.label}.</> },
     "sep",
     /* CREDIT BEFORE DEBIT, and the words are the bank statement's rather than
        this module's own `out`/`in`: a credit is money arriving, which is what
        the two of them mean on every statement anybody reconciles against. The
        stored value is untouched — the ledger still holds `out` and `in`, and
        only what a person reads changed. */
-    { k: <>Credit <b className="tnum">{inr(o.otherInPaise)}</b></>,
+    { k: <>Credit · {PERIOD.label} <b className="tnum">{inr(o.otherInPaise)}</b></>,
       v: o.otherInN, dot: "ok", on: p.dir === "in", to: cellHash({ dir: "in" }),
-      tip: <><b>Never revenue.</b> Interest, own transfers and vendor refunds are the only
+      tip: <><b>Never revenue.</b> {o.otherInN} recorded in {PERIOD.label} ({allInN} all-time). Interest, own transfers and vendor refunds are the only
         three ways money comes in here. Customer money has exactly one way in — a
         subscription — and if anyone could hand-key a credit, anyone could fabricate
         revenue.</> },
     { k: <>Debit · {PERIOD.label} <b className="tnum">{inr(o.otherOutPaise)}</b></>,
       v: o.otherOutN, dot: "bad", on: p.dir === "out", to: cellHash({ dir: "out" }),
-      tip: <>Recorded payments out in {PERIOD.label}, under every tag. Excluded spend is
+      tip: <>Recorded payments out in {PERIOD.label} ({allOutN} all-time), under every tag. Excluded spend is
         inside this figure and called out separately at the end of the strip — it left the
         bank like everything else.</> },
     "sep",
@@ -141,8 +144,8 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
       tip: <>Recorded transactions with no bill attached. One above {inr(BILL_THRESHOLD_PAISE)}
         blocks the period from closing, which is the whole reason this is a queue and not a
         note.</> },
-    { k: <>Excluded spend (tax &amp; statutory) <b className="tnum">{inr(o.excludedPaise)}</b></>,
-      tip: <>Taxes and statutory payments, filed under tags whose kind is <b>excluded</b>.
+    { k: <>Excluded spend · {PERIOD.label} <b className="tnum">{inr(o.excludedPaise)}</b></>,
+      tip: <>Taxes and statutory payments in {PERIOD.label}, filed under tags whose kind is <b>excluded</b>.
         Cash out of the door like any other, and deliberately not part of the operating
         picture — so it is stated here rather than quietly left inside a total.</> },
   ];

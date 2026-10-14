@@ -207,7 +207,24 @@ export default function Roles() {
                   ? <Pill dot tone="ok" text="Active" />
                   : <Pill dot tone="warn" text="Inactive" title="Still assigned, but grants nothing" />}</td>
                 <td><ModuleChips role={r} mods={data.modules} /></td>
-                <td className="n">{r.userCount || <span className="text-quaternary">—</span>}</td>
+                <td className="n" onClick={(e) => { if (r.userCount) e.stopPropagation(); }}>
+                  {r.userCount ? (
+                    <a
+                      href={"#/team?role=" + encodeURIComponent(r.name)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        go("#/team?role=" + encodeURIComponent(r.name));
+                      }}
+                      className="font-medium text-brand-secondary underline-offset-2 hover:underline"
+                      title={"View " + r.userCount + " member" + (r.userCount === 1 ? "" : "s") + " with role " + r.name}
+                    >
+                      {r.userCount}
+                    </a>
+                  ) : (
+                    <span className="text-quaternary">—</span>
+                  )}
+                </td>
                 <td className="acts" onClick={(e) => e.stopPropagation()}>
                   {editable ? (
                     <Button color="secondary" size="xs" ico="edit" data-act="rl-edit" data-ref={r.id}

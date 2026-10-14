@@ -33,7 +33,7 @@ import SubAnalytics from "./SubAnalytics";
 import {
   FILTER_LABELS, PERIOD, SUB_SOURCES, SUB_STATUSES,
   applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, subYears, todayIso,
-  useOverview, useSubRows, useSubTotals,
+  useOverview, usePlansSeen, useSubRows, useSubTotals, useSubsLoading,
 } from "./store";
 import type { Params, SubRow } from "./store";
 
@@ -44,6 +44,8 @@ const PAGE_SIZE = 50;
 export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
   const rows = useSubRows();
+  const subsLoading = useSubsLoading();
+  const plans = usePlansSeen();
   const o = useOverview();
   /* FIX-05: Subscription-scoped failure totals. `useOverview()` (o) counts ALL
      installments including deal quotation ones — so o.failedN was 14 while the
@@ -106,9 +108,11 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
       meta={
         <>
           <span className="label-mono">
-            {shown.length === rows.length
-              ? rows.length + (rows.length === 1 ? " sale" : " sales")
-              : shown.length + " of " + rows.length}
+            {subsLoading && rows.length === 0
+              ? "Loading subscriptions…"
+              : shown.length === rows.length
+                ? rows.length + (rows.length === 1 ? " sale" : " sales")
+                : shown.length + " of " + rows.length + " sales"}
           </span>
           <span className="label-mono">as of {fmtDate(todayIso())}</span>
         </>
@@ -170,6 +174,10 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
               onFilter={onFilter} options={SUB_SOURCES.map((s) => ({ v: s.key, l: s.label }))} />
             <Select key={"status" + (p.status || "")} name="status" label="Status" value={p.status}
               onFilter={onFilter} options={SUB_STATUSES.map((s) => ({ v: s.key, l: s.label, dot: s.tone }))} />
+            {plans.length > 0 && (
+              <Select key={"plan" + (p.plan || "")} name="plan" label="Plan" value={p.plan}
+                onFilter={onFilter} options={plans.map((pl) => ({ v: pl.planId, l: pl.planName }))} />
+            )}
             <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag}
               onFilter={onFilter} options={[
                 { v: "failed", l: "Has a failed installment", dot: "bad" },
@@ -207,15 +215,15 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
           { k: <>Collected · {PERIOD.label} <b className="tnum">{inr(o.collectedPaise)}</b></>,
             v: o.collectedN, dot: "ok", on: p.flag === "settled",
             to: rows.some((r) => r.paidN > 0) ? queueHash("settled") : undefined,
-            tip: <>Installments settled in {PERIOD.label} and what they came to.
+            tip: <>{o.collectedN} installments settled in {PERIOD.label} ({st.paidN} all-time across {rows.length} sales).
               Money that <b>actually arrived</b> — some of it from subscriptions that have since
               completed, defaulted or been refunded, so it does not describe the {activeN} running
               right now.</> },
           "sep",
-          { k: <>Expected installments <b className="tnum">{inr(o.dueNextPaise)}</b></>,
+          { k: <>Expected installments (30d) <b className="tnum">{inr(o.dueNextPaise)}</b></>,
             v: o.dueNextN, on: p.flag === "due",
             to: rows.some((r) => !!r.dueNext) ? queueHash("due") : undefined,
-            tip: <>Due in the next 30 days: the one installment genuinely in front of each customer.
+            tip: <>Due in the next 30 days ({st.dueN} total scheduled across all open subscriptions): the one installment genuinely in front of each customer.
               <b> Expected, not earned</b> — every one is a row that already exists, and none of it
               is revenue until it is collected.</> },
           /* LAST, and last on purpose: it is the one a person acts on, so it
@@ -224,7 +232,7 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
             v: st.failedN, dot: st.failedN ? "bad" : "", on: p.flag === "failed",
             to: st.failedN ? queueHash("failed") : undefined,
             tip: st.failedN
-              ? <>Installments that <b>did not clear</b> — a decline, a cancelled mandate, or a due
+              ? <>{st.failedN} installments that <b>did not clear</b> — a decline, a cancelled mandate, or a due
                 date that demonstrably passed. Each carries its evidence on the record; none of it
                 is written off.</>
               : <>Every installment that fell due has cleared.</> },
@@ -237,6 +245,10 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
            where narrowing means something. */
         <SubAnalytics year={p.year || ""}
           onQueue={(flag) => onParams({ tab: undefined, year: undefined, flag })} />
+      ) : subsLoading && rows.length === 0 ? (
+        <EmptyState icon="clock"
+          title="Loading subscriptions…"
+          body="Fetching subscription schedules and installment history from the ledger." />
       ) : shown.length ? (
         <>
           <ListTable min="66rem" head={<tr>

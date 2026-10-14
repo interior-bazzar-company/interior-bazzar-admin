@@ -95,9 +95,18 @@ export default function AttendancePage({ q, live, viewer }: { q: MemberReads; li
         title="Attendance"
         desc={"The last " + WINDOW + " days, as the derivation sees them. The clock itself lives in the topbar."}
         right={
-          <Button color="secondary" ico="calendar" onClick={() => go(memberHref(String(live.id), "leave"))}>
-            Leave{pending ? " · " + pending : ""}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              color="secondary"
+              ico="clock"
+              onClick={() => go("#/attendance?member=" + encodeURIComponent(String(live.id)))}
+            >
+              View all attendance for this member
+            </Button>
+            <Button color="secondary" ico="calendar" onClick={() => go(memberHref(String(live.id), "leave"))}>
+              Leave{pending ? " · " + pending : ""}
+            </Button>
+          </div>
         } />
 
       <Tiles list={[

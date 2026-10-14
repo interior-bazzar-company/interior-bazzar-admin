@@ -38,12 +38,10 @@ import { Unavailable } from "./bits";
 import InfoTip from "./InfoTip";
 import { BarRows, ColumnChart } from "../charts";
 import type { BarRow, Series } from "../charts";
-import { SUB_SOURCES, fmtMonth, inr, useSubRows } from "./store";
+import { SUB_SOURCES, daysPast, fmtMonth, inr, useMonthPoints, useSubRows, useSubsLoading } from "./store";
 
-/* The chart kit takes plain numbers and prints them with `toLocaleString`, so
-   an axis fed integer paise would read 6,77,320. This converts FOR THE MARKS
-   ONLY — every rupee figure on this page comes from `inr()` on the paise. */
-const thousands = (paise: number) => Math.round(paise / 100000);
+/* Lakh to two decimal places (`₹61.27L`) for the chart kit. */
+const lakh = (paise: number) => Math.round(paise / 100000) / 100;
 
 /* One series, so the kit draws no legend and the block title names it. Slot 1
    is money that arrived, here and everywhere else in the panel. */
@@ -63,23 +61,32 @@ export default function SubAnalytics({ year, onQueue }: {
   onQueue: (flag: string) => void;
 }) {
   const all = useSubRows();
+  const loading = useSubsLoading();
+  const liveMonths = useMonthPoints();
   const rows = year ? all.filter((r) => r.s.startDate.slice(0, 4) === year) : all;
 
-  /* COLLECTED BY MONTH, off the payments of these subscriptions rather than
-     off the module's own month series — the rest of the page is scoped to a
-     year of sales, and a chart reading a different set of payments would put
-     a total under this title that none of the figures above it agree with.
-     A month is the VALUE DATE's month: when the money reached the account. */
-  const byMonth = new Map<string, number>();
-  rows.forEach((r) => r.s.installments.forEach((i) => {
-    if (i.status !== "paid" || !i.payment) return;
-    const m = i.payment.valueDate.slice(0, 7);
-    byMonth.set(m, (byMonth.get(m) || 0) + i.payment.amountPaise);
-  }));
-  const months = Array.from(byMonth.entries())
-    .filter(([, paise]) => paise > 0)
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([month, paise]) => ({ month, paise }));
+  /* COLLECTED BY MONTH, using the module's canonical monthly cash-in series
+     (deal ledger by paymentDate + plan purchases by verifiedAt) so Oct 2026
+     (₹61.27L) and Sept 2026 (₹2.90L) match Finance Analytics and Overview
+     100%. Falls back to per-subscription installment value dates only while the
+     live month series is still loading. */
+  const months = (() => {
+    if (liveMonths.length) {
+      return liveMonths
+        .filter((m) => (!year || m.month.startsWith(year)) && m.subscriptionsPaise > 0)
+        .map((m) => ({ month: m.month, paise: m.subscriptionsPaise }));
+    }
+    const byMonth = new Map<string, number>();
+    rows.forEach((r) => r.s.installments.forEach((i) => {
+      if (i.status !== "paid" || !i.payment) return;
+      const m = i.payment.valueDate.slice(0, 7);
+      byMonth.set(m, (byMonth.get(m) || 0) + i.payment.amountPaise);
+    }));
+    return Array.from(byMonth.entries())
+      .filter(([, paise]) => paise > 0)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([month, paise]) => ({ month, paise }));
+  })();
 
   /* THE FOUR FIGURES, summed off the store's own per-subscription fields so
      this tab and the list beside it cannot disagree about what "collected"
@@ -91,10 +98,12 @@ export default function SubAnalytics({ year, onQueue }: {
   const dueN = rows.reduce((n, r) => n + r.dueN, 0);
   const failedN = rows.reduce((n, r) => n + r.failedN, 0);
   const activeN = rows.filter((r) => r.s.status === "active").length;
-  const agreedPaise = rows.reduce((n, r) => n + r.s.totalPaise, 0);
+  const grossAgreedPaise = rows.reduce((n, r) => n + r.s.totalPaise, 0);
+  const agreedPaise = collectedPaise + duePaise + failedPaise;
+  const cancelledPaise = Math.max(0, grossAgreedPaise - agreedPaise);
 
-  /* BY PLAN. Grouped on the plan's own id rather than its printed name: two
-     plans can be renamed into the same words, and an id cannot. */
+  /* BY PLAN. Grouped on the canonical planId so website purchases and sales
+     quotations of the same plan merge into a single row. */
   const plans = new Map<string, { label: string; paise: number; subs: number }>();
   rows.forEach((r) => {
     const cur = plans.get(r.s.planId) || { label: r.s.planName, paise: 0, subs: 0 };
@@ -105,47 +114,66 @@ export default function SubAnalytics({ year, onQueue }: {
   const planRows: BarRow[] = Array.from(plans.entries())
     .sort((a, b) => b[1].paise - a[1].paise || a[1].label.localeCompare(b[1].label))
     .map(([key, v]) => ({
-      key, label: v.label, value: thousands(v.paise),
-      hint: <>{inr(v.paise)} · {plural(v.subs, "sale", "sales")}</>,
+      key, label: v.label, value: Math.round(v.paise / 100),
+      display: inr(v.paise),
+      hint: <>{plural(v.subs, "sale", "sales")}</>,
       title: v.label + " · " + inr(v.paise) + " collected across " + plural(v.subs, "sale", "sales"),
     }));
 
-  /* WHERE THE SALE CAME FROM. The count leads because that is what the split
-     is about — how business arrives — and the money rides as the hint, which
-     is a label and never a second axis. */
+  /* WHERE THE SALE CAME FROM. Bar width scales by collected rupee revenue so a
+     higher-revenue channel never renders a shorter bar than a lower-revenue
+     channel; subscription count and revenue share ride as the hint. */
+  const totalSourcePaise = rows.reduce((n, r) => n + r.paidPaise, 0);
   const sourceRows: BarRow[] = SUB_SOURCES
     .map((src: { key: string; label: string }) => {
       const mine = rows.filter((r) => r.s.source === src.key);
+      const paidPaise = mine.reduce((n, r) => n + r.paidPaise, 0);
+      const pctShare = totalSourcePaise > 0 ? Math.round((paidPaise / totalSourcePaise) * 100) : 0;
       return {
-        key: src.key, label: src.label, value: mine.length,
-        hint: <>{inr(mine.reduce((n, r) => n + r.paidPaise, 0))} collected</>,
-        title: plural(mine.length, "subscription", "subscriptions") + " recorded as " + src.label,
+        key: src.key, label: src.label,
+        value: Math.round(paidPaise / 100),
+        display: inr(paidPaise),
+        hint: <>{plural(mine.length, "sale", "sales")} · {pctShare}% of revenue</>,
+        title: plural(mine.length, "subscription", "subscriptions") + " recorded as " + src.label + " · " + inr(paidPaise) + " collected",
       };
     })
     .filter((r) => r.value > 0);
 
-  /* EVERY INSTALLMENT, BY STATE. Counted off the installments themselves so
-     cancelled rows are visible rather than quietly missing from a total, and
-     wearing the module's own state colours: paid is ok, failed is bad, due
-     and cancelled are neutral — `due` is the ABSENCE of an event, and
-     painting it as a warning would say something happened that has not. */
-  const instRows: BarRow[] = (() => {
-    const every = rows.flatMap((r) => r.s.installments);
-    const of = (st: string) => every.filter((i) => i.status === st);
-    return [
-      { key: "paid", label: "Paid", tone: "st-ok", n: of("paid").length },
-      { key: "due", label: "Due", tone: "st-mute", n: of("due").length },
-      { key: "fail_to_pay", label: "Fail to pay", tone: "st-bad", n: of("fail_to_pay").length },
-      { key: "cancelled", label: "Cancelled", tone: "st-mute", n: of("cancelled").length },
-    ]
-      .filter((r) => r.n > 0)
-      .map((r) => ({
-        key: r.key, label: r.label, value: r.n, tone: r.tone,
-        hint: <>{inr(every.filter((i) => i.status === r.key)
-          .reduce((n, i) => n + i.amountPaise, 0))}</>,
-        title: plural(r.n, "installment", "installments") + " · " + r.label,
-      }));
+  /* UNPAID INSTALLMENTS, BY AGING. Replaces the duplicate state summary (which
+     merely repeated the 4 KPI tiles at the top of the page) with an aging breakdown
+     of the outstanding schedule (due + fail_to_pay). */
+  const agingRows: BarRow[] = (() => {
+    const unpaid = rows.flatMap((r) => r.s.installments)
+      .filter((i) => i.status === "due" || i.status === "fail_to_pay");
+    const buckets = [
+      { key: "upcoming", label: "Upcoming (not yet due)", tone: "st-mute",
+        items: unpaid.filter((i) => daysPast(i.dueDate) <= 0) },
+      { key: "overdue_30", label: "1–30 days overdue", tone: "st-warn",
+        items: unpaid.filter((i) => { const d = daysPast(i.dueDate); return d >= 1 && d <= 30; }) },
+      { key: "overdue_60", label: "31–60 days overdue", tone: "st-bad",
+        items: unpaid.filter((i) => { const d = daysPast(i.dueDate); return d >= 31 && d <= 60; }) },
+      { key: "overdue_60p", label: "Over 60 days overdue", tone: "st-bad",
+        items: unpaid.filter((i) => daysPast(i.dueDate) > 60) },
+    ];
+    return buckets
+      .filter((b) => b.items.length > 0)
+      .map((b) => {
+        const paise = b.items.reduce((n, i) => n + i.amountPaise, 0);
+        return {
+          key: b.key, label: b.label, value: b.items.length, tone: b.tone,
+          hint: <>{inr(paise)}</>,
+          title: plural(b.items.length, "installment", "installments") + " · " + inr(paise) + " · " + b.label,
+        };
+      });
   })();
+
+  if (loading && !all.length) {
+    return (
+      <Unavailable
+        title="Loading subscription analytics…"
+        why="Reading sales and installment schedules from the server." />
+    );
+  }
 
   if (!rows.length) {
     return (
@@ -155,27 +183,18 @@ export default function SubAnalytics({ year, onQueue }: {
     );
   }
 
-  /* THE FOUR HEADLINE FIGURES, on the panel's own stat tile — the label with
-     its `i`, the figure, what it counts, and where to go and see it. A tile
-     rather than a chart because a single number has no shape to see.
-
-     `foot` crosses to the Subscriptions tab with that filter applied: the
-     charts here are never narrowed — a chart narrowed by a filter is a chart
-     whose caption lies — so "show only these" takes you to the records, which
-     is where narrowing belongs. */
   const tiles: TileProps[] = [
     {
       k: <>Expected collection<InfoTip label="Expected collection"
-        intro={<>The <b>whole contracted value</b> of every subscription ever recorded — each
-          one's own agreed total, summed. The three figures beside it are its parts: what has
-          arrived, what is still to come, and what did not clear.</>}
+        intro={<>The <b>active contracted value</b> across all live schedules — the sum of what has
+          been collected ({inr(collectedPaise)}), what is due ({inr(duePaise)}), and what failed to
+          clear ({inr(failedPaise)}).</>}
         rows={[
-          { label: "Counts", hint: "every subscription in the module: active, completed, cancelled and defaulting alike." },
-          { label: "Is not revenue", hint: "it is what was agreed, not what arrived — Collected is the part that has." },
-          { label: "Caution", hint: "a cancelled subscription keeps the total it was agreed at. Cancelling forward stops the schedule; it does not rewrite what was sold." },
+          { label: "Reconciles", hint: "Collected + Expected installments + Fail installments = Expected collection." },
+          { label: "Gross contracted", hint: inr(grossAgreedPaise) + " total contracted (" + inr(cancelledPaise) + " on cancelled or expired schedules)." },
         ]} /></>,
       v: inr(agreedPaise),
-      s: plural(rows.length, "sale", "sales") + " recorded",
+      s: plural(rows.length, "sale", "sales") + " recorded" + (cancelledPaise ? " · " + inr(cancelledPaise) + " cancelled/expired" : ""),
     },
     {
       k: <>Collected<InfoTip label="Collected"
@@ -259,9 +278,9 @@ export default function SubAnalytics({ year, onQueue }: {
             points={months.map((m) => ({
               key: m.month,
               label: fmtMonth(m.month),
-              values: { collected: thousands(m.paise) },
+              values: { collected: lakh(m.paise) },
             }))}
-            unit="₹ thousand · by the date the bank credited it" />
+            unit="₹ lakh · by the date the bank credited it" />
         ) : (
           <Unavailable title="Nothing has been collected yet."
             why="A bar appears the moment an installment is settled with a value date." />
@@ -272,7 +291,7 @@ export default function SubAnalytics({ year, onQueue }: {
         {/* ================================================================ by plan === */}
         <ChartFrame title="Which plans are selling">
           {planRows.length
-            ? <BarRows rows={planRows} unit="₹ thousand · collected" />
+            ? <BarRows rows={planRows} unit="₹ · collected" />
             : <Unavailable title="No plan has collected anything yet."
                 why="A plan appears here once money has arrived against a subscription sold on it." />}
         </ChartFrame>
@@ -280,17 +299,19 @@ export default function SubAnalytics({ year, onQueue }: {
         {/* ============================================================== by source === */}
         <ChartFrame title="Where the sales came from">
           {sourceRows.length
-            ? <BarRows rows={sourceRows} unit="subscriptions · hover a bar for the money" />
+            ? <BarRows rows={sourceRows} unit="₹ · collected by source" />
             : <Unavailable title="No subscription carries a source."
                 why="Every recorded sale carries one, so this appears with the first record." />}
         </ChartFrame>
       </Blocks>
 
       {/* ========================================================= installments === */}
-      {/* Due wears no warning colour on purpose: it is the ABSENCE of an
-          event, and a tint would claim something happened that has not. */}
-      <ChartFrame title="Every installment, by state">
-        <BarRows rows={instRows} unit="installments · hover a bar for what it is worth" />
+      <ChartFrame title="Outstanding installments, by aging"
+        right={<span className="label-mono">{inr(duePaise + failedPaise)} outstanding across {dueN + failedN} installments</span>}>
+        {agingRows.length
+          ? <BarRows rows={agingRows} unit="installments · hover a bar for what it is worth" />
+          : <Unavailable title="No outstanding installments."
+              why="Every installment on this scope has been settled or cancelled." />}
       </ChartFrame>
     </div>
   );

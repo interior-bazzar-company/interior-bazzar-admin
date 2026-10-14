@@ -30,7 +30,7 @@ export default function RoleDrawer({ role: r, mods, ops }: { role: Role; mods: R
   return (
     <DrawerShell
       title={r.name}
-      sub={<span className="font-mono tnum">#{r.id} · {r.userCount} member{r.userCount === 1 ? "" : "s"}</span>}
+      sub={<span className="font-mono tnum">{r.userCount} member{r.userCount === 1 ? "" : "s"}</span>}
       onClose={() => { ops.closeLayer(); ops.go("#/roles"); }}
       actions={<ActionBar role={r} mods={mods} ops={ops} />}
     >
@@ -73,10 +73,9 @@ export default function RoleDrawer({ role: r, mods, ops }: { role: Role; mods: R
 
         <section>
           <SectionHead title="Permissions"
-            desc="One row per module, one column per verb — exactly what the API enforces." />
+            desc="Grouped by module section. Only the actions supported by each module are shown." />
           <ActionMatrix mods={mods} grants={r.isFullAccess ? null : r.modules} />
           <p className="mt-3 text-sm text-tertiary">
-            A dash means the module has no such action — it is not a permission being withheld.{" "}
             <b className="font-semibold text-secondary">View is the gate</b>: without it the module
             leaves that member&apos;s sidebar and the API refuses every route on it, whatever else is ticked.
           </p>

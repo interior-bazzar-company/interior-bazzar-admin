@@ -78,7 +78,7 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
       <OpHead
         title="Documents"
         desc="Member to company. These are theirs to give and theirs to withdraw."
-        right={viewer === "self"
+        right={viewer === "self" || viewer === "admin"
           ? (
             <Button color="primary" ico="plus"
               onClick={() => shell.modal(<AddDocumentModal memberId={m.memberId} />)}>

@@ -179,10 +179,8 @@ export const PRIO_HINT: Record<number, string> = {
 /* Every stage there is. One list, so a stage added to IBData.STAGES shows up
    in the filter, the strip, the menu and the board without six edits. */
 export const ALL_STAGES: number[] = Object.keys(D.STAGES).map(Number);
-/* The strip counts the stages a deal is still WORKING through. Lost is not a
-   step of the funnel, it is where deals leave it, so it keeps its place in
-   the Stage dropdown and stays out of the count row. */
-export const STRIP_STAGES = ALL_STAGES.filter((s) => s !== 6);
+/* Every stage in the strip so stage pills sum to the total pipeline count. */
+export const STRIP_STAGES = ALL_STAGES;
 
 export function merge(p: Params, extra: Record<string, string | number>): Params {
   const o: Params = {};
@@ -408,8 +406,8 @@ function apiOk<T>(res: { response: boolean; code: number; data: T }): { ok: true
    Kept in a module store with its OWN subscriber set rather than reusing
    `subs`: that one is a dependency of the fetch effect, so notifying through
    it here would re-fire the request that just produced these numbers. */
-export type Counts = { total: number; byStage: Record<number, number>; collected: number; outstanding: number };
-const zeroCounts = (): Counts => ({ total: 0, byStage: {}, collected: 0, outstanding: 0 });
+export type Counts = { total: number; stalled: number; byStage: Record<number, number>; collected: number; outstanding: number };
+const zeroCounts = (): Counts => ({ total: 0, stalled: 0, byStage: {}, collected: 0, outstanding: 0 });
 let LAST_COUNTS: Counts = zeroCounts();
 const countSubs = new Set<() => void>();
 /* The ONLY writer of LAST_COUNTS, and it has to be called on the FAILURE paths
@@ -488,6 +486,7 @@ export function useDealsApi(p: Params): DealsApiState {
       const data = r.data;
       const counts = {
         total: data.counts.total,
+        stalled: data.counts.stalled ?? data.deals.filter((d: any) => d.stalled).length,
         byStage: adaptByStage(data.counts.byStage, data.stages),
         // Paise straight through, same as every other money field — the strip
         // formats, it never arithmetics.
@@ -497,7 +496,7 @@ export function useDealsApi(p: Params): DealsApiState {
       publishCounts(counts);
       setState({
         loading: false, forbidden: false, error: null,
-        list: data.deals.map(adaptDeal).filter((d: any) => !String(d.deal_id).includes("DEMO")),
+        list: data.deals.map(adaptDeal),
         counts,
         stages: data.stages, priorities: data.priorities, tags: data.tags,
         // Placeholder until the roster lands (below); the rows are all that is

@@ -464,6 +464,7 @@ const refill = <T,>(target: Record<string, T>, rows: (T & { key: string })[]) =>
   rows.forEach((r) => { target[r.key] = r; });
 };
 export const ATT_STATE = toneMap(vocabDoc.attendanceStates as ToneRow[]);
+export const ATTENDANCE_STATE = ATT_STATE;
 /** All five stages, the derived one included — the four stored ones from the
  *  server, `delayed` from vocabularies.json. */
 export const WORK_STATUS = toneMap(vocabDoc.workStatuses as ToneRow[]);
@@ -1047,7 +1048,7 @@ export const scopeLabel = (scope: Scope, n: number) =>
 /* ======================================================== attendance === */
 
 const breaksClosedMinutes = (d: AttendanceDay) =>
-  d.breaks.reduce((a, b) => a + (b.minutes || 0), 0);
+  Math.max(d.breakMinutes || 0, d.breaks.reduce((a, b) => a + (b.minutes || 0), 0));
 
 export const openBreakOf = (d: AttendanceDay): Break | null =>
   d.breaks.filter((b) => !b.endedAt)[0] || null;
@@ -1056,7 +1057,7 @@ export const openBreakOf = (d: AttendanceDay): Break | null =>
  *  nothing sweeps: an auto-closed day is a number the system invented; an
  *  unclosed one is a question, and a question is honest. */
 export function isUnclosed(d: AttendanceDay, m: Member | null, at = now()): boolean {
-  if (d.endedAt) return false;
+  if (d.endedAt && ts(d.endedAt) <= at) return false;
   const cutoff = atClock(d.businessDate, (m && m.autoCloseAt) || "20:00");
   return at > cutoff;
 }
@@ -1086,18 +1087,21 @@ export function stateOf(d: AttendanceDay | null, m: Member | null, at: number, d
     return over ? "absent" : "not_started";
   }
   if (isUnclosed(d, m, at)) return "unclosed";
-  if (d.endedAt) return "ended";
+  if (d.endedAt && ts(d.endedAt) <= at) return "ended";
   return openBreakOf(d) ? "on_break" : "working";
 }
 
-/** Minutes actually worked. A closed day uses its stored total; an open one
- *  counts to `at` and subtracts every closed break AND the running one. An
- *  unclosed day returns null and contributes to nothing — it is not a
- *  fourteen-hour shift and it is not zero either. */
+/** Minutes actually worked. A closed day derives its net worked time from
+ *  check-in/out and breaks; an open one counts to `at` and subtracts every
+ *  closed break AND the running one. An unclosed day returns null and
+ *  contributes to nothing — it is not a fourteen-hour shift and it is not zero either. */
 export function workedOf(d: AttendanceDay | null, m: Member | null, at = now()): number | null {
   if (!d) return null;
-  if (d.endedAt) return d.workedMinutes;
   if (isUnclosed(d, m, at)) return null;
+  if (d.endedAt && ts(d.endedAt) <= at) {
+    const gross = Math.max(0, Math.round((ts(d.endedAt) - ts(d.startedAt)) / 60000));
+    return Math.max(0, gross - breaksClosedMinutes(d));
+  }
   const open = openBreakOf(d);
   const runningBreak = open ? Math.max(0, Math.round((at - ts(open.startedAt)) / 60000)) : 0;
   const elapsed = Math.max(0, Math.round((at - ts(d.startedAt)) / 60000));
@@ -1120,6 +1124,29 @@ export interface DayRow {
   state: AttendanceState;
   worked: number | null;
   breakMins: number;
+}
+
+/** Historical and current unclosed attendance rows across the entire record in scope. */
+export function unclosedRows(scope: Scope, at = now()): DayRow[] {
+  const byId = new Map<string, Member>();
+  membersInScope(scope)
+    .filter(isHumanEmployee)
+    .filter((m) => m.status === "active")
+    .forEach((m) => byId.set(m.memberId, m));
+  return snap.days
+    .filter((d) => byId.has(d.memberId) && isUnclosed(d, byId.get(d.memberId) || null, at))
+    .slice()
+    .sort((a, b) => b.businessDate.localeCompare(a.businessDate))
+    .map((d) => {
+      const m = byId.get(d.memberId)!;
+      return {
+        member: m,
+        day: d,
+        state: "unclosed" as AttendanceState,
+        worked: null,
+        breakMins: breakOf(d, at),
+      };
+    });
 }
 
 /** One row per member in scope for one business date — including the members
@@ -1233,6 +1260,8 @@ export function spanRows(from: string, to: string, scope: Scope): SpanRow[] {
       if (!row) return;
       /* Before somebody joined there is nothing to count and nothing to miss. */
       if (d < r.member.joiningDate) return;
+      /* A day that is still open today and not yet started is not an absence. */
+      if (r.state === "not_started") return;
       row.days++;
       row.expected += r.member.expectedHoursPerDay * 60;
       if (r.state === "unclosed") { row.unclosed++; return; }
@@ -1285,19 +1314,24 @@ export function spanTotals(rows: SpanRow[]): SpanTotals {
   return t;
 }
 
-/** WHEN PEOPLE ACTUALLY ARRIVE, in half-hours. This is the one figure on the
- *  analytics face that no single day can show, and it is the honest version of
- *  "are we starting on time" — a spread, not an average, because one person at
- *  11:00 moves a mean and changes nothing about the rest. */
+/** WHEN PEOPLE ACTUALLY ARRIVE, in continuous half-hour buckets from ≤08:30 to 11:00+. */
 export function arrivalSpread(rows: SpanRow[]): { at: number; label: string; n: number }[] {
+  const FIXED_SLOTS = [510, 540, 570, 600, 630, 660];
   const buckets = new Map<number, number>();
+  let total = 0;
   rows.forEach((r) => r.arrivals.forEach((mins) => {
-    const slot = Math.floor(mins / 30) * 30;
+    total++;
+    const raw = Math.ceil(mins / 30) * 30;
+    const slot = Math.min(660, Math.max(510, raw));
     buckets.set(slot, (buckets.get(slot) || 0) + 1);
   }));
+  if (!total) return [];
+  FIXED_SLOTS.forEach((s) => {
+    if (!buckets.has(s)) buckets.set(s, 0);
+  });
   return Array.from(buckets.keys()).sort((a, b) => a - b).map((at) => ({
     at,
-    label: String(Math.floor(at / 60)).padStart(2, "0") + ":" + String(at % 60).padStart(2, "0"),
+    label: at === 510 ? "≤08:30" : at === 660 ? "11:00+" : String(Math.floor(at / 60)).padStart(2, "0") + ":" + String(at % 60).padStart(2, "0"),
     n: buckets.get(at) || 0,
   }));
 }
@@ -1315,7 +1349,7 @@ export const earliestAttendance = (): string | null =>
   snap.days.reduce<string | null>((a, d) =>
     (!a || d.businessDate < a ? d.businessDate : a), null);
 
-export interface SpanDay { date: string; present: number; late: number; absent: number; onLeave: number; unclosed: number }
+export interface SpanDay { date: string; present: number; late: number; absent: number; onLeave: number; unclosed: number; notStarted: number }
 
 /** THE SAME PARTITION `spanRows` USES, one entry per day rather than per member.
  *
@@ -1328,11 +1362,12 @@ export interface SpanDay { date: string; present: number; late: number; absent: 
  *  four, and `late` is a subset of `present`. */
 export function spanDays(from: string, to: string, scope: Scope): SpanDay[] {
   return datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY).map((d) => {
-    const t: SpanDay = { date: d, present: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0 };
+    const t: SpanDay = { date: d, present: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0, notStarted: 0 };
     dayRows(d, scope).forEach((r) => {
       if (d < r.member.joiningDate) return;
       if (r.state === "unclosed") { t.unclosed++; return; }
       if (r.state === "on_leave") { t.onLeave++; return; }
+      if (r.state === "not_started") { t.notStarted++; return; }
       if (!r.day) { t.absent++; return; }
       t.present++;
       if (r.day.isLate) t.late++;
@@ -1463,6 +1498,14 @@ export const leaveOn = (date: string, ids: string[]): LeaveRequest[] =>
 export const pendingLeave = (scope: Scope): LeaveRequest[] =>
   snap.leave.filter((l) => (l.state === "requested" || l.state === "escalated")
     && (scope === "all" || l.memberId !== meId()));
+
+export const decidedLeave = (scope: Scope): LeaveRequest[] => {
+  const ids = membersInScope(scope).map((m) => m.memberId);
+  return snap.leave
+    .filter((l) => l.state !== "requested" && l.state !== "escalated" && (scope === "all" || ids.indexOf(l.memberId) >= 0))
+    .slice()
+    .sort((a, b) => (b.decidedAt || b.fromDate).localeCompare(a.decidedAt || a.fromDate));
+};
 
 /** Every date a range covers, inclusive. Field arithmetic through addDays, not
  *  `new Date(...).toISOString()`: this panel runs at +05:30, where an ISO
@@ -1710,18 +1753,18 @@ export interface WorkFilter {
 
 export function workRows(f: WorkFilter, scope: Scope): WorkItem[] {
   const ids = membersInScope(scope).map((m) => m.memberId);
-  let rows = snap.items.filter((i) => ids.indexOf(i.assigneeId) >= 0);
+  let rows = scope === "all" ? snap.items.slice() : snap.items.filter((i) => ids.indexOf(i.assigneeId) >= 0);
   if (f.member) rows = rows.filter((i) => i.assigneeId === f.member);
   if (f.kind) rows = rows.filter((i) => i.kind === f.kind);
   if (f.status) rows = rows.filter((i) => stageOf(i) === f.status);
   if (f.tag) rows = rows.filter((i) => hasSlug(i, f.tag as string));
   if (f.priority) rows = rows.filter((i) => i.priority === f.priority);
-  if (f.wait) rows = rows.filter((i) => !!blockerOf(i));
+  if (f.wait) rows = rows.filter((i) => stageOf(i) === "blocked" || !!blockerOf(i));
   if (f.parent) rows = rows.filter((i) => i.parentId === f.parent || i.itemId === f.parent);
-  if (f.due === "today") rows = rows.filter((i) => i.dueDate === TODAY);
+  if (f.due === "today") rows = rows.filter((i) => !isTerminal(i.status) && i.dueDate === TODAY);
   if (f.due === "week") {
-    const wk = weekOf(TODAY);
-    rows = rows.filter((i) => !isTerminal(i.status) && !!i.dueDate && wk.indexOf(i.dueDate) >= 0);
+    const end = addDays(TODAY, 7);
+    rows = rows.filter((i) => !isTerminal(i.status) && !!i.dueDate && i.dueDate >= TODAY && i.dueDate <= end);
   }
   if (f.due === "active") {
     rows = rows.filter((i) => !isTerminal(i.status));
@@ -1759,7 +1802,7 @@ export function workTotals(rows: WorkItem[]): WorkTotals {
     if (st === "delayed") t.delayed++;
     if (st === "completed") t.completed++;
     if (st === "cancelled") t.cancelled++;
-    if (blockerOf(i)) t.waiting++;
+    if (st === "blocked" || blockerOf(i)) t.waiting++;
   });
   return t;
 }
@@ -1831,7 +1874,7 @@ export function reviewRows(date: string, scope: Scope, at = now()): ReviewRow[] 
         done: hasPlan ? planDone : dueToday.filter((i) => i.status === "completed").length,
         planned: hasPlan ? planLines.length : 0,
         delayed: items.filter((i) => isDelayed(i)).length,
-        waiting: items.filter((i) => !!blockerOf(i)).length,
+        waiting: items.filter((i) => stageOf(i) === "blocked" || !!blockerOf(i)).length,
       };
     });
 }
@@ -1886,12 +1929,13 @@ export function reportSpanRows(from: string, to: string, scope: Scope): ReportSp
     };
     dates.forEach((d) => {
       if (d < m.joiningDate) return;
-      if (m.reportsTo) row.days++;
       const plan = planFor(m.memberId, d);
-      if (plan && plan.submittedAt) { row.plans++; row.planned += plan.lines.length; }
-      const due = eodDue(d, m);
-      if (m.reportsTo && due) row.eodsDue++;
       const rep = reportFor(m.memberId, d);
+      if (m.reportsTo) {
+        row.days++;
+        if (eodDue(d, m) || (rep && rep.submittedAt)) row.eodsDue++;
+      }
+      if (plan && plan.submittedAt) { row.plans++; row.planned += plan.lines.length; }
       if (rep && rep.submittedAt) {
         row.eods++;
         row.done += rep.lines.filter((l) => l.done).length;
@@ -1918,7 +1962,12 @@ export function reportSpanTotals(rows: ReportSpanRow[]): ReportSpanTotals {
     planned: 0, done: 0, planPct: null, eodPct: null, keptPct: null,
   };
   rows.forEach((r) => {
-    t.days += r.days; t.plans += r.plans; t.eodsDue += r.eodsDue; t.eods += r.eods;
+    if (r.days > 0) {
+      t.days += r.days;
+      t.plans += Math.min(r.plans, r.days);
+      t.eodsDue += r.eodsDue;
+      t.eods += Math.min(r.eods, r.eodsDue);
+    }
     t.unread += r.unread; t.planned += r.planned; t.done += r.done;
   });
   if (t.days) t.planPct = Math.round((t.plans / t.days) * 100);
@@ -1932,16 +1981,18 @@ export interface ReportSpanDay {
   date: string; owed: number; plans: number; eodsDue: number; eods: number; unread: number;
 }
 export function reportSpanDays(from: string, to: string, scope: Scope): ReportSpanDay[] {
-  const people = membersInScope(scope).filter((m) => m.status === "active");
+  const people = membersInScope(scope).filter(isHumanEmployee).filter((m) => m.status === "active");
   return datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY).map((d) => {
     const t: ReportSpanDay = { date: d, owed: 0, plans: 0, eodsDue: 0, eods: 0, unread: 0 };
     people.forEach((m) => {
       if (d < m.joiningDate) return;
-      if (m.reportsTo) t.owed++;
       const plan = planFor(m.memberId, d);
-      if (plan && plan.submittedAt) t.plans++;
-      if (m.reportsTo && eodDue(d, m)) t.eodsDue++;
       const rep = reportFor(m.memberId, d);
+      if (m.reportsTo) {
+        t.owed++;
+        if (eodDue(d, m) || (rep && rep.submittedAt)) t.eodsDue++;
+      }
+      if (plan && plan.submittedAt) t.plans++;
       if (rep && rep.submittedAt) {
         t.eods++;
         if (!rep.acknowledgedById) t.unread++;
@@ -1974,7 +2025,7 @@ export function attentionOf(rows: ReviewRow[]): Attention {
     noPlan: rows.filter((r) => r.member.reportsTo && (!r.plan || !r.plan.submittedAt)),
     noEod: rows.filter((r) => r.member.reportsTo && r.eodDue && (!r.report || !r.report.submittedAt)),
     delayed: uniq(items.filter((i) => isDelayed(i))),
-    waiting: uniq(items.filter((i) => !!blockerOf(i))),
+    waiting: uniq(items.filter((i) => stageOf(i) === "blocked" || !!blockerOf(i))),
     lateOrAbsent: rows.filter((r) => r.state === "absent" || (r.day && r.day.isLate)),
     unacknowledged: rows.filter((r) => r.report && r.report.submittedAt && !r.report.acknowledgedById),
   };
@@ -2010,6 +2061,33 @@ export const openDayAt = (memberId: string, startedAt: string, note: string): Pr
 export const startBreak = (memberId: string) => ownDay(memberId, "break");
 export const resumeDay = (memberId: string) => ownDay(memberId, "resume");
 export const endDay = (memberId: string) => ownDay(memberId, "end");
+
+/** Admin attendance management: log check-in, log check-out, correct times, or force-close an unclosed day with an audit reason. */
+export function correctDay(input: {
+  memberId: string;
+  businessDate: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  breakMinutes?: number | null;
+  reason: string;
+}): Promise<Result<AttendanceDay>> {
+  if (!input.reason.trim()) return Promise.resolve(err("reason_required", "A reason is required for the audit log."));
+  return live(
+    () => AdminOpsService.correctAttendanceDay({
+      member: Number(input.memberId),
+      businessDate: input.businessDate,
+      startedAt: input.startedAt || undefined,
+      endedAt: input.endedAt === undefined ? undefined : input.endedAt,
+      breakMinutes: input.breakMinutes === undefined ? undefined : input.breakMinutes,
+      reason: input.reason.trim(),
+    }),
+    (d) => {
+      const day = toDay(d);
+      snap.days = snap.days.filter((x) => x.attendanceId !== day.attendanceId && !(x.memberId === day.memberId && x.businessDate === day.businessDate)).concat([day]);
+      return day;
+    },
+  );
+}
 
 /** WHERE THIS ITEM MAY GO NEXT, read from the same server rows that
  *  `work/<id>/status/` enforces with. A control that offers a move the server

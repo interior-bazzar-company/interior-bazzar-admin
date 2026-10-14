@@ -35,22 +35,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { usePageChrome } from "../../shell/AdminShell";
+import { can, usePageChrome } from "../../shell/AdminShell";
+import { getSession } from "../../auth/session";
 import { useShell } from "../../shell/ShellContext";
 import {
-  Alert, Button, ChartFrame, DateInput, EmptyState, FilterBar, FilterChips, FormField, IconButton, Input,
-  ListTable, PageHeader, Pill, Rail, SearchField, SectionHead, Segmented, Select, StatStrip,
+  Alert, Button, ChartFrame, DateInput, EmptyState, FieldRow, FilterBar, FilterChips, FormField, FormSection, IconButton, Input,
+  ListTable, ModalShell, PageHeader, Pill, Rail, SearchField, SectionHead, Segmented, Select, SelectInput, StatStrip,
   Tabs, TbTitle, Tiles, qs,
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import { ColumnChart } from "../charts";
 import { go } from "../../ui/nav";
 import {
-  LEAVE_KIND, TODAY, addDays, canDecideLeave, attendanceTotals, clampDay, datesIn, dayFor, fmtDate, fmtDayName,
+  ATTENDANCE_STATE, LEAVE_KIND, TODAY, addDays, canDecideLeave, attendanceTotals, clampDay, correctDay, datesIn, dayFor, dayRows, decidedLeave, fmtDate, fmtDayName,
   fmtMonth, isHumanEmployee, isWeekend, labelOf, leaveOverlap, leaveQueue, fmtHM, fmtTime, meId, monthStep,
   readMember, arrivalSpread, earliestAttendance, scopeLabel, scopeOf, spanDays, spanRows,
-  spanTotals, stateOf, openDayAt, startBreak, resumeDay, useDayRows, useLeave, useMe, useMembers,
-  
+  spanTotals, stateOf, openDayAt, startBreak, resumeDay, unclosedRows, useDayRows, useLeave, useMe, useMembers,
   useMyDay, workedOf, now as clockNow,
 } from "./store";
 import type { DayRow, LeaveRequest, Member, Scope, SpanRow } from "./store";
@@ -63,18 +63,63 @@ import { ensureAdopted } from "./adopt";
 
 const ROUTE = "#/attendance";
 
+function csvCell(v: string | number | null | undefined): string {
+  const s = String(v ?? "");
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function downloadCsv(filename: string, rows: {
+  memberName: string;
+  date: string;
+  checkIn: string;
+  checkOut: string;
+  breakDuration: string;
+  totalHours: string;
+  status: string;
+}[]) {
+  const header = ["Member Name", "Date", "Check-In", "Check-Out", "Break Duration", "Total Hours", "Status"];
+  const lines = [
+    header.join(","),
+    ...rows.map((r) => [
+      csvCell(r.memberName),
+      csvCell(r.date),
+      csvCell(r.checkIn),
+      csvCell(r.checkOut),
+      csvCell(r.breakDuration),
+      csvCell(r.totalHours),
+      csvCell(r.status),
+    ].join(",")),
+  ];
+  const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+const isoToHHMM = (iso: string | null | undefined): string => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+};
+
 /* ORDER IS URGENCY, NOT CHRONOLOGY. The record is the live day, Requests is the
-   only tab that can be waiting on the reader, and the window comes last.
-   Requests used to be third, behind two views nobody opens twice a day, which
-   is how a queue with a count on it still gets missed. */
+   only tab that can be waiting on the reader, and the window comes last. */
 const TABS = [
   { k: "record", label: "Record", icon: "clock" },
   { k: "requests", label: "Requests", icon: "inbox" },
   { k: "analytics", label: "Analytics", icon: "chart" },
 ];
-/** The `?face=` values, unchanged — `today` and `history` are the two zooms of
- *  the record tab, so a link somebody sent last week still lands where it
- *  meant. */
 const FACES = ["today", "history", "requests", "analytics"];
 
 export default function Attendance() {
@@ -94,6 +139,7 @@ export default function Attendance() {
   const members = useMembers();
   const me = useMe();
   const shell = useShell();
+  const isAdmin = !!getSession()?.isFullAccess || can("attendance", "approve") || can("attendance", "all");
 
   usePageChrome({ crumbs: <TbTitle label="Attendance" to="#/attendance" /> }, face + date);
 
@@ -108,12 +154,8 @@ export default function Attendance() {
     go(ROUTE + qs(next));
   }, [p]);
 
-  /* `*` IS THE CLEAR-ALL THE CHIP ROW WRITES. Without this branch the row's
-     own "Clear all" set a parameter literally named `*` to nothing and left
-     every filter standing — the one control on the band that promised to undo
-     the others did nothing at all. */
   const onFilter = (name: string, value: string) => {
-    if (name === "*") { goto({ q: undefined, state: undefined, late: undefined }); return; }
+    if (name === "*") { goto({ q: undefined, state: undefined, late: undefined, member: undefined }); return; }
     goto({ [name]: value || undefined });
   };
   const onDate = (d: string) => goto({ date: d === TODAY ? undefined : d });
@@ -143,10 +185,26 @@ export default function Attendance() {
             <Button
               color="primary"
               ico="plus"
-              onClick={() => shell.modal(<LeaveRequestModal memberId={me ? me.memberId : meId()} />)}
+              onClick={() => shell.modal(<LeaveRequestModal memberId={p.member || (me ? me.memberId : meId())} />)}
             >
               Request leave
             </Button>
+          ) : isAdmin ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                color="secondary"
+                ico="clock"
+                onClick={() => shell.modal(
+                  <AdminAttendanceModal
+                    mode="log"
+                    defaultMemberId={p.member || (rows[0]?.member.memberId ?? "")}
+                    defaultDate={date}
+                  />
+                )}
+              >
+                Log check-in / out
+              </Button>
+            </div>
           ) : undefined
         }
         tabs={
@@ -158,12 +216,12 @@ export default function Attendance() {
       />
 
       {face === "today"
-        ? <Today rows={rows} p={p} bar={bar} onFilter={onFilter} />
+        ? <Today rows={rows} date={date} p={p} bar={bar} isAdmin={isAdmin} onFilter={onFilter} />
         : face === "history"
           ? <Month members={members} me={me ? me.memberId : meId()} scope={scope} date={date}
-              bar={bar} onPick={onDate} />
+              memberFilter={p.member} bar={bar} onPick={onDate} onFilter={onFilter} />
           : face === "analytics"
-            ? <Analytics scope={scope} span={p.span || "7"}
+            ? <Analytics scope={scope} span={p.span || "7"} memberFilter={p.member}
                 onSpan={(v) => goto({ span: v === "7" ? undefined : v })} />
             : <Requests />}
     </div>
@@ -172,14 +230,6 @@ export default function Attendance() {
 
 /* ------------------------------------------------------------- date bar --- */
 
-/** THE DATE IS A FILTER, not two chevrons and a label.
- *
- *  Stepping one at a time is the right control for "yesterday" and a terrible
- *  one for "the Tuesday before last" — twelve presses to reach a date somebody
- *  already knows. The chevrons stay because the common move IS one step; the
- *  field is there for every other move, and `max` is what actually refuses a
- *  future date rather than a disabled button somebody routes around by typing
- *  the URL. */
 function DateBar({ zoom, date, onPick, onZoom }: {
   zoom: string; date: string; onPick: (d: string) => void; onZoom: (z: string) => void;
 }) {
@@ -203,27 +253,50 @@ function DateBar({ zoom, date, onPick, onZoom }: {
 
 /* ---------------------------------------------------------------- today --- */
 
-function Today({ rows, p, bar, onFilter }: {
-  rows: DayRow[]; p: Record<string, string>; bar: ReactNode;
-  onFilter: (n: string, v: string) => void;
+function Today({ rows, date, p, bar, isAdmin, onFilter }: {
+  rows: DayRow[]; date: string; p: Record<string, string>; bar: ReactNode;
+  isAdmin: boolean; onFilter: (n: string, v: string) => void;
 }) {
+  const shell = useShell();
   const nowH = useMemo(() => {
     const d = new Date(clockNow());
     return d.getHours() + d.getMinutes() / 60;
   }, []);
 
   const t = attendanceTotals(rows);
-  let list = rows;
+  const histUnclosed = unclosedRows(scopeOf("attendance"));
+  const unclosedCount = t.unclosed || histUnclosed.length;
+  const showingPastUnclosed = p.state === "unclosed" && t.unclosed === 0 && histUnclosed.length > 0;
+
+  let list = showingPastUnclosed ? histUnclosed : rows;
+  if (p.member) {
+    list = list.filter((r) => r.member.memberId === p.member);
+  }
   if (p.q) {
     const q = p.q.toLowerCase();
     list = list.filter((r) => r.member.name.toLowerCase().indexOf(q) >= 0
       || r.member.designation.toLowerCase().indexOf(q) >= 0);
   }
-  if (p.state) list = list.filter((r) => r.state === p.state);
+  if (p.state && !showingPastUnclosed) {
+    list = p.state === "present" ? list.filter((r) => !!r.day) : list.filter((r) => r.state === p.state);
+  }
   if (p.late) list = list.filter((r) => !!r.day && r.day.isLate);
 
-  /* EVERY COUNT IS THE FILTER FOR ITSELF, and pressing the one you are on
-     clears it — so the strip is never a trap you have to leave by the chips. */
+  const exportTodayCsv = () => {
+    downloadCsv(
+      `attendance-${date}.csv`,
+      list.map((r) => ({
+        memberName: r.member.name,
+        date: r.day?.businessDate || date,
+        checkIn: r.day && r.day.startedAt ? fmtTime(r.day.startedAt) : "—",
+        checkOut: r.day && r.day.endedAt ? fmtTime(r.day.endedAt) : "—",
+        breakDuration: r.breakMins ? fmtHM(r.breakMins) : "0m",
+        totalHours: r.worked != null ? fmtHM(r.worked) : "—",
+        status: labelOf(ATTENDANCE_STATE, r.state) + (r.day && r.day.isLate ? " (Late)" : ""),
+      }))
+    );
+  };
+
   const at = (patch: Record<string, string | undefined>) => {
     const next: Record<string, string> = { ...p };
     delete next.state; delete next.late;
@@ -231,20 +304,34 @@ function Today({ rows, p, bar, onFilter }: {
     return ROUTE + qs(next);
   };
   const cells: (StatCell | "sep")[] = [
-    { k: "present", v: t.present, title: "Members with a day opened" },
+    {
+      k: t.late ? `present (${t.late} late)` : "present",
+      v: t.present,
+      dot: "ok",
+      title: "Members with a day opened (includes on-time and late arrivals)",
+      to: p.state === "present" ? at({}) : at({ state: "present" }),
+      on: p.state === "present",
+    },
     "sep",
     { k: "working", v: t.working, dot: "ok", to: p.state === "working" ? at({}) : at({ state: "working" }), on: p.state === "working" },
     { k: "on break", v: t.onBreak, dot: "info", to: p.state === "on_break" ? at({}) : at({ state: "on_break" }), on: p.state === "on_break" },
     { k: "ended", v: t.ended, dot: "neutral", to: p.state === "ended" ? at({}) : at({ state: "ended" }), on: p.state === "ended" },
     "sep",
-    { k: "late", v: t.late, dot: t.late ? "warn" : "neutral", to: p.late ? at({}) : at({ late: "1" }), on: !!p.late },
+    { k: "late (in present)", v: t.late, dot: t.late ? "warn" : "neutral", title: "Subset of present members who checked in late", to: p.late ? at({}) : at({ late: "1" }), on: !!p.late },
     { k: "not started", v: t.notStarted, dot: "neutral", to: p.state === "not_started" ? at({}) : at({ state: "not_started" }), on: p.state === "not_started" },
     { k: "absent", v: t.absent, dot: t.absent ? "bad" : "neutral", to: p.state === "absent" ? at({}) : at({ state: "absent" }), on: p.state === "absent" },
     { k: "on leave", v: t.onLeave, dot: t.onLeave ? "info" : "neutral", to: p.state === "on_leave" ? at({}) : at({ state: "on_leave" }), on: p.state === "on_leave" },
-    { k: "unclosed", v: t.unclosed, dot: t.unclosed ? "warn" : "neutral", to: p.state === "unclosed" ? at({}) : at({ state: "unclosed" }), on: p.state === "unclosed" },
+    {
+      k: !t.unclosed && histUnclosed.length ? "unclosed (past)" : "unclosed",
+      v: unclosedCount,
+      dot: unclosedCount ? "warn" : "neutral",
+      to: p.state === "unclosed" ? at({}) : at({ state: "unclosed" }),
+      on: p.state === "unclosed",
+    },
   ];
 
-  const narrowed = !!(p.q || p.state || p.late);
+  const narrowed = !!(p.q || p.state || p.late || p.member);
+  const selectedMember = p.member ? rows.find((r) => r.member.memberId === p.member)?.member || readMember(p.member) : null;
 
   return (
     <>
@@ -255,21 +342,55 @@ function Today({ rows, p, bar, onFilter }: {
         search={<SearchField ph="Search member" name="q" val={p.q} onFilter={onFilter} />}
         filters={
           <>
+            <Select
+              name="member"
+              label="Member"
+              value={p.member}
+              onFilter={onFilter}
+              options={rows.map((r) => ({ v: r.member.memberId, l: r.member.name }))}
+            />
             <Select name="state" label="State" value={p.state} onFilter={onFilter}
-              options={[{ v: "working", l: "Working", dot: "ok" }, { v: "on_break", l: "On break", dot: "info" },
-                { v: "ended", l: "Day ended", dot: "neutral" }, { v: "unclosed", l: "Unclosed", dot: "warn" },
-                { v: "not_started", l: "Not started", dot: "neutral" }, { v: "absent", l: "Absent", dot: "bad" },
-                { v: "on_leave", l: "On leave", dot: "info" }]} />
+              options={[
+                { v: "present", l: "Present (all)", dot: "ok" },
+                { v: "working", l: "Working", dot: "ok" },
+                { v: "on_break", l: "On break", dot: "info" },
+                { v: "ended", l: "Day ended", dot: "neutral" },
+                { v: "unclosed", l: "Unclosed", dot: "warn" },
+                { v: "not_started", l: "Not started", dot: "neutral" },
+                { v: "absent", l: "Absent", dot: "bad" },
+                { v: "on_leave", l: "On leave", dot: "info" },
+              ]} />
             <Select name="late" label="Late" value={p.late} onFilter={onFilter}
               options={[{ v: "1", l: "Late only", dot: "warn" }]} />
           </>
         }
-        right={bar}
+        right={
+          <div className="flex flex-wrap items-center gap-2">
+            {bar}
+            <Button color="secondary" size="sm" ico="download" onClick={exportTodayCsv}>
+              Export CSV
+            </Button>
+          </div>
+        }
         chips={
-          <FilterChips params={{ q: p.q, state: p.state, late: p.late }}
-            labels={{ late: "late only" }} onUnfilter={(n) => onFilter(n, "")} />
+          <FilterChips
+            params={{
+              q: p.q,
+              member: selectedMember ? selectedMember.name : p.member,
+              state: p.state,
+              late: p.late,
+            }}
+            labels={{ late: "late only", member: "member" }}
+            onUnfilter={(n) => onFilter(n, "")}
+          />
         }
       />
+
+      {showingPastUnclosed ? (
+        <Alert tone="warn" title={`${list.length} historical unclosed attendance record${list.length === 1 ? "" : "s"} awaiting resolution`}>
+          Today has 0 unclosed records because the shift is still active. Showing past days left open past auto-close so you can correct or force-close them directly.
+        </Alert>
+      ) : null}
 
       {list.length ? (
         <ListTable min="1080px"
@@ -282,36 +403,44 @@ function Today({ rows, p, bar, onFilter }: {
               <th>Out</th>
               <th className="n">Break</th>
               <th className="n">Worked</th>
-              {/* AGAINST EXPECTED, on the row. "6h 10m" is a fact; whether it is
-                  a short day depends on what that member was expected to do,
-                  and that number lives on the member. Without this column the
-                  reader has to know eight people's contracted hours by heart. */}
               <th>Of expected</th>
-              {/* The scale is stacked under the label rather than beside it:
-                  beside it the numbers ran into the word and, worse, sat over
-                  its own 160px rather than over the column the bars are drawn
-                  in, so the ticks lined up with nothing. */}
               <th>
                 <span className="flex flex-col gap-1">
                   <span>The day</span>
                   <BarScale />
                 </span>
               </th>
+              {isAdmin ? <th className="acts"><span className="sr-only">Manage</span></th> : null}
             </tr>
           }>
           {list.map((r) => {
             const tone = r.state === "absent" ? "bad"
               : r.state === "unclosed" || (r.day && r.day.isLate) ? "warn" : undefined;
+            const isOpenDay = !!r.day && !r.day.endedAt;
+            const rowDate = r.day?.businessDate || date;
             return (
-              <tr key={r.member.memberId}>
+              <tr key={r.member.memberId + "-" + rowDate}>
                 <Rail tone={tone} />
-                <td className="cell-1"><Who m={r.member} /></td>
-                <td><StatePill state={r.state} /></td>
+                <td className="cell-1">
+                  <Who m={r.member} />
+                  {showingPastUnclosed && r.day ? (
+                    <span className="cell-2 block font-mono">{fmtDate(r.day.businessDate)}</span>
+                  ) : null}
+                </td>
+                <td>
+                  <span className="inline-flex flex-wrap items-center gap-1">
+                    <StatePill state={r.state} />
+                    {r.day && r.day.isLate ? (
+                      <Pill xs tone="warn" text="Late"
+                        title={"Late by " + r.day.lateByMinutes + " minutes against a " + r.member.dayStartsAt + " start"} />
+                    ) : null}
+                  </span>
+                </td>
                 <td className="font-mono tnum">
                   <span className="flex items-center gap-1.5">
                     {r.day ? fmtTime(r.day.startedAt) : <span className="text-quaternary">—</span>}
                     {r.day && r.day.isLate ? (
-                      <Pill xs tone="warn" text="late"
+                      <Pill xs tone="warn" text={r.day.lateByMinutes ? `+${r.day.lateByMinutes}m` : "late"}
                         title={"Late by " + r.day.lateByMinutes + " minutes against a " + r.member.dayStartsAt + " start"} />
                     ) : null}
                   </span>
@@ -320,7 +449,11 @@ function Today({ rows, p, bar, onFilter }: {
                   {r.day && r.day.endedAt ? fmtTime(r.day.endedAt) : <span className="text-quaternary">—</span>}
                 </td>
                 <td className="n">{r.breakMins ? fmtHM(r.breakMins) : "—"}</td>
-                <td className="n">{r.worked != null ? fmtHM(r.worked) : "—"}</td>
+                <td className="n">
+                  {r.worked != null
+                    ? (isOpenDay && rowDate === TODAY ? fmtHM(r.worked) + " so far" : fmtHM(r.worked))
+                    : "—"}
+                </td>
                 <td>
                   {r.worked != null ? (
                     <Meter value={r.worked} of={r.member.expectedHoursPerDay * 60}
@@ -330,6 +463,42 @@ function Today({ rows, p, bar, onFilter }: {
                   ) : <span className="text-quaternary">—</span>}
                 </td>
                 <td><DayBar row={r} nowH={nowH} /></td>
+                {isAdmin ? (
+                  <td className="acts">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Button
+                        size="xs"
+                        color="secondary"
+                        onClick={() => shell.modal(
+                          <AdminAttendanceModal
+                            mode={r.day ? "correct" : "log"}
+                            defaultMemberId={r.member.memberId}
+                            defaultDate={rowDate}
+                            existingDay={r.day}
+                          />
+                        )}
+                      >
+                        {r.day ? "Correct" : "Log check-in"}
+                      </Button>
+                      {isOpenDay ? (
+                        <Button
+                          size="xs"
+                          color="secondary"
+                          onClick={() => shell.modal(
+                            <AdminAttendanceModal
+                              mode="force_close"
+                              defaultMemberId={r.member.memberId}
+                              defaultDate={rowDate}
+                              existingDay={r.day}
+                            />
+                          )}
+                        >
+                          Force close
+                        </Button>
+                      ) : null}
+                    </span>
+                  </td>
+                ) : null}
               </tr>
             );
           })}
@@ -345,10 +514,9 @@ function Today({ rows, p, bar, onFilter }: {
             : undefined} />
       )}
 
-      {t.unclosed ? (
-        <Alert tone="warn" title={t.unclosed + " day" + (t.unclosed > 1 ? "s" : "") + " left open past the member's auto-close"}>
-          Nothing is written automatically — the member is asked to confirm or correct on their
-          next visit, and until then those days count towards no total.
+      {unclosedCount && !showingPastUnclosed ? (
+        <Alert tone="warn" title={unclosedCount + " day" + (unclosedCount > 1 ? "s" : "") + " left open past the member's auto-close"}>
+          Nothing is written automatically — click the Unclosed filter above to review, correct, or force-close open past attendance records.
         </Alert>
       ) : null}
     </>
@@ -451,34 +619,55 @@ function CheckIn() {
 
 /* ---------------------------------------------------------------- month --- */
 
-/** THE MONTH, MEMBER BY DAY. It was a five-column week, which is a table with
- *  the shape of a week and none of the shape of a month: nobody could see a
- *  pattern in it, and the pattern is the only thing a grid of hours is for.
- *
- *  Magnitude is the message — who worked a full day, who worked half of one —
- *  so it is a sequential ramp rather than five unrelated hues. The three states
- *  that are NOT a quantity (no record, on leave, still open) take status
- *  colours instead of a step, because they are not more or less of anything.
- *
- *  Every cell is a link to that day's own row on the day view: a heat map you
- *  cannot drill into is a picture rather than a screen. */
-function Month({ members, me, scope, date, bar, onPick }: {
+function Month({ members, me, scope, date, memberFilter, bar, onPick }: {
   members: Member[]; me: string; scope: Scope; date: string;
-  bar: ReactNode; onPick: (d: string) => void;
+  memberFilter?: string; bar: ReactNode; onPick: (d: string) => void;
+  onFilter?: (n: string, v: string) => void;
 }) {
   const first = date.slice(0, 8) + "01";
   const last = addDays(monthStep(date, 1), -1);
   const days = datesIn(first, last).filter((d) => !isWeekend(d) && d <= TODAY);
-  const inScope = members.filter((m) =>
+  let inScope = members.filter(isHumanEmployee).filter((m) =>
     m.status === "active" && (scope === "all" || m.memberId === me || m.reportsTo === me));
+  if (memberFilter) {
+    inScope = inScope.filter((m) => m.memberId === memberFilter);
+  }
+  const monthSummaryRows = spanRows(first, last, scope).filter(
+    (r) => !memberFilter || r.member.memberId === memberFilter
+  );
+
+  const exportMonthCsv = () => {
+    const out: {
+      memberName: string;
+      date: string;
+      checkIn: string;
+      checkOut: string;
+      breakDuration: string;
+      totalHours: string;
+      status: string;
+    }[] = [];
+    days.forEach((d) => {
+      dayRows(d, scope).forEach((r) => {
+        if (memberFilter && r.member.memberId !== memberFilter) return;
+        if (d < r.member.joiningDate) return;
+        out.push({
+          memberName: r.member.name,
+          date: d,
+          checkIn: r.day && r.day.startedAt ? fmtTime(r.day.startedAt) : "—",
+          checkOut: r.day && r.day.endedAt ? fmtTime(r.day.endedAt) : "—",
+          breakDuration: r.breakMins ? fmtHM(r.breakMins) : "0m",
+          totalHours: r.worked != null ? fmtHM(r.worked) : "—",
+          status: labelOf(ATTENDANCE_STATE, r.state) + (r.day && r.day.isLate ? " (Late)" : ""),
+        });
+      });
+    });
+    downloadCsv(`attendance-${date.slice(0, 7)}.csv`, out);
+  };
 
   const rows: HeatRow[] = inScope.map((m) => {
     let total = 0;
     const cells: HeatCell[] = days.map((d) => {
       const day = dayFor(m.memberId, d);
-      /* `d` is passed: without it `stateOf` cannot see approved leave, and this
-         grid drew a leave day exactly like an absence — the one thing the note
-         under it promises never happens. */
       const st = stateOf(day, m, clockNow(), d);
       const w = workedOf(day, m, clockNow());
       if (w != null) total += w;
@@ -487,6 +676,7 @@ function Month({ members, me, scope, date, bar, onPick }: {
       if (d < m.joiningDate) return { date: d, kind: "off", step: 0, title: head + "before " + m.name.split(" ")[0] + " joined" };
       if (st === "on_leave") return { date: d, kind: "leave", step: 0, title: head + "on approved leave" };
       if (st === "unclosed") return { date: d, kind: "open", step: 0, title: head + "still open, counted towards no total" };
+      if (st === "not_started") return { date: d, kind: "off", step: 0, title: head + "not started yet" };
       if (!day) return { date: d, kind: "none", step: 0, title: head + "no record — absent" };
       return {
         date: d, kind: "work",
@@ -501,14 +691,52 @@ function Month({ members, me, scope, date, bar, onPick }: {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionHead className="mb-0" title={fmtMonth(date, true)}
-          desc={days.length + " working days · weekends are not counted (holidays are out of v1; approved leave is shown as On leave)"} />
-        {bar}
+          desc={days.length + " working days · 6-day workweek · Sundays excluded (approved leave is shown as On leave)"} />
+        <div className="flex flex-wrap items-center gap-2">
+          {bar}
+          <Button color="secondary" size="sm" ico="download" onClick={exportMonthCsv}>
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       {inScope.length && days.length ? (
         <>
           <HeatGrid days={days} rows={rows} onPick={onPick} />
           <HeatLegend />
+
+          <SectionHead title="Month summary"
+            desc="Derived per-member totals for the month across working days after each member's joining date." />
+          <ListTable min="920px"
+            head={
+              <tr>
+                <th>Member</th>
+                <th className="n">Present</th>
+                <th className="n">Late</th>
+                <th className="n">Leave</th>
+                <th className="n">Absent</th>
+                <th className="n">Unclosed</th>
+                <th className="n">Worked</th>
+              </tr>
+            }>
+            {monthSummaryRows.map((r) => (
+              <tr key={r.member.memberId}>
+                <td className="cell-1"><Who m={r.member} /></td>
+                <td className="n">{r.present} <span className="text-quaternary">/ {r.days}</span></td>
+                <td className="n">
+                  <span className={r.late ? "font-medium text-warning-primary" : undefined}>{r.late || "—"}</span>
+                </td>
+                <td className="n">{r.onLeave || "—"}</td>
+                <td className="n">
+                  <span className={r.absent ? "font-medium text-error-primary" : undefined}>{r.absent || "0"}</span>
+                </td>
+                <td className="n">
+                  <span className={r.unclosed ? "font-medium text-warning-primary" : undefined}>{r.unclosed || "—"}</span>
+                </td>
+                <td className="n">{fmtHM(r.worked)}</td>
+              </tr>
+            ))}
+          </ListTable>
         </>
       ) : (
         <EmptyState icon="users"
@@ -528,35 +756,50 @@ function Month({ members, me, scope, date, bar, onPick }: {
 
 /* ------------------------------------------------------------ analytics --- */
 
-const SPANS = [{ v: "7", l: "7 days" }, { v: "14", l: "14 days" }, { v: "30", l: "30 days" }];
+const SPANS = [{ v: "7", l: "6d (week)" }, { v: "14", l: "14 days" }, { v: "30", l: "30 days" }];
 
-/** THE SHAPE OF A FORTNIGHT, which no single day can show.
- *
- *  Everything here comes from `spanRows` — the same `dayRows` the table draws,
- *  summed. Two counting rules would be one too many, and the one nobody is
- *  looking at is always the one that drifts.
- *
- *  WHAT IT DELIBERATELY DOES NOT DO: reduce a person to a score. Every column
- *  is a raw count or a total, every column sorts, and there is no composite
- *  anywhere on the face. "Meera: 78" would be a number the panel invented and a
- *  conversation nobody could have honestly. */
-function Analytics({ scope, span, onSpan }: {
-  scope: Scope; span: string; onSpan: (v: string) => void;
+function Analytics({ scope, span, memberFilter, onSpan }: {
+  scope: Scope; span: string; memberFilter?: string; onSpan: (v: string) => void;
 }) {
   useMembers();
   const [sort, setSort] = useState("late");
 
   const days = Math.max(1, Number(span) || 7);
   const from = addDays(TODAY, -(days - 1));
-  const rows = spanRows(from, TODAY, scope);
+  const allRows = spanRows(from, TODAY, scope);
+  const rows = memberFilter ? allRows.filter((r) => r.member.memberId === memberFilter) : allRows;
   const t = spanTotals(rows);
   const daily = spanDays(from, TODAY, scope);
   const spread = arrivalSpread(rows);
-  /* A window that reaches back past the first row ever written is not showing
-     absence, it is showing the edge of the record — and to a derivation whose
-     whole rule is "an absence is the lack of a row" those two are identical. So
-     the screen says which one it is looking at. */
   const first = earliestAttendance();
+
+  const exportAnalyticsCsv = () => {
+    const out: {
+      memberName: string;
+      date: string;
+      checkIn: string;
+      checkOut: string;
+      breakDuration: string;
+      totalHours: string;
+      status: string;
+    }[] = [];
+    datesIn(from, TODAY).filter((d) => !isWeekend(d) && d <= TODAY).forEach((d) => {
+      dayRows(d, scope).forEach((r) => {
+        if (memberFilter && r.member.memberId !== memberFilter) return;
+        if (d < r.member.joiningDate) return;
+        out.push({
+          memberName: r.member.name,
+          date: d,
+          checkIn: r.day && r.day.startedAt ? fmtTime(r.day.startedAt) : "—",
+          checkOut: r.day && r.day.endedAt ? fmtTime(r.day.endedAt) : "—",
+          breakDuration: r.breakMins ? fmtHM(r.breakMins) : "0m",
+          totalHours: r.worked != null ? fmtHM(r.worked) : "—",
+          status: labelOf(ATTENDANCE_STATE, r.state) + (r.day && r.day.isLate ? " (Late)" : ""),
+        });
+      });
+    });
+    downloadCsv(`attendance-analytics-${from}-to-${TODAY}.csv`, out);
+  };
 
   const rank = (r: SpanRow): number => {
     if (sort === "present") return r.present;
@@ -580,18 +823,23 @@ function Analytics({ scope, span, onSpan }: {
       { k: "t", n: d.late, tone: "warn", what: "late" },
       { k: "l", n: d.onLeave, tone: "info", what: "on leave" },
       { k: "a", n: d.absent, tone: "bad", what: "absent" },
-      { k: "u", n: d.unclosed, tone: "mute", what: "unclosed" },
+      { k: "u", n: d.unclosed + (d.notStarted || 0), tone: "mute", what: d.notStarted ? "not started" : "unclosed" },
     ],
   }));
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3">
-        <Segmented sm label="Window" value={span} onPick={onSpan}
-          options={SPANS.map((o) => ({ v: o.v, l: o.l }))} />
-        <span className="text-sm text-tertiary">
-          {fmtDate(from)} to {fmtDate(TODAY)} · weekends excluded
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented sm label="Window" value={span} onPick={onSpan}
+            options={SPANS.map((o) => ({ v: o.v, l: o.l }))} />
+          <span className="text-sm text-tertiary">
+            {fmtDate(from)} to {fmtDate(TODAY)} · 6-day workweek · Sundays excluded
+          </span>
+        </div>
+        <Button color="secondary" size="sm" ico="download" onClick={exportAnalyticsCsv}>
+          Export CSV
+        </Button>
       </div>
 
       <Tiles list={[
@@ -626,12 +874,12 @@ function Analytics({ scope, span, onSpan }: {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ChartFrame title="Day by day"
-          note="One column per working day, across everybody in scope. Absence is the lack of a row, so it is drawn as the part of the column nobody filled.">
+          note="One column per working day, across everybody in scope. Today's open unstarted shifts are shown in grey rather than counted as absent.">
           {stack.length ? (
             <StackBars days={stack} legend={[
               { tone: "ok", label: "on time" }, { tone: "warn", label: "late" },
               { tone: "info", label: "leave" }, { tone: "bad", label: "absent" },
-              { tone: "mute", label: "unclosed" },
+              { tone: "mute", label: "unclosed / not started" },
             ]} />
           ) : (
             <EmptyState flat icon="calendar" title="No working day in this window" body="" />
@@ -639,11 +887,23 @@ function Analytics({ scope, span, onSpan }: {
         </ChartFrame>
 
         <ChartFrame title="When people arrive"
-          note="A spread, not an average. One person at 11:00 moves a mean and tells you nothing about everybody else.">
+          note="Continuous 30-minute arrival windows. Arrivals up to 09:30 are on time (green); arrivals after 09:30 are late (amber).">
           {spread.length ? (
-            <ColumnChart unit="arrivals" height={200}
-              series={[{ key: "n", label: "Arrivals", slot: 1 }]}
-              points={spread.map((b) => ({ key: String(b.at), label: b.label, values: { n: b.n } }))} />
+            <div className="[&_.bg-chart-1]:!bg-utility-green-500 [&_.fill-chart-1]:!fill-utility-green-500 [&_.bg-chart-3]:!bg-utility-yellow-500 [&_.fill-chart-3]:!fill-utility-yellow-500">
+              <ColumnChart unit="arrivals" height={200}
+                series={[
+                  { key: "onTime", label: "On time (≤09:30)", slot: 1 },
+                  { key: "late", label: "Late (>09:30)", slot: 3 },
+                ]}
+                points={spread.map((b) => ({
+                  key: String(b.at),
+                  label: b.label,
+                  values: {
+                    onTime: b.at <= 570 ? b.n : 0,
+                    late: b.at > 570 ? b.n : 0,
+                  },
+                }))} />
+            </div>
           ) : (
             <EmptyState flat icon="clock" title="Nobody has clocked in"
               body="There is nothing to spread over this window." />
@@ -710,67 +970,67 @@ function Analytics({ scope, span, onSpan }: {
 
 /* ------------------------------------------------------------- requests --- */
 
-/** THE QUEUE, ON ITS OWN. It used to sit in the middle of the day table, above
- *  the rows and below the stats — a fine place for something nobody is looking
- *  for, and a poor one for the only block on this screen waiting on a person.
- *
- *  Approving writes NO attendance row. It suppresses the derived absence, and
- *  the day reads On leave instead — which is why a request left sitting here
- *  quietly counts as absence until somebody decides it.
- *
- *  A request with no approver is never silent: somebody at the top of the tree
- *  points at nobody with `reportsTo`, so their request has no reporting line to
- *  route down. It falls to any holder of the deciding verb and it says so out
- *  loud — a request that simply sat there is the exact failure the second table
- *  exists to prevent. */
 function Requests() {
-  const shell = useShell();
   useLeave();
-  const { mine, unrouted } = leaveQueue(scopeOf("attendance"));
+  const scope = scopeOf("attendance");
+  const { mine, unrouted } = leaveQueue(scope);
+  const decided = decidedLeave(scope);
+  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">(
+    mine.length + unrouted.length > 0 ? "pending" : "all"
+  );
 
-  if (!mine.length && !unrouted.length) {
-    return (
-      <>
-        <EmptyState icon="inbox" title="Nothing waiting on you"
-          body="No leave request needs a decision. A request appears here only while it is undecided — once it is approved or refused it lives on that member's own leave page."
-          action={
-            <Button color="primary" ico="plus" onClick={() => shell.modal(<LeaveRequestModal memberId={meId()} />)}>
-              Request leave
-            </Button>
-          } />
-        <Alert tone="info">
-          Approving writes no attendance row. It suppresses the derived absence and those days
-          read as On leave instead.
-        </Alert>
-      </>
-    );
-  }
+  const pendingList = mine.concat(unrouted);
+  const approvedList = decided.filter((l) => l.state === "approved");
+  const rejectedList = decided.filter((l) => l.state === "rejected");
+  const shownDecided = filter === "approved" ? approvedList : filter === "rejected" ? rejectedList : decided;
 
   return (
     <>
-      {mine.length ? (
-        <section className="flex flex-col gap-3">
-          <SectionHead className="mb-0" title="Leave requests"
-            desc="Until you decide, those days still read as absent."
-            right={
-              <div className="flex items-center gap-2">
-                <Pill tone="warn" text={mine.length + " waiting"} />
-                <Button size="xs" color="primary" ico="plus" onClick={() => shell.modal(<LeaveRequestModal memberId={meId()} />)}>
-                  Request leave
-                </Button>
-              </div>
-            } />
-          <LeaveTable list={mine} />
-        </section>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Segmented sm label="Status" value={filter} onPick={(v) => setFilter(v as typeof filter)}
+          options={[
+            { v: "all", l: `All (${pendingList.length + decided.length})` },
+            { v: "pending", l: `Pending (${pendingList.length})` },
+            { v: "approved", l: `Approved (${approvedList.length})` },
+            { v: "rejected", l: `Rejected (${rejectedList.length})` },
+          ]} />
+      </div>
+
+      {(filter === "pending" || filter === "all") && (mine.length > 0 || unrouted.length > 0) ? (
+        <>
+          {mine.length ? (
+            <section className="flex flex-col gap-3">
+              <SectionHead className="mb-0" title="Pending leave requests"
+                desc="Until you decide, those days still read as absent."
+                right={<Pill tone="warn" text={mine.length + " waiting"} />} />
+              <LeaveTable list={mine} />
+            </section>
+          ) : null}
+
+          {unrouted.length ? (
+            <section className="mt-2 flex flex-col gap-3">
+              <SectionHead className="mb-0" title="Nobody to route these to"
+                desc="These members report to nobody, so they fall to any admin who can decide leave."
+                right={<Pill tone="warn" text={String(unrouted.length)} />} />
+              <LeaveTable list={unrouted} unrouted />
+            </section>
+          ) : null}
+        </>
+      ) : filter === "pending" ? (
+        <EmptyState icon="inbox" title="Nothing waiting on you"
+          body="No leave request needs a decision right now. Switch to All or Approved above to inspect historical decided leave." />
       ) : null}
 
-      {unrouted.length ? (
-        <section className="mt-2 flex flex-col gap-3">
-          <SectionHead className="mb-0" title="Nobody to route these to"
-            desc="These members report to nobody, so they fall to any admin who can decide leave."
-            right={<Pill tone="warn" text={String(unrouted.length)} />} />
-          <LeaveTable list={unrouted} unrouted />
+      {filter !== "pending" && shownDecided.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <SectionHead className="mb-0" title="Decided leave history"
+            desc="Historical leave requests that have already been approved or refused."
+            right={<Pill tone="neutral" text={shownDecided.length + " decided"} />} />
+          <LeaveTable list={shownDecided} />
         </section>
+      ) : filter !== "pending" && !shownDecided.length ? (
+        <EmptyState icon="inbox" title="No matching leave records"
+          body="No leave requests match this status filter." />
       ) : null}
 
       <Alert tone="info">
@@ -791,6 +1051,7 @@ function LeaveTable({ list, unrouted }: { list: LeaveRequest[]; unrouted?: boole
           <th>Member</th>
           <th>Dates</th>
           <th>Kind</th>
+          <th>Status</th>
           <th>Reason</th>
           <th className="acts" />
         </tr>
@@ -798,22 +1059,21 @@ function LeaveTable({ list, unrouted }: { list: LeaveRequest[]; unrouted?: boole
       {list.map((l) => {
         const m = readMember(l.memberId);
         const days = datesIn(l.fromDate, l.toDate).length;
-        /* The clash is shown ON THE ROW as well as in the dialog, because the
-           whole point of it is to be seen before somebody presses Approve out
-           of habit. */
         const clash = leaveOverlap(l)[0] || null;
+        const stateTone = l.state === "approved" ? "ok" : l.state === "rejected" ? "bad" : "warn";
         return (
           <tr key={l.leaveId}>
-            <Rail tone={unrouted || clash ? "warn" : undefined} />
+            <Rail tone={unrouted || clash ? "warn" : l.state === "approved" ? "ok" : l.state === "rejected" ? "bad" : undefined} />
             <td className="cell-1">{m ? <Who m={m} /> : l.memberId}</td>
             <td className="font-mono tnum">
               {fmtDate(l.fromDate)}{l.toDate !== l.fromDate ? " – " + fmtDate(l.toDate) : ""}
               <span className="cell-2 block">{days + (days > 1 ? " days" : " day")}</span>
             </td>
             <td><Pill xs tone="neutral" text={labelOf(LEAVE_KIND, l.kind)} /></td>
+            <td><Pill xs tone={stateTone} text={l.state} /></td>
             <td>
               <span className="block max-w-md">{l.reason}</span>
-              {clash ? (
+              {clash && (l.state === "requested" || l.state === "escalated") ? (
                 <span className="cell-2 block text-warning-primary!">
                   {clash.members.map((x) => x.name).join(", ")}
                   {clash.members.length > 1 ? " are" : " is"} also away on {fmtDate(clash.date)}.
@@ -826,6 +1086,11 @@ function LeaveTable({ list, unrouted }: { list: LeaveRequest[]; unrouted?: boole
                   {l.decisionNote ? " — " + l.decisionNote : ""}
                 </span>
               ) : null}
+              {l.decidedById && l.state !== "escalated" ? (
+                <span className="cell-2 block text-tertiary">
+                  Decided by {readMember(l.decidedById)?.name || "Admin"}{l.decisionNote ? " — " + l.decisionNote : ""}
+                </span>
+              ) : null}
             </td>
             <td className="acts">
               <span className="inline-flex items-center gap-2">
@@ -836,19 +1101,178 @@ function LeaveTable({ list, unrouted }: { list: LeaveRequest[]; unrouted?: boole
                   <Button color="tertiary" size="xs"
                     onClick={() => shell.modal(<LeaveEscalateModal l={l} />)}>Escalate…</Button>
                 ) : null}
-                {canDecideLeave(l) ? (
+                {(l.state === "requested" || l.state === "escalated") && canDecideLeave(l) ? (
                   <>
                     <Button color="secondary" size="xs"
                       onClick={() => shell.modal(<LeaveDecideModal l={l} state="rejected" />)}>Refuse…</Button>
                     <Button color="primary" size="xs"
                       onClick={() => shell.modal(<LeaveDecideModal l={l} state="approved" />)}>Approve…</Button>
                   </>
-                ) : <span className="text-quaternary">with the Admin</span>}
+                ) : (l.state === "requested" || l.state === "escalated") ? <span className="text-quaternary">with the Admin</span> : null}
               </span>
             </td>
           </tr>
         );
       })}
     </ListTable>
+  );
+}
+
+/* ------------------------------------------- admin attendance management --- */
+
+function AdminAttendanceModal({
+  mode,
+  defaultMemberId,
+  defaultDate,
+  existingDay,
+}: {
+  mode: "log" | "correct" | "force_close";
+  defaultMemberId: string;
+  defaultDate: string;
+  existingDay?: DayRow["day"] | null;
+}) {
+  const shell = useShell();
+  const members = useMembers();
+  const activeMembers = members.filter(isHumanEmployee).filter((m) => m.status === "active");
+  const [memberId, setMemberId] = useState(
+    activeMembers.some((m) => m.memberId === defaultMemberId)
+      ? defaultMemberId
+      : (activeMembers[0]?.memberId || defaultMemberId)
+  );
+  const [businessDate, setBusinessDate] = useState(defaultDate || TODAY);
+
+  const memberObj = readMember(memberId);
+  const currentDay = existingDay !== undefined ? existingDay : dayFor(memberId, businessDate);
+  const [startedAt, setStartedAt] = useState(
+    currentDay?.startedAt ? isoToHHMM(currentDay.startedAt) : (memberObj?.dayStartsAt || "10:00")
+  );
+  const [endedAt, setEndedAt] = useState(
+    mode === "force_close"
+      ? (currentDay?.endedAt ? isoToHHMM(currentDay.endedAt) : (memberObj?.autoCloseAt || "20:00"))
+      : (currentDay?.endedAt ? isoToHHMM(currentDay.endedAt) : "")
+  );
+  const [breakMins, setBreakMins] = useState(
+    currentDay ? String(dayRows(businessDate, "all").find((r) => r.member.memberId === memberId)?.breakMins ?? 0) : "0"
+  );
+  const [reason, setReason] = useState(
+    mode === "force_close" ? "Force-closed open attendance record" : ""
+  );
+  const [busy, setBusy] = useState(false);
+
+  const onChangeMemberOrDate = (nextMemberId: string, nextDate: string) => {
+    setMemberId(nextMemberId);
+    setBusinessDate(nextDate);
+    const m = readMember(nextMemberId);
+    const d = dayFor(nextMemberId, nextDate);
+    setStartedAt(d?.startedAt ? isoToHHMM(d.startedAt) : (m?.dayStartsAt || "10:00"));
+    setEndedAt(
+      mode === "force_close"
+        ? (d?.endedAt ? isoToHHMM(d.endedAt) : (m?.autoCloseAt || "20:00"))
+        : (d?.endedAt ? isoToHHMM(d.endedAt) : "")
+    );
+  };
+
+  const submit = async () => {
+    if (busy || !memberId || !businessDate || !reason.trim()) return;
+    setBusy(true);
+    const r = await correctDay({
+      memberId,
+      businessDate,
+      startedAt: startedAt || undefined,
+      endedAt: endedAt ? endedAt : null,
+      breakMinutes: breakMins.trim() !== "" ? Math.max(0, Number(breakMins) || 0) : undefined,
+      reason: reason.trim(),
+    });
+    setBusy(false);
+    if (!r.ok) {
+      shell.toast(r.message, "bad");
+      return;
+    }
+    shell.closeLayer();
+    shell.toast(
+      mode === "force_close"
+        ? "Attendance record force-closed."
+        : mode === "correct"
+          ? "Attendance record corrected."
+          : "Attendance logged."
+    );
+  };
+
+  const title =
+    mode === "force_close"
+      ? "Force-close attendance day"
+      : mode === "correct"
+        ? "Correct attendance time"
+        : "Log check-in / check-out";
+
+  return (
+    <ModalShell
+      title={title}
+      sub={memberObj ? memberObj.name + " · " + fmtDate(businessDate) : fmtDate(businessDate)}
+      ico="clock"
+      onClose={() => shell.closeLayer()}
+      actions={
+        <>
+          <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
+          <Button
+            color="primary"
+            isLoading={busy}
+            isDisabled={!memberId || !businessDate || (!startedAt && !endedAt) || !reason.trim()}
+            onClick={submit}
+          >
+            {mode === "force_close" ? "Force close day" : "Save attendance"}
+          </Button>
+        </>
+      }
+    >
+      <FormSection>
+        <FieldRow>
+          <FormField id="admAttMember" label="Team member" req>
+            <SelectInput
+              id="admAttMember"
+              value={memberId}
+              onChange={(v) => onChangeMemberOrDate(v, businessDate)}
+              options={activeMembers.map((m) => ({
+                v: m.memberId,
+                l: m.name + (m.designation ? " — " + m.designation : ""),
+              }))}
+            />
+          </FormField>
+          <FormField id="admAttDate" label="Date" req>
+            <DateInput
+              id="admAttDate"
+              value={businessDate}
+              max={TODAY}
+              onChange={(v) => v && onChangeMemberOrDate(memberId, v)}
+              className="w-full"
+            />
+          </FormField>
+        </FieldRow>
+
+        <FieldRow>
+          <FormField id="admAttIn" label="Check-in time" req>
+            <Input id="admAttIn" type="time" mono value={startedAt} onChange={setStartedAt} />
+          </FormField>
+          <FormField id="admAttOut" label="Check-out time" req={mode === "force_close"}
+            hint={mode === "force_close" ? "Required to close the open day." : "Leave blank if the member is still working."}>
+            <Input id="admAttOut" type="time" mono value={endedAt} onChange={setEndedAt} />
+          </FormField>
+        </FieldRow>
+
+        <FormField id="admAttBreak" label="Break duration (minutes)">
+          <Input id="admAttBreak" type="number" mono value={breakMins} onChange={setBreakMins} />
+        </FormField>
+
+        <FormField id="admAttReason" label="Reason (audit trail)" req
+          hint="Recorded on the attendance row with your name and timestamp.">
+          <Input
+            id="admAttReason"
+            value={reason}
+            ph="Forgot to clock out / field site visit / manual correction"
+            onChange={setReason}
+          />
+        </FormField>
+      </FormSection>
+    </ModalShell>
   );
 }

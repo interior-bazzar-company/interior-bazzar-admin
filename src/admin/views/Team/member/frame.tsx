@@ -56,7 +56,7 @@ export function MemberStrip({ m, live, viewer, right }: {
   const designation = (live && live.designation && live.designation.label) || "";
   const department = live ? (live.roles || []).map((r) => r.name).join(", ") : "";
   const hasLine = !!live && "reportsTo" in live;
-  const name = live ? live.name : m ? m.name : "Member";
+  const name = (live && (live.name || live.username || live.email)) || (m && m.name) || "Member";
   const email = (live && live.email) || (m && m.email) || "";
   const phone = (live && live.phone) || (m && m.phone) || "";
 
@@ -74,14 +74,18 @@ export function MemberStrip({ m, live, viewer, right }: {
           </div>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-tertiary">
-            <span className="font-medium text-secondary">{designation || "—"}</span>
-            {department ? (
+            {designation ? (
               <>
+                <span className="font-medium text-secondary">{designation}</span>
                 <span aria-hidden="true" className="text-quaternary">·</span>
-                <span>{department}</span>
               </>
             ) : null}
-            <span aria-hidden="true" className="text-quaternary">·</span>
+            {department ? (
+              <>
+                <span>{department}</span>
+                <span aria-hidden="true" className="text-quaternary">·</span>
+              </>
+            ) : null}
             <span>
               {senior ? "reports to " + senior.name : hasLine ? "reports to nobody" : "no reporting line"}
             </span>

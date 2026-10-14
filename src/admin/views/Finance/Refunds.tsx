@@ -62,6 +62,8 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter, onParams }:
   const shown = rows.slice().sort((a, b) =>
     jobOf(a.r.state) - jobOf(b.r.state)
     || b.r.requestedAt.localeCompare(a.r.requestedAt));
+  const paidAll = q.settled.filter((x) => x.r.state === "paid");
+  const paidAllPaise = paidAll.reduce((n, x) => n + x.r.amountPaise, 0);
   const declinedN = q.settled.filter((x) => x.r.state === "declined").length;
   const narrowed = Object.keys(p).some((k) => p[k] && ["page", "tab"].indexOf(k) < 0);
 
@@ -108,10 +110,10 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter, onParams }:
         has not sent — it is still in the account and it is not the company's. It leaves the
         moment somebody records the transfer that pays it.</> },
     "sep",
-    { k: <>Paid · {PERIOD.label} <b className="tnum">{inr(ov.refundsPaidPaise)}</b></>,
-      v: ov.refundsPaidN, dot: "ok",
+    { k: <>Paid <b className="tnum">{inr(paidAllPaise)}</b></>,
+      v: paidAll.length, dot: "ok",
       on: p.state === "paid", to: cellHash({ state: "paid" }),
-      tip: <>Transfers actually made in {PERIOD.label}. A refund counts here when the money left,
+      tip: <>Transfers actually made across all time ({ov.refundsPaidN} settled in {PERIOD.label} · {inr(ov.refundsPaidPaise)}). A refund counts here when the money left,
         not when it was approved.</> },
     { k: <>Declined</>, v: declinedN,
       on: p.state === "declined", to: cellHash({ state: "declined" }),

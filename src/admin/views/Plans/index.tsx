@@ -32,7 +32,7 @@ import ConfirmModal from "./ConfirmModal";
 import { call, familiesOf, rangeOf, usePlans } from "./api";
 import type { Plan } from "./api";
 import { val } from "../teamShared";
-import { countsOf, familyLabel, sorter, statusOf, urgency } from "./helpers";
+import { countsOf, familyLabel, normalizeFamily, sorter, statusOf, urgency } from "./helpers";
 import { DurationChips, PlanStatus, PriceRange, railTone } from "./bits";
 
 const CHIP_LABELS = { q: "Search", fam: "Family", status: "Status", sort: "Sort" };
@@ -169,7 +169,7 @@ export default function Plans() {
      the drawer opens for any of them by id whatever the filter says. */
   if (p.status) rows = rows.filter((x) => statusOf(x) === p.status);
   else rows = rows.filter((x) => !x.archived);
-  if (p.fam) rows = rows.filter((x) => (x.family || "").trim().toLowerCase() === p.fam.trim().toLowerCase());
+  if (p.fam) rows = rows.filter((x) => normalizeFamily(x.family) === normalizeFamily(p.fam));
   if (p.q) {
     const s = p.q.toLowerCase();
     rows = rows.filter((x) =>
@@ -188,7 +188,7 @@ export default function Plans() {
   const c = countsOf(plans);
   const byFam: Record<string, number> = {};
   live.forEach((x) => {
-    const f = (x.family || "").trim().toLowerCase();
+    const f = normalizeFamily(x.family);
     byFam[f] = (byFam[f] || 0) + 1;
   });
 
@@ -212,7 +212,7 @@ export default function Plans() {
     cells.push("sep");
     families.forEach((f) => cells.push({
       k: familyLabel(f).toLowerCase(), v: byFam[f] || 0,
-      to: route("fam", f), on: p.fam === f, title: familyLabel(f) + " plans",
+      to: route("fam", f), on: normalizeFamily(p.fam) === f && !!p.fam, title: familyLabel(f) + " plans",
     }));
   }
   cells.push(
@@ -252,7 +252,7 @@ export default function Plans() {
         search={<SearchField key={"q" + p.q} ph="Search plan, description or feature…" val={p.q} onFilter={onSearch} />}
         filters={<>
           {families.length
-            ? <Select key={"fam" + p.fam} name="fam" label="Family" value={p.fam} onFilter={onFilter}
+            ? <Select key={"fam" + p.fam} name="fam" label="Family" value={p.fam ? normalizeFamily(p.fam) : ""} onFilter={onFilter}
                 options={families.map((f) => ({ v: f, l: familyLabel(f) + " (" + (byFam[f] || 0) + ")" }))} />
             : null}
           <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
@@ -300,10 +300,10 @@ function PlansTable({ rows, p, act, go, onUnfilter }: {
           : null} />;
 
   return (
-    <ListTable min="60rem" head={<tr>
+    <ListTable min="64rem" head={<tr>
       <th className="rail" /><th scope="col">Plan</th><th scope="col">Family</th>
       <th scope="col">Durations</th><th scope="col" className="n">Price</th>
-      <th scope="col">Status</th><th scope="col" className="n">Tier</th>
+      <th scope="col">Status</th><th scope="col" className="n">Subscribers</th><th scope="col" className="n">Tier</th>
       <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
     </tr>}>
       {rows.map((pl) => {
@@ -323,6 +323,10 @@ function PlansTable({ rows, p, act, go, onUnfilter }: {
             <td><DurationChips cycles={pl.cycles} /></td>
             <td className="n"><PriceRange range={rangeOf(pl)} /></td>
             <td><PlanStatus plan={pl} /></td>
+            <td className="n tnum text-secondary">
+              {pl.usage.membersActive} active
+              {pl.usage.members > pl.usage.membersActive ? <div className="cell-2">{pl.usage.members} total</div> : null}
+            </td>
             <td className="n text-quaternary">{pl.tier || "—"}</td>
             <td className="acts" onClick={(e) => e.stopPropagation()}>
               <RowMenu plan={pl} act={act} />

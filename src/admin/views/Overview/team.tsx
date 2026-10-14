@@ -38,7 +38,7 @@ export function TeamIntel({ d }: { d: OverviewData }) {
           flush
           tight
           className="overflow-hidden"
-          foot="Tasks = completed in period / open / overdue · Collected is all-time on their deals"
+          foot="Tasks = completed in period / open / overdue for active members in view · Collected in period on their deals"
         >
           <ListTable
             className="rounded-none ring-0"
@@ -127,12 +127,12 @@ export function Operations({ d }: { d: OverviewData }) {
                 <span className="inline-flex items-center gap-1.5">Today<Tip k="team" /></span>
               </Eyebrow>
               <StatLine label="Present" n={t.today.present} to="#/attendance" tone="ok" />
-              <StatLine label="Late" n={t.today.late} to="#/attendance" tone="warn" />
+              <StatLine label="Late (of present)" n={t.today.late} to="#/attendance" tone="warn" />
               {/* Same buckets as #/attendance: everyone with no day who is neither absent nor on leave yet. */}
               <StatLine label="Not started" n={Math.max(0, t.members - t.today.present - t.today.absent - t.today.onLeave)} to="#/attendance?state=not_started" />
               <StatLine label="Absent" n={t.today.absent} to="#/attendance" tone="bad" />
               <StatLine label="On leave" n={t.today.onLeave} to="#/attendance" />
-              <StatLine label="Day never closed" n={t.today.unclosed} to="#/attendance" tone="warn" />
+              <StatLine label="Past days never closed" n={t.today.unclosed} to="#/attendance" tone="warn" />
             </div>
             <div className="flex flex-col gap-1">
               <Eyebrow className="mb-1">Owed to a manager</Eyebrow>

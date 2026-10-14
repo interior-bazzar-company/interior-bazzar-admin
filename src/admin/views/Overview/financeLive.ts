@@ -30,7 +30,7 @@ import type {
   BankTotals, DealPaymentRow, IncomeRow, InstallmentRow, PlanPaymentRow, PlanPaymentsListResponse,
   RefundRow, SalariesResponse, SalaryRunRow, SpendRow, SpendTagTotal,
 } from "../../../api/modules/adminOps";
-import { every, planCashPaise, settledRefundPayments, within, ymd } from "./live";
+import { every, isTestRefund, planCashPaise, settledRefundPayments, within, ymd } from "./live";
 import type { LiveState } from "./live";
 import { inr } from "../../ui/format";
 import { addDays, bucketsOf, todayLocal } from "./derive";
@@ -138,13 +138,16 @@ export function useFinanceLive(p: Period, on: boolean) {
          which is the truth and not a load failure. */
       const list = Object.values(gaps);
       const dead = !list.some((g) => g === "ok") && list.some((g) => g === "error");
+      const cleanRefunds = refunds ? (refunds.refunds || []).filter((r) => !isTestRefund(r)) : [];
+      const owedRows = cleanRefunds.filter((r) => r.state?.key === "approved" && !r.settledAt);
+      const toDecideRows = cleanRefunds.filter((r) => r.state?.key === "requested");
       setS({
         state: dead ? "error" : "ready",
         raw: {
           ledger, plans, income, spend: spend ? spend.spend : [], byTag: spend ? spend.byTag : [], salaries,
-          refunds: refunds ? refunds.refunds : [],
-          owed: refunds ? refunds.owed : { n: 0, paise: 0 },
-          toDecide: refunds ? refunds.toDecide : 0,
+          refunds: cleanRefunds,
+          owed: refunds ? { n: owedRows.length, paise: owedRows.reduce((a, r) => a + r.amountPaise, 0) } : { n: 0, paise: 0 },
+          toDecide: refunds ? toDecideRows.length : 0,
           installments, bank: bank ? bank.totals : null,
           gaps,
         },
@@ -179,7 +182,33 @@ export interface LiveFinance {
    *  than drawing a zero. */
   gaps: Gaps;
 }
-export interface LivePayroll { owedPaise: number; people: number; openRun: string | null; openRunPaise: number }
+export interface LivePayroll {
+  owedPaise: number;
+  people: number;
+  pendingPeople: number;
+  pendingPaise: number;
+  heldPeople: number;
+  heldPaise: number;
+  openRun: string | null;
+  openRunPaise: number;
+}
+
+type RunRow = SalaryRunRow & {
+  paidSlips?: number;
+  paidPaise?: number;
+  lastPaidAt?: string | null;
+  pendingPeople?: number;
+  pendingPaise?: number;
+  heldPeople?: number;
+  heldPaise?: number;
+};
+
+type OwedTotals = SalariesResponse["owed"] & {
+  heldPaise?: number;
+  heldPeople?: number;
+  totalUnpaidPaise?: number;
+  totalUnpaidPeople?: number;
+};
 
 const sum = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((a, x) => a + f(x), 0);
 
@@ -198,19 +227,25 @@ function windowOf(r: Raw, from: string, to: string): MoneyWindow {
      and statutory payments. It is counted, and counted apart. */
   const operating = spend.filter((x) => x.tag?.kind !== "excluded");
   const excluded = spend.filter((x) => x.tag?.kind === "excluded");
-  /* A run is money out on the DAY IT WAS PAID, not the month it is for. */
-  const runs = (r.salaries?.runs || []).filter((x) => !!x.paidAt && within(ymd(x.paidAt), from, to));
-  const refundsPaid = r.refunds.filter((x) => !!x.settledAt && within(ymd(x.settledAt), from, to));
+  /* A run or its paid slips are money out on the DAY PAID, not the month it is for. */
+  const runs = ((r.salaries?.runs || []) as RunRow[])
+    .map((x) => ({
+      paidDate: ymd(x.paidAt || x.lastPaidAt) || (x.paidPaise ? x.month + "-01" : ""),
+      paidAmt: x.paidPaise !== undefined ? x.paidPaise : (x.paidAt ? x.totalNetPaise : 0),
+      slipCount: x.paidSlips !== undefined ? x.paidSlips : x.slips,
+    }))
+    .filter((x) => x.paidAmt > 0 && !!x.paidDate && within(x.paidDate, from, to));
+  const refundsPaid = r.refunds.filter((x) => !isTestRefund(x) && !!x.settledAt && within(ymd(x.settledAt), from, to));
 
   const collectedPaise = sum(deal, (x) => x.amountPaise) + sum(plans, (x) => x.net);
   const otherInPaise = sum(income, (x) => x.amountPaise);
-  const salaryPaise = sum(runs, (x) => x.totalNetPaise);
+  const salaryPaise = sum(runs, (x) => x.paidAmt);
   const otherOutPaise = sum(operating, (x) => x.amountPaise);
   const refundsPaidPaise = sum(refundsPaid, (x) => x.amountPaise);
   const outPaise = salaryPaise + otherOutPaise + refundsPaidPaise;
   return {
     collectedPaise, otherInPaise, collectedN: deal.length + plans.length,
-    salaryPaise, salaryN: sum(runs, (x) => x.slips), otherOutPaise, refundsPaidPaise,
+    salaryPaise, salaryN: sum(runs, (x) => x.slipCount), otherOutPaise, refundsPaidPaise,
     excludedPaise: sum(excluded, (x) => x.amountPaise),
     outPaise, netPaise: collectedPaise + otherInPaise - outPaise,
   };
@@ -229,19 +264,26 @@ export function liveFinance(r: Raw, p: Period, months: string[]): LiveFinance {
   const paise = (xs: InstallmentRow[]) => sum(xs, (x) => x.amountPaise);
 
   const cur = windowOf(r, p.from, p.to);
-  const over = r.byTag.filter((t) => t.overBudget);
+  const curMonth = monthOf(today);
+  const monthSpendByTag = new Map<string, number>();
+  r.spend.forEach((x) => {
+    if (x.tag?.kind !== "excluded" && x.tag?.key && ymd(x.valueDate).slice(0, 7) === curMonth) {
+      monthSpendByTag.set(x.tag.key, (monthSpendByTag.get(x.tag.key) || 0) + x.amountPaise);
+    }
+  });
+  const over = r.byTag
+    .map((t) => {
+      const budget = (t as SpendTagTotal & { budgetPaise?: number | null }).budgetPaise;
+      const spent = monthSpendByTag.get(t.key) || 0;
+      const pct = budget ? Math.round((spent / budget) * 100) : null;
+      return { ...t, paise: spent, pctOfBudget: pct, overBudget: !!(budget && spent > budget) };
+    })
+    .filter((t) => t.overBudget);
 
-  /* A READ THAT DID NOT LAND CONTRIBUTES NO ROWS. "0 installments" off a
-     refused installments read is a claim, not a count. */
-  const risk: RiskRow[] = r.gaps.installments !== "ok" ? [] : [
-    /* Not `#/finance?flag=failed`: that queue filters SUBSCRIPTIONS and these
-       are installments off accepted quotations, most of which have no
-       subscription recorded against them yet -- see derive.ts attentionOf. */
-    { key: "failed", label: "Fail to pay", paise: paise(failed), figure: null,
-      count: plural(failed.length, "installment"), tone: "bad", to: "#/invoices?new=1" },
-    { key: "due_next", label: "Due next 30 days", paise: paise(soon), figure: null,
-      count: plural(soon.length, "installment"), tone: "mute", to: "#/finance?flag=due" },
-  ];
+  /* Due in 30 days and Failed to pay already have dedicated KPI cards directly
+     above in the Finance section; keep this exception table focused on
+     unsettled refunds, current-month budget overruns, and unexplained bank lines. */
+  const risk: RiskRow[] = [];
   if (r.owed.n) {
     risk.push({ key: "owed", label: "Approved, not sent", paise: r.owed.paise, figure: null,
       count: plural(r.owed.n, "refund"), tone: "warn", to: "#/finance-refunds?flag=owed" });
@@ -286,9 +328,16 @@ export function liveFinance(r: Raw, p: Period, months: string[]): LiveFinance {
 export function livePayroll(r: Raw): LivePayroll | null {
   /* A refused or failed salaries read is NOT "no run open · nothing owed". */
   if (r.gaps.salaries !== "ok") return null;
-  const open: SalaryRunRow | null = r.salaries?.openRun || null;
+  const open = (r.salaries?.openRun || null) as RunRow | null;
+  const owed = (r.salaries?.owed || null) as OwedTotals | null;
+  const owedPaise = open ? open.owedPaise : (owed?.totalUnpaidPaise ?? owed?.paise ?? 0);
+  const people = open ? open.unpaidPeople : (owed?.totalUnpaidPeople ?? owed?.people ?? 0);
+  const pendingPeople = open?.pendingPeople ?? owed?.people ?? people;
+  const pendingPaise = open?.pendingPaise ?? owed?.paise ?? owedPaise;
+  const heldPeople = open?.heldPeople ?? owed?.heldPeople ?? Math.max(0, people - pendingPeople);
+  const heldPaise = open?.heldPaise ?? owed?.heldPaise ?? Math.max(0, owedPaise - pendingPaise);
   return {
-    owedPaise: open ? open.owedPaise : 0, people: open ? open.unpaidPeople : 0,
+    owedPaise, people, pendingPeople, pendingPaise, heldPeople, heldPaise,
     openRun: open ? open.month : null, openRunPaise: open ? open.totalNetPaise : 0,
   };
 }

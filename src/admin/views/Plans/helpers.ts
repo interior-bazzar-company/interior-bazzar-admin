@@ -26,6 +26,12 @@ export const inr = (rupees: number) => "₹" + IN.format(rupees);
  *  goes by everywhere else in the panel (deals, tasks). Everything else is
  *  title-cased as-is, since the server's families are free strings and there
  *  is no fuller label table to fall out of sync with them. */
+export const normalizeFamily = (k: string) => {
+  const low = (k || "").trim().toLowerCase();
+  if (low === "autogrowth" || low === "automation") return "automation";
+  return low || "business";
+};
+
 export const familyLabel = (k: string) => {
   if (!k) return "—";
   const low = k.toLowerCase();

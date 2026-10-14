@@ -191,12 +191,47 @@ export function auditTone(e: AuditEntry): string {
   return TONE_BY_VERB[e.verb] || "";
 }
 
+const EVENT_LABEL_MAP: Record<string, string> = {
+  "REGISTERED": "Registered account",
+  "User.registered": "Registered account",
+  "Profile.completed": "Completed profile",
+  "Subscription.default": "Subscription payment defaulted",
+  "Subscription.activated": "Subscription activated",
+  "Subscription.expired": "Subscription expired",
+  "Subscription.cancelled": "Subscription cancelled",
+  "Salary.hold": "Salary placed on hold",
+  "Salary.released": "Salary hold released",
+  "platform_user_profile_updated": "Profile updated",
+  "platform_user_deactivated": "Account deactivated",
+  "platform_user_reactivated": "Account reactivated",
+  "platform_user_tags_updated": "Tags updated",
+  "platform_user_note_added": "Internal note added",
+  "platform_user_note_updated": "Internal note updated",
+  "platform_user_note_deleted": "Internal note removed",
+};
+
+export function formatEventLabel(raw: string | null | undefined): string {
+  const s = String(raw || "").trim();
+  if (!s) return "Activity recorded";
+  if (EVENT_LABEL_MAP[s]) return EVENT_LABEL_MAP[s];
+  if (/^[A-Za-z]+\.[a-z_]+$/.test(s)) {
+    const [ns, act] = s.split(".");
+    const words = (ns + " " + act.replace(/_/g, " ")).toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
+  if (/^[a-z0-9_]+$/.test(s) && s.includes("_")) {
+    const words = s.replace(/^platform_user_/, "account_").replace(/_/g, " ");
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
+  return s;
+}
+
 /** Remembers how to draw an action the first time an entry carrying it lands.
  *  The screens look a type up by key, which is what the bundled list of labels
  *  and tones used to answer. */
 function rememberType(key: string, e: AuditEntry): void {
   if (EVENT_TYPES.some((t) => t.key === key)) return;
-  EVENT_TYPES.push({ key, label: e.label || e.action || key, tone: auditTone(e) });
+  EVENT_TYPES.push({ key, label: formatEventLabel(e.label || e.action || key), tone: auditTone(e) });
 }
 
 export const VOCAB = { ...vocabDoc, eventTypes: EVENT_TYPES, deactivateReasons: DEACTIVATE_REASONS };
@@ -565,7 +600,16 @@ export const USERNAME_RULES = { ...vocabDoc.usernameRules, min: 0, max: Infinity
 export const RESERVED_USERNAMES: string[] = [];
 export let REGISTERED_RANGES: VocabOption[] = [];
 export let SORT_OPTIONS: VocabOption[] = [];
-export const METRICS = vocabDoc.metricDefinitions;
+export const METRICS = vocabDoc.metricDefinitions.map((m) =>
+  m.key === "engagement"
+    ? {
+        ...m,
+        label: "Active users (DAU / WAU / MAU)",
+        formula: "Distinct active accounts with an authenticated session in the last 24h (DAU), 7d (WAU), or 30d (MAU).",
+        caution: "Counted from each account's most recent authenticated session or sign-in timestamp, never estimated.",
+      }
+    : m
+);
 export let OPEN_DECISIONS: OpenDecision[] = [];
 
 /* A SYNTHETIC ROW RATHER THAN `CLASSIFICATIONS[0]`: the list is empty until the
@@ -1543,10 +1587,34 @@ let ANALYTICS_SOURCES: VocabOption[] = [];
  *  happens to have loaded, and not the range. Null until the read lands. */
 let ANALYTICS_BASE: Counts | null = null;
 
+export interface EngagementCounts {
+  active24h: number;
+  active7d: number;
+  active30d: number;
+  withSession: number;
+}
+
+let ANALYTICS_ENGAGEMENT: EngagementCounts | null = null;
+
 /** The base counts for the tiles, or the loaded page's own counts while the
  *  read is in flight. The server's answer is the honest one — the page is 20
  *  rows of a population that is not. */
 export const baseCounts = (rows: UserRow[]): Counts => ANALYTICS_BASE || countsOf(rows);
+
+export function engagementCounts(rows: UserRow[]): EngagementCounts {
+  if (ANALYTICS_ENGAGEMENT) return ANALYTICS_ENGAGEMENT;
+  let active24h = 0, active7d = 0, active30d = 0, withSession = 0;
+  rows.forEach((r) => {
+    const t = ts(r.user.lastActivityAt);
+    if (isNaN(t)) return;
+    withSession += 1;
+    const d = daysBetween(t, NOW);
+    if (d <= 1) active24h += 1;
+    if (d <= 7) active7d += 1;
+    if (d <= 30) active30d += 1;
+  });
+  return { active24h, active7d, active30d, withSession };
+}
 
 /** Plants a fetched payload. Its own function so a check can state "the
  *  analytics arrived" without standing up a server. */
@@ -1554,6 +1622,8 @@ export function applyUsersAnalytics(a: UsersAnalytics): void {
   MONTHS = (a.months || []) as MonthRow[];
   ANALYTICS_SOURCES = (a.sources || []).map((r) => ({ key: r.key, label: r.label }));
   ANALYTICS_BASE = a.base || null;
+  const eng = (a as unknown as { engagement?: EngagementCounts | null }).engagement;
+  ANALYTICS_ENGAGEMENT = eng || null;
   if (a.asOf) applyServerDate(a.asOf);
 }
 

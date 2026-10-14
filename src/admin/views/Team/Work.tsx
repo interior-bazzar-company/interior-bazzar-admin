@@ -41,7 +41,7 @@ import { useShell } from "../../shell/ShellContext";
 import {
   Alert, Button, Card, ChartFrame, DateInput, EmptyState, FieldRow, FilterBar, FilterChips,
   FormField, Icon, IconButton, Input, ListTable, ModalShell, PageHeader, Pill, Rail,
-  SearchField, Segmented, Select, SelectInput, StatStrip, Tabs, TbTitle, Tiles,
+  SearchField, SectionHead, Segmented, Select, SelectInput, StatStrip, Tabs, TbTitle, Tiles,
   cap, qs, tagClasses,
 } from "../../ui";
 import type { StatCell } from "../../ui";
@@ -50,12 +50,12 @@ import { go } from "../../ui/nav";
 import {
   KIND, PRIORITY, PRIORITY_SCALE, TODAY, WORK_STATUS, addDays,
   blockerOf, checkCount, eventsOn, fmtDate, fmtMonth, gridDays,
-  isDelayed, isTerminal, isWeekend, labelOf, lanesOf, leaveOn, meId, membersInScope, monthStep,
+  isDelayed, isHumanEmployee, isTerminal, isWeekend, labelOf, lanesOf, leaveOn, meId, membersInScope, monthStep,
   normaliseUrl, parentOf, progressOf, readMember, scopeLabel, scopeOf, setItemStatus, stageOf, tagsOf,
-  toneOf, updateItem, useItem, useMembers, useTags, useWork, workTotals,
+  timePct, toneOf, updateItem, useItem, useMembers, useTags, useWork, workTotals,
 } from "./store";
 import type {
-  Attachment, CalEvent, Member, Tag, WorkItem, WorkStage,
+  Attachment, CalEvent, Member, Tag, WorkItem, WorkStage, WorkStatus,
 } from "./store";
 import { ensureAdopted } from "./adopt";
 import { createWorkItem, createWorkTag, myId, todayReal, useAssignees, useWorkTags, useWorkVocab } from "./liveWork";
@@ -174,37 +174,16 @@ export default function Work() {
     }
   }, [selectedTaskIds.length, rows]);
 
-  const handleBulkReschedule = async (days: number = 7) => {
-    const toUpdate = rows.filter((r) => selectedTaskIds.includes(r.itemId));
-    let count = 0;
-    for (const item of toUpdate) {
-      const baseDate = item.dueDate || TODAY;
-      const nextDue = addDays(baseDate, days);
-      const res = await updateItem(item.itemId, { dueDate: nextDue });
-      if (res.ok) count++;
-    }
-    shell.toast(`Rescheduled ${count} task${count === 1 ? "" : "s"} by +${days} days.`);
-    setSelectedTaskIds([]);
-  };
-
-  const handleBulkComplete = async () => {
-    let count = 0;
-    for (const id of selectedTaskIds) {
-      const res = await setItemStatus(id, "completed");
-      if (res.ok) count++;
-    }
-    shell.toast(`Marked ${count} task${count === 1 ? "" : "s"} as completed.`);
-    setSelectedTaskIds([]);
-  };
-
-  const handleBulkArchive = async () => {
-    let count = 0;
-    for (const id of selectedTaskIds) {
-      const res = await setItemStatus(id, "cancelled", "Bulk archived/stale cleanup");
-      if (res.ok) count++;
-    }
-    shell.toast(`Archived/cancelled ${count} task${count === 1 ? "" : "s"}.`);
-    setSelectedTaskIds([]);
+  const openBulkAction = (mode: "reassign" | "reschedule" | "status") => {
+    shell.modal(
+      <BulkWorkActionModal
+        mode={mode}
+        selectedIds={selectedTaskIds}
+        members={members}
+        onDone={() => setSelectedTaskIds([])}
+      />,
+      "sm"
+    );
   };
 
   useEffect(() => { ensureAdopted(); }, []);
@@ -275,8 +254,10 @@ export default function Work() {
     if (ownsDrawer.current) { ownsDrawer.current = false; closeLayer(); }
   }, [openId, layerKind, openDrawer, closeLayer]);
 
-  const t = workTotals(rows);
+  const allTotals = workTotals(all);
+  const openAll = all.filter((i) => !isTerminal(i.status)).length;
   const narrowed = FILTERS.some((k) => p[k]);
+  const activeHumans = members.filter(isHumanEmployee).filter((m) => m.status === "active").length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -284,9 +265,15 @@ export default function Work() {
         title="Tasks"
         meta={
           <>
-            <span className="font-medium text-secondary tnum">{rows.length} in view</span>
-            {t.delayed ? <span className="text-warning-primary tnum">{t.delayed} in delay</span> : null}
-            <span>{scopeLabel(scopeOf("work"), all.length)}</span>
+            <span className="font-medium text-secondary tnum">
+              All work: {openAll} open · {allTotals.delayed} delayed
+            </span>
+            {narrowed ? (
+              <span className="font-medium text-brand-secondary tnum">Showing {rows.length} matching</span>
+            ) : (
+              <span className="text-tertiary tnum">{rows.length} in view</span>
+            )}
+            <span>{scopeLabel(scopeOf("work"), activeHumans)}</span>
           </>
         }
         actions={
@@ -303,6 +290,8 @@ export default function Work() {
             onPick={(k) => goto(tabPatch(k))} />
         }
       />
+
+      <WorkStats p={p} />
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-tertiary">Quick scope:</span>
@@ -346,7 +335,7 @@ export default function Work() {
         filters={
           <>
             <Select name="member" label="Member" value={p.member} onFilter={onFilter}
-              options={members.filter((m) => m.status === "active").map((m) => ({ v: m.memberId, l: m.name }))} />
+              options={members.filter(isHumanEmployee).filter((m) => m.status === "active").map((m) => ({ v: m.memberId, l: m.name }))} />
             <Select name="kind" label="Kind" value={p.kind} onFilter={onFilter}
               options={[{ v: "task", l: "Tasks" }, { v: "milestone", l: "Milestones" }, { v: "target", l: "Targets" }]} />
             <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter} options={slugOptions(tags)} />
@@ -377,7 +366,7 @@ export default function Work() {
       />
 
       {tab === "timeline" ? <TimelineFace rows={rows} onOpen={openItem} />
-        : tab === "analysis" ? <Analysis rows={rows} all={all} members={members} />
+        : tab === "analysis" ? <Analysis rows={rows} all={all} members={members} onOpen={openItem} />
           : tab === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} members={members} />
             : tab === "board" ? <Board rows={rows} all={all} group={p.group || ""} onOpen={openItem} />
               : <List rows={rows} all={all} onOpen={openItem} narrowed={narrowed} onClear={() => onFilter("*", "")}
@@ -391,32 +380,32 @@ export default function Work() {
           <div className="h-4 w-px bg-slate-700" />
           <button
             type="button"
-            onClick={() => handleBulkReschedule(7)}
-            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 transition-colors border border-slate-700 active:scale-95"
+            onClick={() => openBulkAction("reassign")}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 transition-colors border border-slate-700 active:scale-95 cursor-pointer"
+          >
+            <Icon name="user" size="xs" />
+            Reassign
+          </button>
+          <button
+            type="button"
+            onClick={() => openBulkAction("reschedule")}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 transition-colors border border-slate-700 active:scale-95 cursor-pointer"
           >
             <Icon name="calendar" size="xs" />
-            Reschedule (+7d)
+            Reschedule
           </button>
           <button
             type="button"
-            onClick={handleBulkComplete}
-            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors active:scale-95"
+            onClick={() => openBulkAction("status")}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-brand-solid hover:opacity-90 text-white transition-colors active:scale-95 cursor-pointer"
           >
             <Icon name="check" size="xs" />
-            Mark Completed
-          </button>
-          <button
-            type="button"
-            onClick={handleBulkArchive}
-            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-colors active:scale-95"
-          >
-            <Icon name="trash" size="xs" />
-            Close Stale / Archive
+            Change Status
           </button>
           <button
             type="button"
             onClick={() => setSelectedTaskIds([])}
-            className="text-xs text-slate-400 hover:text-slate-200 ml-1 px-1.5 py-1"
+            className="text-xs text-slate-400 hover:text-slate-200 ml-1 px-1.5 py-1 cursor-pointer"
             title="Clear selection"
           >
             ✕ Clear
@@ -540,13 +529,20 @@ export function FaceMenu({ face, view, goto }: {
  *  asked of a smaller set rather than a different screen. A chart that ignored
  *  the filter band would be a chart nobody could trust against the list beside
  *  it. */
-function Analysis({ rows, all, members }: {
-  rows: WorkItem[]; all: WorkItem[]; members: Member[];
+const shortMemberLabel = (name: string): string => {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "Unassigned";
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+};
+
+function Analysis({ rows, all, members, onOpen }: {
+  rows: WorkItem[]; all: WorkItem[]; members: Member[]; onOpen: (id: string) => void;
 }) {
   const tasks = rows.filter((i) => i.kind === "task");
   const open = rows.filter((i) => !isTerminal(i.status));
   const late = rows.filter((i) => isDelayed(i));
-  const blocked = rows.filter((i) => !!blockerOf(i, all));
+  const blocked = rows.filter((i) => stageOf(i) === "blocked" || !!blockerOf(i, all));
 
   /* Completed over everything that is not cancelled. A cancelled task is not a
      failure to finish, it is a decision not to — counting it against the rate
@@ -557,34 +553,44 @@ function Analysis({ rows, all, members }: {
 
   const byStage = STAGES.map((st) => ({
     key: st,
-    label: labelOf(WORK_STATUS, st) || cap(st),
-    value: rows.filter((i) => stageOf(i) === st).length,
-    /* The chart kit's own reserved status tones, not the pill vocabulary — they
-       are different scales and mixing them is how a chart ends up colouring a
-       stage with a hue that means something else. */
-    tone: st === "delayed" ? "st-bad" : st === "completed" ? "st-ok" : "st-mute",
+    label: st === "blocked" ? "Waiting" : (labelOf(WORK_STATUS, st) || cap(st)),
+    value: st === "blocked" ? blocked.length : rows.filter((i) => stageOf(i) === st).length,
+    tone: st === "delayed" ? "st-bad" : st === "blocked" ? "st-warn" : st === "in_progress" ? "st-info" : st === "completed" ? "st-ok" : "st-mute",
   })).filter((r) => r.value > 0);
 
-  /* AN ORDINAL SCALE, DRAWN AS ONE. Priority is ranked, so it takes the kit's
-     ordinal steps rather than four unrelated hues — the reader should be able
-     to see the order without reading the labels. */
-  const byPriority = PRIORITY_SCALE.map((k, n) => ({
+  /* Semantic priority hues: Urgent (red), High (amber), Normal (blue), Low (slate). */
+  const byPriority = PRIORITY_SCALE.map((k) => ({
     key: k,
     label: labelOf(PRIORITY, k),
     value: open.filter((i) => i.priority === k).length,
-    tone: n === 0 ? "st-bad" : n === 1 ? "o1" : n === 2 ? "o2" : "o3",
+    tone: k === "urgent" ? "st-bad" : k === "high" ? "st-warn" : k === "medium" ? "st-info" : "st-mute",
   })).filter((r) => r.value > 0);
 
-  /* WHO IS CARRYING WHAT — open items only, because a person's finished work is
-     not load. Sorted by what is late rather than by volume: eight on time is a
-     working week and two overdue is a conversation. */
-  const byMember = members
+  /* WHO IS CARRYING WHAT — open items only, human members, formatted as First Name + Last Initial. */
+  const humanMembers = members.filter(isHumanEmployee);
+  const humanIds = new Set(humanMembers.map((m) => m.memberId));
+  const byMember = humanMembers
     .map((m) => {
       const mine = open.filter((i) => i.assigneeId === m.memberId);
-      return { m, open: mine.length, late: mine.filter((i) => isDelayed(i)).length };
+      return {
+        key: m.memberId,
+        label: shortMemberLabel(m.name),
+        open: mine.length,
+        late: mine.filter((i) => isDelayed(i)).length,
+      };
     })
     .filter((r) => r.open > 0)
     .sort((a, b) => (b.late - a.late) || (b.open - a.open));
+
+  const otherOpen = open.filter((i) => !humanIds.has(i.assigneeId));
+  if (otherOpen.length > 0) {
+    byMember.push({
+      key: "unassigned",
+      label: "Unassigned",
+      open: otherOpen.length,
+      late: otherOpen.filter((i) => isDelayed(i)).length,
+    });
+  }
 
   /* A checklist is the only place a task says how far in it is, so the tasks
      that HAVE one are worth reading apart from the ones that do not. */
@@ -633,8 +639,8 @@ function Analysis({ rows, all, members }: {
           <ColumnChart unit="open items" height={220}
             series={[{ key: "ok", label: "On time", slot: 1 }, { key: "late", label: "In delay", slot: 3 }]}
             points={byMember.map((r) => ({
-              key: r.m.memberId,
-              label: r.m.name.split(" ").slice(-1)[0],
+              key: r.key,
+              label: r.label,
               values: { ok: r.open - r.late, late: r.late },
             }))} />
         ) : (
@@ -642,12 +648,18 @@ function Analysis({ rows, all, members }: {
         )}
       </ChartFrame>
 
-      <Card title="Steps ticked off" tight flush
-        sub="Only the tasks that carry a checklist — the rest have no way to say how far in they are."
-        right={withList.length
-          ? <Pill tone={lineDone === lineTotal ? "ok" : "neutral"} text={lineDone + " of " + lineTotal + " steps"} />
-          : undefined}>
-        {withList.length ? (
+      <SectionHead title="Milestones & targets progress"
+        desc="Assigned work, milestone completion, and cumulative target progress across the active scope." />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <TasksBlock who={meId()} withTeam scope={scopeOf("work")} onOpen={onOpen} limit={8} />
+        <MarksBlock kind="milestone" who={meId()} scope={scopeOf("work")} onOpen={onOpen} />
+        <MarksBlock kind="target" who={meId()} scope={scopeOf("work")} onOpen={onOpen} />
+      </div>
+
+      {withList.length >= 3 ? (
+        <Card title="Steps ticked off" tight flush
+          sub="Only the tasks that carry a checklist — the rest have no way to say how far in they are."
+          right={<Pill tone={lineDone === lineTotal ? "ok" : "neutral"} text={lineDone + " of " + lineTotal + " steps"} />}>
           <ListTable className="rounded-t-none ring-0" min="620px"
             head={<tr><th>Task</th><th className="n">Steps</th><th>Progress</th></tr>}>
             {withList
@@ -667,13 +679,8 @@ function Analysis({ rows, all, members }: {
                 );
               })}
           </ListTable>
-        ) : (
-          <p className="p-5 text-sm text-tertiary">
-            No task in view has a checklist. Add steps to one and its progress stops being a choice
-            between nothing and everything.
-          </p>
-        )}
-      </Card>
+        </Card>
+      ) : null}
     </>
   );
 }
@@ -1128,22 +1135,73 @@ function MonthRail({ anchor, rows, me, onOpen }: {
 function Board({ rows, all, group, onOpen }: {
   rows: WorkItem[]; all: WorkItem[]; group: string; onOpen: (id: string) => void;
 }) {
+  const shell = useShell();
   const cols = columnsFor(rows, group);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [overCol, setOverCol] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const handleDrop = async (targetKey: string, e: React.DragEvent) => {
+    e.preventDefault();
+    setOverCol(null);
+    const id = e.dataTransfer.getData("text/plain") || draggedId;
+    setDraggedId(null);
+    if (!id || group || targetKey === "delayed") return;
+    const item = rows.find((r) => r.itemId === id);
+    if (!item || stageOf(item) === targetKey) return;
+    setUpdatingId(id);
+    const res = await setItemStatus(
+      id,
+      targetKey as WorkStatus,
+      targetKey === "cancelled" || targetKey === "blocked" ? "Moved on board" : undefined
+    );
+    setUpdatingId(null);
+    if (!res.ok) {
+      shell.toast(res.message, "bad");
+      return;
+    }
+    shell.toast(`${item.title} moved to ${labelOf(WORK_STATUS, targetKey).toLowerCase()}.`);
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-tertiary">
         {group
           ? "A grouping, not a workflow — a drag here would mean a reassignment, which needs a reason."
-          : "Open an item to move it between stages. Delay is never set by hand — the due date sets it."}
+          : "Drag a card between stage columns or open it to update its stage. Delay is derived from the due date."}
       </p>
       <div className="flex gap-3 overflow-x-auto pb-2">
-        {cols.map((c) => (
-          <StageColumn key={c.key} label={c.label} n={c.list.length}>
-            {c.list.map((i) => (
-              <TaskCard key={i.itemId} item={i} parent={parentOf(i, all)} onOpen={onOpen} />
-            ))}
-          </StageColumn>
-        ))}
+        {cols.map((c) => {
+          const canDrop = !group && c.key !== "delayed";
+          return (
+            <StageColumn
+              key={c.key}
+              label={c.label}
+              n={c.list.length}
+              isDropTarget={canDrop && overCol === c.key}
+              onDragOver={canDrop ? (e) => { e.preventDefault(); setOverCol(c.key); } : undefined}
+              onDragLeave={canDrop ? () => setOverCol((prev) => (prev === c.key ? null : prev)) : undefined}
+              onDrop={canDrop ? (e) => handleDrop(c.key, e) : undefined}
+            >
+              {c.list.map((i) => (
+                <TaskCard
+                  key={i.itemId}
+                  item={i}
+                  parent={parentOf(i, all)}
+                  onOpen={onOpen}
+                  draggable={!group}
+                  isDragging={draggedId === i.itemId || updatingId === i.itemId}
+                  onDragStart={!group ? (id, e) => {
+                    setDraggedId(id);
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", id);
+                  } : undefined}
+                  onDragEnd={!group ? () => { setDraggedId(null); setOverCol(null); } : undefined}
+                />
+              ))}
+            </StageColumn>
+          );
+        })}
       </div>
     </div>
   );
@@ -1219,8 +1277,8 @@ function TimelineFace({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string)
       </div>
 
       <div className="w-full overflow-x-auto rounded-xl bg-primary ring-1 ring-secondary">
-        <div className="min-w-[64rem]">
-          <div className="grid grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)] border-b border-secondary bg-secondary">
+        <div className="min-w-[68rem]">
+          <div className="grid grid-cols-[340px_minmax(0,1fr)] border-b border-secondary bg-secondary">
             <span className="label-mono border-r border-secondary px-3 py-2">Target · milestone</span>
             <span className="grid" style={cols}>
               {days.map((d) => (
@@ -1234,19 +1292,25 @@ function TimelineFace({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string)
 
           {lanes.map((ln, n) => {
             const host = ln.item;
-            const bars: { i: WorkItem; win: boolean }[] = [];
-            if (host && host.startDate) bars.push({ i: host, win: true });
-            ln.tasks.filter((i) => i.startDate).forEach((i) => bars.push({ i, win: false }));
-            const height = Math.max(1, bars.length) * 22 + 14;
+            const rawBars: { i: WorkItem; win: boolean }[] = [];
+            if (host && host.startDate) rawBars.push({ i: host, win: true });
+            ln.tasks.filter((i) => i.startDate).forEach((i) => rawBars.push({ i, win: false }));
+            const visibleBars = rawBars
+              .map((b) => ({
+                ...b,
+                s: span(b.i.startDate as string, (b.i.dueDate || b.i.startDate) as string),
+              }))
+              .filter((b): b is { i: WorkItem; win: boolean; s: { left: string; width: string } } => b.s !== null);
+            const height = visibleBars.length ? visibleBars.length * 24 + 14 : 48;
             return (
               <div key={host ? host.itemId : "none" + n}
-                className="grid grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)] border-b border-secondary last:border-0">
+                className="grid grid-cols-[340px_minmax(0,1fr)] border-b border-secondary last:border-0">
                 <span className={cx("flex min-w-0 flex-col justify-center border-r border-secondary px-3 py-2", ln.sub && "pl-7")}>
                   {host ? (
                     <>
-                      <b className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-primary">
-                        <KindMark kind={host.kind} />
-                        <span className="truncate">{host.title}</span>
+                      <b className="flex min-w-0 items-start gap-1.5 text-sm font-medium text-primary" title={host.title}>
+                        <span className="mt-0.5 shrink-0"><KindMark kind={host.kind} /></span>
+                        <span className="line-clamp-2 whitespace-normal leading-snug">{host.title}</span>
                       </b>
                       <span className="truncate text-xs text-tertiary">
                         {labelOf(KIND, host.kind)} · {readMember(host.assigneeId)?.name || "unassigned"} · {noteOf(host)}{host.dueDate ? " · due " + fmtDate(host.dueDate) : ""}
@@ -1254,8 +1318,10 @@ function TimelineFace({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string)
                     </>
                   ) : (
                     <>
-                      <b className="text-sm font-medium text-primary">No milestone</b>
-                      <span className="text-xs text-tertiary">{ln.tasks.length} tasks hang off nothing</span>
+                      <b className="text-sm font-medium text-primary">Unlinked tasks (no milestone)</b>
+                      <span className="text-xs text-tertiary">
+                        {visibleBars.length} in window · {ln.tasks.length} total tasks
+                      </span>
                     </>
                   )}
                 </span>
@@ -1263,17 +1329,17 @@ function TimelineFace({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string)
                   {days.map((d) => (
                     <i key={d} className={cx("border-r border-secondary last:border-r-0", isWeekend(d) && "bg-tertiary")} />
                   ))}
-                  {bars.map((b, k) => {
-                    const s = span(b.i.startDate as string, (b.i.dueDate || b.i.startDate) as string);
-                    if (!s) return null;
-                    return (
-                      <LaneBar key={b.i.itemId + k} title={b.i.title}
-                        sub={nameOf(b.i.assigneeId)}
-                        left={s.left} width={s.width} top={7 + k * 22}
-                        tone={toneOf(WORK_STATUS, stageOf(b.i)) || "neutral"}
-                        window={b.win} onOpen={() => onOpen(b.i.itemId)} />
-                    );
-                  })}
+                  {visibleBars.length ? visibleBars.map((b, k) => (
+                    <LaneBar key={b.i.itemId + k} title={b.i.title}
+                      sub={nameOf(b.i.assigneeId)}
+                      left={b.s.left} width={b.s.width} top={7 + k * 24}
+                      tone={toneOf(WORK_STATUS, stageOf(b.i)) || "neutral"}
+                      window={b.win} onOpen={() => onOpen(b.i.itemId)} />
+                  )) : (
+                    <span className="pointer-events-none absolute inset-0 flex items-center px-3 text-xs text-quaternary">
+                      No tasks scheduled in this date window
+                    </span>
+                  )}
                 </span>
               </div>
             );
@@ -1323,7 +1389,6 @@ function List({
               onChange={onToggleSelectAll}
             />
           </th>
-          <th className="rail" />
           <th>Item</th>
           {/* PROGRESS SITS BESIDE THE THING IT IS ABOUT. Last in the row it was
               the far end of a 1000px scan from the title; the two facts
@@ -1340,14 +1405,17 @@ function List({
         const m = readMember(i.assigneeId);
         const parent = parentOf(i, all);
         const late = isDelayed(i);
-        const tone = late && blockerOf(i) ? "bad" : late ? "warn" : undefined;
         const isChecked = selectedIds.includes(i.itemId);
+        const pct = progressOf(i) ?? 0;
+        const winPct = timePct(i);
+        const stageLabel = labelOf(WORK_STATUS, stageOf(i));
         /* A TASK HAS A REAL PERCENTAGE. The dash is kept for the one case that
            still has nothing to say: an open task with no steps on it. */
         const bare = i.kind === "task" && !checkCount(i).total && i.status !== "completed";
         return (
           <tr key={i.itemId} className={cx("clickable", i.status === "cancelled" && "opacity-60", isChecked && "bg-brand-primary/5")}
             tabIndex={0} role="link"
+            aria-label={`${i.title} — ${pct}% done${winPct !== null ? `, ${winPct}% of the window elapsed` : ""} — ${stageLabel}`}
             onClick={() => onOpen(i.itemId)}
             onKeyDown={(e) => { if (e.key === "Enter") onOpen(i.itemId); }}>
             <td className="w-10 px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
@@ -1359,7 +1427,6 @@ function List({
                 onChange={() => onToggleSelect(i.itemId)}
               />
             </td>
-            <Rail tone={tone} />
             <td className="cell-1">
               <span className="flex min-w-0 items-center gap-2">
                 <KindTag kind={i.kind} />
@@ -1399,3 +1466,115 @@ function List({
     </ListTable>
   );
 }
+
+/* ----------------------------------------------------------- bulk modal --- */
+
+function BulkWorkActionModal({
+  mode, selectedIds, members, onDone,
+}: {
+  mode: "reassign" | "reschedule" | "status";
+  selectedIds: string[];
+  members: Member[];
+  onDone: () => void;
+}) {
+  const shell = useShell();
+  const activeMembers = members.filter((m) => m.status === "active");
+  const [assigneeId, setAssigneeId] = useState(activeMembers[0]?.memberId || "");
+  const [dueDate, setDueDate] = useState(addDays(TODAY, 7));
+  const [status, setStatus] = useState<WorkStatus>("in_progress");
+  const [reason, setReason] = useState("Bulk updated");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    let count = 0;
+    for (const id of selectedIds) {
+      if (mode === "reassign") {
+        const res = await updateItem(id, { assigneeId });
+        if (res.ok) count++;
+      } else if (mode === "reschedule") {
+        const res = await updateItem(id, { dueDate });
+        if (res.ok) count++;
+      } else if (mode === "status") {
+        const res = await setItemStatus(
+          id,
+          status,
+          status === "cancelled" || status === "blocked" ? reason.trim() || "Bulk updated" : undefined
+        );
+        if (res.ok) count++;
+      }
+    }
+    setBusy(false);
+    shell.closeLayer();
+    onDone();
+    shell.toast(`Updated ${count} item${count === 1 ? "" : "s"}.`);
+  };
+
+  const titles = {
+    reassign: "Reassign Selected Tasks",
+    reschedule: "Reschedule Selected Tasks",
+    status: "Change Status",
+  };
+
+  return (
+    <ModalShell
+      title={titles[mode]}
+      sub={`${selectedIds.length} item${selectedIds.length === 1 ? "" : "s"} selected`}
+      ico={mode === "reassign" ? "user" : mode === "reschedule" ? "calendar" : "check"}
+      onClose={() => shell.closeLayer()}
+      actions={
+        <>
+          <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
+          <Button isDisabled={busy || (mode === "reassign" && !assigneeId) || (mode === "reschedule" && !dueDate)} onClick={submit}>
+            {busy ? "Saving…" : "Apply to Selected"}
+          </Button>
+        </>
+      }
+    >
+      {mode === "reassign" ? (
+        <FormField id="bwAssignee" label="New assignee" req>
+          <SelectInput
+            id="bwAssignee"
+            value={assigneeId}
+            onChange={setAssigneeId}
+            options={activeMembers.map((m) => ({
+              v: m.memberId,
+              l: m.name + (m.designation ? ` (${m.designation})` : ""),
+            }))}
+          />
+        </FormField>
+      ) : null}
+
+      {mode === "reschedule" ? (
+        <FormField id="bwDue" label="New due date" req>
+          <DateInput id="bwDue" value={dueDate} onChange={setDueDate} />
+        </FormField>
+      ) : null}
+
+      {mode === "status" ? (
+        <>
+          <FormField id="bwStatus" label="New status" req>
+            <SelectInput
+              id="bwStatus"
+              value={status}
+              onChange={(v) => setStatus(v as WorkStatus)}
+              options={[
+                { v: "planned", l: "Planning" },
+                { v: "in_progress", l: "In progress" },
+                { v: "blocked", l: "Blocked" },
+                { v: "completed", l: "Complete" },
+                { v: "cancelled", l: "Cancel" },
+              ]}
+            />
+          </FormField>
+          {(status === "cancelled" || status === "blocked") ? (
+            <FormField id="bwReason" label="Reason" req>
+              <Input id="bwReason" value={reason} onChange={setReason} />
+            </FormField>
+          ) : null}
+        </>
+      ) : null}
+    </ModalShell>
+  );
+}
+

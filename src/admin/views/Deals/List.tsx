@@ -51,25 +51,23 @@ export function AttnStrip({ p, m }: { p: Params; m: Counts }) {
   const cells: (StatCell | "sep")[] = [
     { k: "total", v: m.total,
       to: "#/deals" + qs(omit(p, ["stage", "stalled", "next", "priority", "page", "pipe"])),
-      on: !p.stage && !p.stalled && !p.next && !p.priority && (!p.pipe || p.pipe === "open") },
+      on: !p.stage && !p.stalled && !p.next && !p.priority && (!p.pipe || p.pipe === "all") },
     "sep",
-    /* The four working stages only. Lost is not a step of the funnel, it is
-       where deals leave it — a cell for it counted an outcome alongside four
-       positions and made the row read as five things of one kind when it is
-       four plus an exit. Lost is still one pick away in the Stage dropdown. */
     ...STRIP_STAGES.map((s) => ({
       k: D.STAGES[s].label.toLowerCase(), v: m.byStage[s] || 0,
       to: stageRoute(s), on: String(p.stage) === String(s),
       dot: D.STAGES[s].tone || "neutral"
     })),
-    /* The money sits beside the funnel it came out of, divided by the same
-       hairline as every other pair. Neither cell is a link: every other cell
-       filters the list, and there is no "show me the outstanding ones" filter
-       for these to route to. */
     "sep",
-    { k: "outstanding", v: inr(m.outstanding, { compact: true }), tone: "warn" },
+    { k: "stalled", v: m.stalled || 0,
+      to: "#/deals" + qs(merge(omit(p, ["page"]), { stalled: p.stalled === "1" ? "" : "1" })),
+      on: p.stalled === "1", dot: m.stalled ? "bad" : "neutral", tone: m.stalled ? "bad" : "" },
     "sep",
-    { k: "collected", v: inr(m.collected, { compact: true }), tone: "ok" },
+    { k: "installments outstanding", v: inr(m.outstanding, { compact: true }), tone: "warn",
+      title: "Unpaid balance on active Installment and Won deals in this pipeline (excludes self-serve subscriptions in Finance)" },
+    "sep",
+    { k: "deal invoices collected", v: inr(m.collected, { compact: true }), tone: "ok",
+      title: "Net payments recorded on deal invoices in this pipeline (Finance shows all subscription collections)" },
   ];
   return <StatStrip cells={cells} />;
 }
@@ -131,8 +129,8 @@ export function TbStats({ p }: { p: Params }) {
           later rather than squeezing the seven cells beside them. */}
       <span className="hidden items-center gap-1 2xl:flex">
         {rule}
-        <span className="flex shrink-0 items-center gap-1.5 px-1.5 py-0.5">{figure(inr(m.outstanding, { compact: true }), "outstanding", "text-warning-primary")}</span>
-        <span className="flex shrink-0 items-center gap-1.5 px-1.5 py-0.5">{figure(inr(m.collected, { compact: true }), "collected", "text-success-primary")}</span>
+        <span className="flex shrink-0 items-center gap-1.5 px-1.5 py-0.5" title="Unpaid balance on active Installment and Won deals">{figure(inr(m.outstanding, { compact: true }), "installments outstanding", "text-warning-primary")}</span>
+        <span className="flex shrink-0 items-center gap-1.5 px-1.5 py-0.5" title="Net payments recorded on deal invoices">{figure(inr(m.collected, { compact: true }), "deal invoices collected", "text-success-primary")}</span>
       </span>
     </span>
   );
@@ -181,7 +179,7 @@ export function DealsList({ id, p, api }: {
   const view = p.view === "board" ? "board" : "table";
   const canCreate = can("deals", "create");
 
-  const pipe = p.pipe || (p.stage ? "custom" : "open");
+  const pipe = p.pipe || (p.stage ? "custom" : "all");
   const scopedList = useMemo(() => {
     if (p.stage) return api.list;
     if (pipe === "open") return api.list.filter((r) => r.stage < STAGE.WON);
@@ -228,6 +226,15 @@ export function DealsList({ id, p, api }: {
         meta={
           <>
             <span className="tnum">{api.counts.total} in the pipeline</span>
+            {api.counts.stalled ? (
+              <button
+                type="button"
+                className="cursor-pointer font-medium text-error-primary hover:underline tnum"
+                onClick={() => go("#/deals" + qs(merge(omit(p, ["page"]), { stalled: p.stalled === "1" ? "" : "1" })))}
+              >
+                {api.counts.stalled} stalled
+              </button>
+            ) : null}
             {rows.length !== api.counts.total ? <span className="tnum">{rows.length} match these filters</span> : null}
             {/* SAY WHOSE PIPELINE THIS IS, and only when it is not everyone's.
                 "your deals only" over a manager's team list is a lie that got
@@ -239,6 +246,13 @@ export function DealsList({ id, p, api }: {
         actions={
           <>
             <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
+              <Button
+                color={pipe === "all" ? "primary" : "secondary"}
+                size="xs"
+                onClick={() => go("#/deals" + qs(merge(omit(p, ["stage", "page"]), { pipe: "all" })))}
+              >
+                All
+              </Button>
               <Button
                 color={pipe === "open" ? "primary" : "secondary"}
                 size="xs"
@@ -259,13 +273,6 @@ export function DealsList({ id, p, api }: {
                 onClick={() => go("#/deals" + qs(merge(omit(p, ["stage", "page"]), { pipe: "lost" })))}
               >
                 Lost
-              </Button>
-              <Button
-                color={pipe === "all" ? "primary" : "secondary"}
-                size="xs"
-                onClick={() => go("#/deals" + qs(merge(omit(p, ["stage", "page"]), { pipe: "all" })))}
-              >
-                All
               </Button>
             </div>
             <MoreMenu label="Actions" items={menu} />

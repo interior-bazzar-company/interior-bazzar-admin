@@ -178,6 +178,8 @@ function InvoicesList() {
       title: "Draft invoices" + only },
     { k: "issued", v: byStatus.issued || 0, dot: "info", to: route("status", "issued"), on: p.status === "issued",
       title: "Raised and sent — paid or not" + only },
+    { k: "cancelled", v: byStatus.cancelled || 0, dot: "neutral", to: route("status", "cancelled"), on: p.status === "cancelled",
+      title: "Cancelled invoices" + only },
     "sep",
     { k: "overdue", v: overdue, dot: overdue ? "bad" : "", tone: overdue ? "bad" : "",
       to: route("status", "overdue"), on: p.status === "overdue",

@@ -34,7 +34,7 @@ import type { BarRow, Series } from "../charts";
 import DateRange from "./DateRange";
 import {
   METRICS, VOCAB,
-  ago, bandCounts, baseCounts, clampRange, delta, pct, presetRange, rangeTotals,
+  ago, bandCounts, baseCounts, clampRange, delta, engagementCounts, formatEventLabel, pct, presetRange, rangeTotals,
   useRecentActivity, useUserTotals, useUsersAnalytics,
 } from "./store";
 
@@ -56,6 +56,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
      happens to have loaded. `rows` is the fallback until that read lands. */
   const analytics = useUsersAnalytics();
   const c = baseCounts(rows);
+  const eng = engagementCounts(rows);
   const recent = useRecentActivity(6);
   const totals = useUserTotals();
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
   /* Sources are nominal — no natural order — so every bar takes the same slot-1
      hue. Shading them by value would double-encode the bar length as colour. */
   const sourceRows: BarRow[] = t.bySource
+    .filter((s) => !(s.key === "" && s.registrations === 0))
     .slice().sort((a, b) => b.registrations - a.registrations)
     .map((s) => ({
       key: s.key,
@@ -104,7 +106,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
       meta={<>
         <span>{t.label}</span>
         <span>
-          {t.monthCount} month{t.monthCount === 1 ? "" : "s"}
+          {t.monthCount} calendar month{t.monthCount === 1 ? "" : "s"}
           {t.prev ? <> · against the {t.monthCount} before</> : <> · no prior span to compare</>}
         </span>
       </>}
@@ -149,7 +151,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
                 profileCompleted: m.profileCompleted,
               },
             }))}
-            unit="hover or tab a group for both figures" />
+            unit="accounts per month · registrations & completed profiles" />
         </ChartFrame>
 
         {/* ===================================================== the funnel === */}
@@ -185,14 +187,21 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
         </ChartFrame>
 
         {/* ===================================================== engagement === */}
-        <Block title="How they use it" desc="blocked on the event taxonomy">
-          <EmptyState flat icon="chart" title="Unavailable, not zero"
-            body={<>
-              DAU, WAU and MAU need a defined set of qualifying product events. That taxonomy
-              does not exist (<span className="font-mono">UM-OD-10</span>), so the payload carries{" "}
-              <span className="font-mono">engagement: null</span> rather than zeros — which would
-              be indistinguishable from a platform nobody opens.
-            </>} />
+        <Block title="How they use it" desc="active accounts by most recent session">
+          <Tiles cols={2} list={[
+            { k: "Active last 24h (DAU)", v: eng.active24h, tone: eng.active24h ? "ok" : undefined,
+              s: pct(c.active ? eng.active24h / c.active : null, 1) + " of active accounts",
+              to: dir({ sort: "activity" }) },
+            { k: "Active last 7d (WAU)", v: eng.active7d, tone: eng.active7d ? "ok" : undefined,
+              s: pct(c.active ? eng.active7d / c.active : null, 1) + " of active accounts",
+              to: dir({ sort: "activity" }) },
+            { k: "Active last 30d (MAU)", v: eng.active30d, tone: eng.active30d ? "ok" : undefined,
+              s: pct(c.active ? eng.active30d / c.active : null, 1) + " of active accounts",
+              to: dir({ sort: "activity" }) },
+            { k: "Signed in at least once", v: eng.withSession,
+              s: "of " + c.total.toLocaleString("en-IN") + " total accounts",
+              to: dir({ sort: "activity" }) },
+          ]} />
         </Block>
 
         {/* ========================================================= recent === */}
@@ -200,10 +209,11 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
           {recent.length ? (
             <ActivityFeed items={recent.map((e) => {
               const meta = VOCAB.eventTypes.filter((x) => x.key === e.type)[0];
+              const eventLabel = formatEventLabel(meta ? meta.label : e.type);
               return {
                 who: e.actor,
                 what: <>
-                  <span className="text-tertiary">{meta ? meta.label : e.type} · </span>
+                  <span className="text-tertiary">{eventLabel} · </span>
                   <a href={"#/users/" + e.userId} data-go={"#/users/" + e.userId}
                     className="rounded font-medium text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
                     onClick={(ev) => { ev.preventDefault(); go("#/users/" + e.userId); }}>

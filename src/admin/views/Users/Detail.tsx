@@ -256,7 +256,6 @@ export default function Detail({ id, p, rows, onParams }: {
                 ["Last edited", <>{u.profile.updatedBy || "—"} · <span className="tnum">{ago(u.profile.updatedAt)}</span></>],
               ]} />
             </Card>
-            <Assumed id="UM-OD-09" />
           </div>
         </div>
       ) : null}

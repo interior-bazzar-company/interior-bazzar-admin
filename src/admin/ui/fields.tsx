@@ -168,6 +168,7 @@ export interface InputProps {
     sm?: boolean;
     required?: boolean;
     ariaLabel?: string;
+    autoComplete?: string;
     autoFocus?: boolean;
     min?: string | number;
     max?: string | number;
@@ -202,6 +203,7 @@ export function Input(p: InputProps) {
             isRequired={p.required}
             readOnly={p.readOnly}
             aria-label={p.ariaLabel}
+            autoComplete={p.autoComplete}
             autoFocus={p.autoFocus}
             min={p.min}
             max={p.max}

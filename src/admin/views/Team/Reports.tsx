@@ -225,7 +225,9 @@ function ReviewCard({ r }: { r: ReviewRow }) {
           <span className="inline-flex items-center gap-1.5">
             <span className="label-mono">Worked</span>
             <b className="font-mono font-medium text-secondary tnum">
-              {r.worked != null ? fmtHM(r.worked) : "—"}
+              {r.worked != null
+                ? fmtHM(r.worked) + (r.state === "working" || r.state === "on_break" ? " so far" : "")
+                : "—"}
             </b>
           </span>
           {r.doing ? (
@@ -248,8 +250,10 @@ function ReviewCard({ r }: { r: ReviewRow }) {
               <Pill xs dot tone="ok" text={"in " + fmtTime(plan.submittedAt)} />
             ) : plan && plan.lines.length ? (
               <Pill xs dot tone="neutral" text="draft" title="Started and not submitted" />
+            ) : !r.member.reportsToId ? (
+              <Pill xs tone="neutral" text="Optional (no reporting line)" />
             ) : (
-              <Pill xs tone="neutral" text="No morning plan" />
+              <Pill xs tone="warn" text="No morning plan" />
             )}
             {plan && plan.lines.length && r.planned ? (
               <span className="ml-auto text-xs font-medium text-secondary tnum">{r.done}/{r.planned} done</span>
@@ -281,7 +285,7 @@ function ReviewCard({ r }: { r: ReviewRow }) {
             </>
           ) : (
             <p className="text-sm text-quaternary">
-              {plan ? "Started, nothing written yet." : "Nothing planned for this day."}
+              {plan ? "Started, nothing written yet." : !r.member.reportsToId ? "No reporting line configured — plan optional." : "Nothing planned for this day."}
             </p>
           )}
         </section>
@@ -293,9 +297,11 @@ function ReviewCard({ r }: { r: ReviewRow }) {
               ? rep.acknowledgedById
                 ? <Pill xs dot tone="ok" text="read" />
                 : <Pill xs dot tone="info" text="unread" />
-              : r.eodDue
-                ? <Pill xs dot tone="warn" text="outstanding" />
-                : <Pill xs dot tone="neutral" text="not due yet" />}
+              : !r.member.reportsToId
+                ? <Pill xs dot tone="neutral" text="optional" />
+                : r.eodDue
+                  ? <Pill xs dot tone="warn" text="outstanding" />
+                  : <Pill xs dot tone="neutral" text="not due yet" />}
           </header>
           {rep && rep.submittedAt ? (
             <div className="flex flex-col gap-2">
@@ -406,7 +412,7 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
   a.unacknowledged.filter((r) => canAcknowledge(r.member.memberId)).forEach((r) => list.push({
     key: "un" + r.member.memberId, kind: "Unread EOD", tone: "info",
     what: r.member.name,
-    why: "A report nobody read is worse than one nobody wrote — the person who wrote it believes it was read.",
+    why: "End-of-day report submitted and awaiting review.",
     act: (
       <Button color="secondary" size="xs" ico="eye" onClick={async () => {
         const res = await acknowledgeReport((r.report as { reportId: string }).reportId);
@@ -417,14 +423,14 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
 
   a.noEod.forEach((r) => list.push({
     key: "eo" + r.member.memberId, kind: "EOD due", tone: "warn",
-    what: r.member.name, why: "Their day is over and nothing has come back.",
+    what: r.member.name, why: "Workday ended without an end-of-day report submission.",
     act: <Button color="tertiary" size="xs" onClick={() => go("#/work")}>Open</Button>,
   }));
 
   a.noPlan.forEach((r) => list.push({
     key: "np" + r.member.memberId, kind: "No plan", tone: "warn",
     what: r.member.name,
-    why: "Anybody with no reporting line is excluded — a number that always shows the founder delinquent is one people learn to ignore.",
+    why: "No morning plan submitted for today.",
     act: <Button color="tertiary" size="xs" onClick={() => go("#/work")}>Open</Button>,
   }));
 
@@ -444,13 +450,13 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
   a.lateOrAbsent.forEach((r) => list.push({
     key: "la" + r.member.memberId, kind: "Attendance", tone: "warn",
     what: r.member.name,
-    why: r.state === "absent" ? "No record for this day at all." : "In late against their own start time.",
+    why: r.state === "absent" ? "No attendance record logged for this day." : "Checked in after scheduled start time.",
     act: <Button color="tertiary" size="xs" onClick={() => go("#/attendance")}>Open</Button>,
   }));
 
   unopened.forEach((ag) => list.push({
     key: "ag" + ag.agreementId, kind: "Agreement", tone: "warn",
-    what: ag.title, why: <>Sent to {readMember(ag.memberId)?.name || ag.memberId} and never opened.</>,
+    what: ag.title, why: <>Sent to {readMember(ag.memberId)?.name || ag.memberId} and awaiting review.</>,
     act: (
       <Button color="tertiary" size="xs"
         onClick={() => go("#/team/" + ag.memberId + "?tab=documents")}>Open</Button>
@@ -460,7 +466,7 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
   return (
     <>
       <SectionHead className="mb-0" title="Needs a person"
-        desc="Not the work — the things that have stopped because somebody has not moved." />
+        desc="Items and submissions awaiting review or action." />
 
       {list.length ? (
         <ListTable min="880px"
@@ -495,7 +501,7 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
 
 /* ----------------------------------------------------------- analytics --- */
 
-const SPANS = [{ v: "7", l: "7 days" }, { v: "14", l: "14 days" }, { v: "30", l: "30 days" }];
+const SPANS = [{ v: "7", l: "6d (week)" }, { v: "14", l: "14 days" }, { v: "30", l: "30 days" }];
 
 /** PLANS AND EODS OVER A WINDOW, and the one comparison this module exists to
  *  make: what people said they would do against what came back.
@@ -521,6 +527,7 @@ function Analytics({ scope, span, onSpan }: {
   const rows = reportSpanRows(from, TODAY, scope);
   const t = reportSpanTotals(rows);
   const daily = reportSpanDays(from, TODAY, scope);
+  const expectedPerDay = rows.filter((r) => r.days > 0).length;
 
   const rank = (r: ReportSpanRow): number => {
     if (sort === "plans") return r.plans;
@@ -540,7 +547,7 @@ function Analytics({ scope, span, onSpan }: {
         <Segmented sm label="Window" value={span} onPick={onSpan}
           options={SPANS.map((o) => ({ v: o.v, l: o.l }))} />
         <span className="text-sm text-tertiary">
-          {fmtDate(from)} to {fmtDate(TODAY)} · weekends excluded
+          {fmtDate(from)} to {fmtDate(TODAY)} · 6-day workweek · Sundays excluded
         </span>
       </div>
 
@@ -568,15 +575,13 @@ function Analytics({ scope, span, onSpan }: {
 
       {t.unread ? (
         <Alert tone="warn" ico="inbox"
-          title={t.unread + " report" + (t.unread > 1 ? "s" : "") + " nobody has opened."}>
-          The person who wrote each one believes it was read. That is the failure this number
-          exists to surface — it is the only one on the page that is nobody's fault but the
-          reader's.
+          title={t.unread + " report" + (t.unread > 1 ? "s" : "") + " awaiting review."}>
+          Submitted end-of-day reports that are still awaiting review and acknowledgement.
         </Alert>
       ) : null}
 
       <ChartFrame title="Day by day"
-        note="Plans and reports against what was owed. A day with nothing owed — a weekend, or before anybody joined — is not drawn.">
+        note={"Daily plans and end-of-day reports compared against expected submissions (Expected = " + expectedPerDay + " reporting members per workday)."}>
         {daily.length ? (
           <ColumnChart unit="submissions" height={220}
             series={[{ key: "plans", label: "Plan submitted", slot: 1 }, { key: "eods", label: "Report submitted", slot: 2 }]}
@@ -591,7 +596,7 @@ function Analytics({ scope, span, onSpan }: {
       </ChartFrame>
 
       <SectionHead title="Per member"
-        desc="Counts, and one ratio made of two of them. Every column sorts and nothing adds up to a rating." />
+        desc="Submission counts and completion ratios per team member." />
       {sorted.length ? (
         <ListTable min="980px"
           head={
@@ -635,22 +640,21 @@ function Analytics({ scope, span, onSpan }: {
       )}
 
       <Alert tone="info">
-        Anybody with no reporting line is owed nothing and reads as “not owed” rather than as a
-        failure — a figure that always shows the founder delinquent is a figure people stop
-        reading. An EOD counts as due only once that member&rsquo;s own day is over.
+        Excluded: No reporting line configured. Members without a reporting line are marked as
+        “not owed”, and an EOD report counts as due only after that member&rsquo;s scheduled workday ends.
       </Alert>
 
       <SectionHead title="Progress" className="mt-2"
-        desc="The three blocks the calendar rail draws, one level wider — you and your reports. Derived from the children, never typed."
+        desc="Aggregated progress across tasks, milestones, and targets for your team."
         right={
           <Button color="secondary" ico="timeline" onClick={() => go("#/work?face=timeline")}>
             Open the milestone timeline
           </Button>
         } />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <TasksBlock who={meId()} withTeam onOpen={openWork} />
-        <MarksBlock kind="milestone" who={meId()} onOpen={openWork} />
-        <MarksBlock kind="target" who={meId()} onOpen={openWork} />
+        <TasksBlock who={meId()} withTeam scope={scope} onOpen={openWork} limit={8} />
+        <MarksBlock kind="milestone" who={meId()} scope={scope} onOpen={openWork} />
+        <MarksBlock kind="target" who={meId()} scope={scope} onOpen={openWork} />
       </div>
     </>
   );

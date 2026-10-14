@@ -21,6 +21,7 @@
    nobody read is worse than one nobody wrote.
    ============================================================================= */
 import { Alert, Button, Card, Icon, Pill, Tiles } from "../../../ui";
+import { go } from "../../../ui/nav";
 import { cx } from "@/utils/cx";
 import { useShell } from "../../../shell/ShellContext";
 import { EodModal, PlanModal } from "./reportForms";
@@ -90,22 +91,25 @@ export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }
       <OpHead
         title="Reports"
         desc={"The last " + WINDOW + " days. Weekends are listed and never counted against anybody."}
-        right={viewer === "self" ? (
+        right={
           <>
-            {/* WRITING YOUR OWN DAY BELONGS ON YOUR OWN PAGE. These two were a
-                segmented control on `#/reports`, which is a senior's review
-                surface — one screen answering to two different people, with a
-                write control on a page that is otherwise entirely a read. */}
-            <Button color={todayPlan ? "secondary" : "primary"} ico="check"
-              onClick={() => shell.modal(<PlanModal m={m} />, "lg")}>
-              {todayPlan ? "Today's plan" : "Write today's plan"}
+            <Button color="secondary" ico="ext" onClick={() => go("#/reports")}>
+              Team reports
             </Button>
-            <Button color={todayReport || !todayEodDue ? "secondary" : "primary"} ico="doc"
-              onClick={() => shell.modal(<EodModal m={m} />, "lg")}>
-              {todayReport ? "Today's report" : "Submit EOD report"}
-            </Button>
+            {viewer === "self" ? (
+              <>
+                <Button color={todayPlan ? "secondary" : "primary"} ico="check"
+                  onClick={() => shell.modal(<PlanModal m={m} />, "lg")}>
+                  {todayPlan ? "Today's plan" : "Write today's plan"}
+                </Button>
+                <Button color={todayReport || !todayEodDue ? "secondary" : "primary"} ico="doc"
+                  onClick={() => shell.modal(<EodModal m={m} />, "lg")}>
+                  {todayReport ? "Today's report" : "Submit EOD report"}
+                </Button>
+              </>
+            ) : null}
           </>
-        ) : null} />
+        } />
 
       <Tiles list={[
         { k: "Plans in", v: plans + " / " + working.length, s: "submitted in the morning" },
@@ -116,9 +120,8 @@ export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }
 
       {unread && canAck ? (
         <Alert tone="warn" ico="inbox"
-          title={unread + " report" + (unread > 1 ? "s" : "") + " nobody has read"}>
-          A report that is written and never opened teaches the person writing it that the exercise
-          is paperwork.
+          title={unread + " report" + (unread > 1 ? "s" : "") + " awaiting review"}>
+          Submitted end-of-day reports are waiting to be reviewed and acknowledged.
         </Alert>
       ) : null}
 

@@ -94,7 +94,7 @@ function LensTable({ m, lens, today }: { m: DealMetrics; lens: Lens; today: stri
   );
 }
 
-const thousands = (paise: number) => Math.round(paise / 100000);
+const lakh = (paise: number) => Math.round(paise / 100000) / 100;
 
 export function DealsIntel({ d }: { d: OverviewData }) {
   if (!d.gates.deals) return null;
@@ -118,9 +118,12 @@ export function DealsIntel({ d }: { d: OverviewData }) {
   const owners: BarRow[] = m!.byOwner.slice(0, 8).map((o) => ({
     key: o.name,
     label: <span className="flex min-w-0 items-center gap-2"><Avatar name={o.name} sm /><span className="truncate">{o.name}</span></span>,
-    value: thousands(o.value), hint: <>{o.open} open · {o.won} won</>,
+    value: lakh(o.value),
+    hint: o.value === 0 && o.open > 0 ? <>{o.open} open (unquoted) · {o.won} won</> : <>{o.open} open · {o.won} won</>,
     title: inr(o.value) + " open · " + o.open + " deals · " + o.won + " won in period",
   }));
+  const unassignedOpen = m!.unassignedOpen ?? Math.max(0, m!.open - m!.byOwner.reduce((a, o) => a + o.open, 0));
+  const ownerUnit = "₹ lakh of open pipeline" + (unassignedOpen ? " · " + unassignedOpen + " unassigned not shown" : "");
   const count = (n: number) => (n ? <span className="tnum text-quaternary"> {n}</span> : null);
   const lensOptions = [
     { v: "risk", l: <>At risk{count(m!.atRisk.length)}</> },
@@ -151,7 +154,7 @@ export function DealsIntel({ d }: { d: OverviewData }) {
         <ChartFrame title={<span className="inline-flex items-center gap-1.5">By owner<Tip k="byowner" /></span>}>
           <div className="flex h-full flex-col justify-center">
             {owners.length
-              ? <BarRows rows={owners} unit="₹ thousand of open pipeline" />
+              ? <BarRows rows={owners} unit={ownerUnit} />
               : <Empty title="No owned deals." why="Deals without an owner do not appear here." />}
           </div>
         </ChartFrame>

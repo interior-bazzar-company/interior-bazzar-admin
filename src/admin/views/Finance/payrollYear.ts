@@ -29,7 +29,7 @@
    taken.
    ============================================================================= */
 import {
-  fixedOf, incentiveOf, monthOf, readRuns, readSalaryAccounts, todayIso, useVersion,
+  fixedOf, incentiveOf, monthOf, normDept, readRuns, readSalaryAccounts, todayIso, useVersion,
 } from "./store";
 
 /* =========================================================== the year === */
@@ -268,7 +268,7 @@ export function departmentYear(year: string): DepartmentYear[] {
          is on the year chart above, where it is labelled as what it is. */
       if (!sl.paidAt) return;
       const acc = accounts.filter((a) => a.salaryAccountId === sl.salaryAccountId)[0];
-      const dep = (acc && (acc.department || "").trim()) || "Unassigned";
+      const dep = (acc && normDept(acc.department)) || "Unassigned";
       const cur = by.get(dep) || {
         paidPaise: 0, incentivePaise: 0, fixedPaise: 0, people: {}, slips: 0,
       };
@@ -347,7 +347,7 @@ export function employeeTotals(year: string): EmployeeTotal[] {
         salaryAccountId: sl.salaryAccountId,
         name: sl.memberName,
         shortName: shorten(sl.memberName),
-        department: (acc && (acc.department || "").trim()) || "Unassigned",
+        department: (acc && normDept(acc.department)) || "Unassigned",
         fixedPaise: 0, incentivePaise: 0, grossPaise: 0, slips: 0,
         incentiveSharePct: null,
       };

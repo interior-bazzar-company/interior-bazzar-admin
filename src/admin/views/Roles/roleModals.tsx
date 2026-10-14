@@ -46,8 +46,7 @@ export function RoleModal({ role, mods, ops }: { role: Role | null; mods: RolesM
   return (
     <ModalShell
       title={isNew ? "Create role" : "Edit role"}
-      sub={isNew ? "A name, and what it may do" : "#" + role!.id + " · " + role!.name}
-      mono={!isNew}
+      sub={isNew ? "A name, and what it may do" : role!.name}
       onClose={ops.closeLayer}
       actions={<>
         <Button color="secondary" data-close="1" onClick={ops.closeLayer} isDisabled={busy}>Cancel</Button>
@@ -74,10 +73,9 @@ export function RoleModal({ role, mods, ops }: { role: Role | null; mods: RolesM
         </FormSection>
 
         <FormSection title="Permissions"
-          desc="One row per module, one column per verb. A tick here is what the API enforces.">
+          desc="Grouped by module section. Only the actions supported by each module are shown.">
           <ActionMatrix mods={mods} grants={role && role.isFullAccess ? null : (role ? role.modules : {})} editable />
           <p className="text-sm text-tertiary">
-            A dash means the module has no such action — it is not a permission being withheld.{" "}
             <b className="font-semibold text-secondary">View is the gate</b>: without it the module
             leaves that member&apos;s sidebar and the API refuses every route on it, whatever else is
             ticked — so ticking any verb ticks view, and clearing view clears the row.

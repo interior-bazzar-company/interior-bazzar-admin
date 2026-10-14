@@ -90,7 +90,8 @@ export function useLive(p: Period, on: { money: boolean; team: boolean }) {
            then nets its refund off, which is the only place it is counted. */
         every((n) => call(AdminOpsService.refunds({ pageNo: n, pageSize: 500 })), (r) => r.refunds).catch(() => [] as RefundRow[]),
       ]).then(([ledger, plans, income, installments, refunds]) => {
-        const settled = settledRefundPayments(refunds);
+        const cleanRefunds = (refunds || []).filter((r) => !isTestRefund(r));
+        const settled = settledRefundPayments(cleanRefunds);
         if (live) setS((x) => ({ ...x, money: "ready", raw: { ...x.raw, ledger, plans, income, installments, settled } }));
       }).catch(() => { if (live) setS((x) => ({ ...x, money: "error" })); });
     }
@@ -114,16 +115,27 @@ export function useLive(p: Period, on: { money: boolean; team: boolean }) {
 }
 
 /* ------------------------------------------------------------------ money --- */
-/** Local calendar date of an ISO timestamp (verifiedAt is UTC on the wire). */
+const IST_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+});
+
+/** India calendar date of an ISO timestamp (verifiedAt/settledAt are UTC on the wire). */
 export const ymd = (v: string | null | undefined) => {
   if (!v) return "";
-  if (v.length <= 10) return v;
+  if (v.indexOf("T") === -1 && v.length <= 10) return v;
   const d = new Date(v);
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  return isNaN(d.getTime()) ? v.slice(0, 10) : IST_DATE.format(d);
 };
 export const within = (d: string, from: string, to: string) => !!d && d >= from && d <= to;
 /** "19500.0" rupees -> 1950000 paise. */
 export const paiseOf = (rupees: string | null | undefined) => Math.round((parseFloat(rupees || "0") || 0) * 100);
+
+/** Excludes test/demo refund rows (RF-12 ₹99,99,999 test check and RF-2 ₹198 LOCAL-DEMO)
+ *  using the same rule as Finance/store.ts so Overview and Finance Analytics never drift. */
+export const isTestRefund = (r: { id?: number | null; detail?: string | null; payeeName?: string | null; decisionNote?: string | null }) => {
+  const text = ((r.detail || "") + " " + (r.payeeName || "") + " " + (r.decisionNote || "")).toLowerCase();
+  return text.includes("test only") || text.includes("local-demo") || r.id === 12 || r.id === 2;
+};
 
 /** The plan payments a settled refund request points at. */
 export const settledRefundPayments = (refunds: { settledAt: string | null; payment: { id: number } | null }[]) =>
@@ -148,12 +160,47 @@ export interface LiveMoney {
   failed: { n: number; paise: number }; overdue: { n: number; paise: number };
 }
 
-function windowOf(r: Raw, from: string, to: string): MoneyWindow {
-  const deal = r.ledger.filter((x) => x.type === "payment" && !x.reversed && within(ymd(x.paymentDate), from, to));
-  const plans = r.plans
+export function matchesOwner(x: unknown, owner: string, ownerName: string | undefined, dealIds?: Set<string>): boolean {
+  const row = x as Record<string, unknown>;
+  const dealObj = row.deal && typeof row.deal === "object" ? (row.deal as Record<string, unknown>) : null;
+  const ownerObj = (
+    row.owner && typeof row.owner === "object" ? row.owner
+    : row.ownerAtPayment && typeof row.ownerAtPayment === "object" ? row.ownerAtPayment
+    : dealObj?.owner && typeof dealObj.owner === "object" ? dealObj.owner
+    : null
+  ) as Record<string, unknown> | null;
+
+  const candDealIds = [
+    row.dealRef, row.deal_ref, row.dealId, row.deal_id, row.dealCode,
+    typeof row.deal === "string" || typeof row.deal === "number" ? row.deal : null,
+    dealObj?.ref, dealObj?.dealRef, dealObj?.id, dealObj?.dealId, dealObj?.deal_id, dealObj?.code,
+  ].filter((v) => v !== undefined && v !== null).map(String);
+
+  if (dealIds && candDealIds.some((id) => dealIds.has(id))) return true;
+
+  const candOwners = [
+    row.ownerName, row.owner_name, row.ownerId, row.owner_id,
+    dealObj?.ownerName, dealObj?.owner_name, dealObj?.ownerId, dealObj?.owner_id,
+    ownerObj?.name, ownerObj?.id, ownerObj?.username,
+  ].filter((v) => v !== undefined && v !== null).map(String);
+
+  const norm = (s: string) => s.trim().toLowerCase();
+  const targetId = norm(owner);
+  const targetName = ownerName ? norm(ownerName) : "";
+  return candOwners.some((o) => {
+    const no = norm(o);
+    return no === targetId || (!!targetName && no === targetName);
+  });
+}
+
+function windowOf(r: Raw, from: string, to: string, owner?: string, dealIds?: Set<string>, ownerName?: string): MoneyWindow {
+  const deal = r.ledger.filter((x) =>
+    x.type === "payment" && !x.reversed && within(ymd(x.paymentDate), from, to)
+    && (!owner || matchesOwner(x, owner, ownerName, dealIds)));
+  const plans = owner ? [] : r.plans
     .map((x) => ({ at: ymd(x.verifiedAt), net: planCashPaise(x, r.settled) }))
     .filter((x) => x.net > 0 && within(x.at, from, to));
-  const income = r.income.filter((x) => within(ymd(x.valueDate), from, to));
+  const income = owner ? [] : r.income.filter((x) => within(ymd(x.valueDate), from, to));
   return {
     collectedPaise: deal.reduce((a, x) => a + x.amountPaise, 0) + plans.reduce((a, x) => a + x.net, 0),
     otherInPaise: income.reduce((a, x) => a + x.amountPaise, 0),
@@ -161,16 +208,19 @@ function windowOf(r: Raw, from: string, to: string): MoneyWindow {
   };
 }
 
-export function liveMoney(r: Raw, p: Period): LiveMoney {
-  const owed = r.installments.filter((x) => within(x.dueDate, p.from, p.to));
-  const isFailed = (x: InstallmentRow) => x.status?.key === "failed";
-  const failed = r.installments.filter(isFailed);
+export function liveMoney(r: Raw, p: Period, owner?: string, dealIds?: Set<string>, ownerName?: string): LiveMoney {
   const today = todayLocal();
-  const overdue = r.installments.filter((x) => x.status?.key === "due" && x.dueDate < today);
+  const soonTo = addDays(today, 30);
+  const inst = owner ? r.installments.filter((x) => matchesOwner(x, owner, ownerName, dealIds)) : r.installments;
+  const due = inst.filter((x) => x.status?.key === "due" && within(x.dueDate, today, soonTo));
+  const isFailed = (x: InstallmentRow) => x.status?.key === "failed";
+  const failed = inst.filter(isFailed);
+  const overdue = inst.filter((x) => x.status?.key === "due" && x.dueDate < today);
   const sum = (xs: InstallmentRow[]) => xs.reduce((a, x) => a + x.amountPaise, 0);
   return {
-    cur: windowOf(r, p.from, p.to), prev: windowOf(r, p.prevFrom, p.prevTo),
-    totals: { outstandingPaise: sum(owed), dueN: owed.filter((x) => !isFailed(x)).length, failedN: owed.filter(isFailed).length },
+    cur: windowOf(r, p.from, p.to, owner, dealIds, ownerName),
+    prev: windowOf(r, p.prevFrom, p.prevTo, owner, dealIds, ownerName),
+    totals: { outstandingPaise: sum(due) + sum(failed), dueN: due.length, failedN: failed.length },
     failed: { n: failed.length, paise: sum(failed) }, overdue: { n: overdue.length, paise: sum(overdue) },
   };
 }
@@ -181,24 +231,42 @@ export interface LiveTeam {
   work: { total: number; completed: number; cancelled: number; delayed: number };
 }
 
+const TERMINAL = ["completed", "cancelled"];
+const SYSTEM_ROLE_RE = /^(bot|system administrator)$/i;
+const SYSTEM_USER_RE = /\b(bot|gmb_bot|gmb bot|system administrator|test member|enquiries_desk|enquiries desk|dev qa|panel admin|claude\.local)\b/i;
+
+export function isSystemOrBotRole(roleName: string | null | undefined): boolean {
+  return SYSTEM_ROLE_RE.test((roleName || "").trim());
+}
+
+export function isSystemOrBotUser(
+  u: { name?: string | null; username?: string | null; roles?: { name: string }[] | null },
+  roleNames?: string[],
+): boolean {
+  const roles = roleNames || (u.roles || []).map((r) => r.name);
+  if (roles.some((r) => isSystemOrBotRole(r))) return true;
+  const hay = [u.name || "", u.username || "", ...roles].join(" ");
+  return SYSTEM_USER_RE.test(hay);
+}
+
 function isRecentDelayed(i: WorkItemRow): boolean {
-  if (!i.delayed) return false;
-  if (!i.dueDate) return true;
-  const due = new Date(i.dueDate).getTime();
-  const diffDays = (Date.now() - due) / (1000 * 60 * 60 * 24);
-  return diffDays >= 0 && diffDays <= 14;
+  return !!i.delayed && TERMINAL.indexOf(i.status?.key) < 0;
 }
 
 /** `dept` is a ROLE name (see store.ts useDepartments): a member is in it when
  *  their account holds that role, the same rule the Team section applies. */
 export function liveTeam(r: Raw, dept: string | undefined, rolesOf: Map<string, string[]>): LiveTeam {
-  const inDept = (id: number) => !dept || (rolesOf.get(String(id)) || []).indexOf(dept) >= 0;
+  const inDept = (id: number) => {
+    const key = String(id);
+    if (rolesOf.size > 0 && !rolesOf.has(key)) return false;
+    return !dept || (rolesOf.get(key) || []).indexOf(dept) >= 0;
+  };
   /* PRESENT IS A DAY SOMEBODY OPENED. The list now also carries the days that
      do not exist (d4), and an absence is not an attendance: the start time is
      what separates them, and an unclosed day still counts for nobody. */
-  const present = r.days.filter((d) => inDept(d.member.id) && !!d.startedAt && d.state.key !== "unclosed");
+  const present = r.days.filter((d) => !isSystemOrBotUser(d.member) && inDept(d.member.id) && !!d.startedAt && d.state.key !== "unclosed");
   const late = present.filter((d) => d.isLate).length;
-  const items = r.work.filter((i) => inDept(i.assignee.id));
+  const items = r.work.filter((i) => !isSystemOrBotUser(i.assignee) && inDept(i.assignee.id));
   const key = (i: WorkItemRow) => i.status?.key;
   return {
     span: { onTimePct: onTimePctOf(present.length, late) },
@@ -212,7 +280,6 @@ export function liveTeam(r: Raw, dept: string | undefined, rolesOf: Map<string, 
 }
 
 /* ------------------------------------------------------------ team table --- */
-const TERMINAL = ["completed", "cancelled"];
 
 export interface TeamPerson { memberId: string; name: string; designation: string }
 export interface TeamTableRow {
@@ -230,7 +297,7 @@ export interface LiveTeamTable { members: TeamPerson[]; rows: TeamTableRow[]; ma
 export function liveTeamRows(r: Raw, people: AdminUserRow[], dept: string | undefined,
   rolesOf: Map<string, string[]>, owners: Map<string, OwnerStat>, today: string): LiveTeamTable {
   const inDept = (id: string) => !dept || (rolesOf.get(id) || []).indexOf(dept) >= 0;
-  const members = people.filter((u) => u.isActive !== false && inDept(String(u.id)));
+  const members = people.filter((u) => u.isActive !== false && !isSystemOrBotUser(u, rolesOf.get(String(u.id))) && inDept(String(u.id)));
   const rows: TeamTableRow[] = members.map((u) => {
     const id = String(u.id);
     const mine = r.work.filter((i) => String(i.assignee.id) === id);

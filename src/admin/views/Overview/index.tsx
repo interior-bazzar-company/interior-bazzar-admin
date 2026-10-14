@@ -40,7 +40,7 @@ import { Retry, Snapshot, Performance } from "./top";
 import { DealsIntel } from "./deals";
 import { TeamIntel, Operations } from "./team";
 import { Finance } from "./money";
-import { Attention, Signals } from "./decide";
+import { Attention } from "./decide";
 
 const HASH = "#/overview";
 
@@ -189,7 +189,6 @@ export default function Overview() {
         {d.gates.finance ? <Finance d={d} /> : null}
         {d.gates.team || can("work", "view") || can("team", "view") ? <Operations d={d} /> : null}
         <Attention d={d} />
-        <Signals d={d} />
       </div>
     </div>
   );

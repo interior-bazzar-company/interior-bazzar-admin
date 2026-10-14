@@ -131,7 +131,7 @@ export interface FlowPoint { key: string; label: string; created: number; won: n
 export interface OwnerRow { name: string; open: number; value: number; won: number; wonValue: number; collected: number }
 export interface StageRow { stage: number; key: string; label: string; tone: string; n: number; value: number }
 export interface DealMetrics {
-  total: number; open: number; openValue: number; unquoted: number;
+  total: number; open: number; openValue: number; unquoted: number; unassignedOpen?: number;
   /** The snapshot's Pipeline value and the Pipeline health cell.
    *
    *  A PIPELINE IS A LEVEL, NOT A FLOW. This was "open now AND created inside
@@ -232,6 +232,7 @@ export function dealMetrics(list: DealRec[], p: Period, today: string, stages: D
   return {
     total: list.length, open: open.length, openValue: sumValue(open),
     unquoted: open.filter((d) => d.deal_value === null).length,
+    unassignedOpen: open.filter((d) => !d.owner_id).length,
     openInPeriod: {
       n: open.length, value: sumValue(open), unquoted: open.filter((d) => d.deal_value === null).length,
       stalled: stalled.length,
@@ -241,7 +242,7 @@ export function dealMetrics(list: DealRec[], p: Period, today: string, stages: D
     lost: { n: lostNow.length }, lostPrev: { n: lostPrev.length },
     conversion: rate(wonNow.length, lostNow.length), conversionPrev: rate(wonPrev.length, lostPrev.length),
     avgWon: valued.length ? Math.round(sumValue(valued) / valued.length) : null,
-    byStage, byOwner: Array.from(owners.values()).sort((a, b) => b.value - a.value || b.open - a.open),
+    byStage, byOwner: Array.from(owners.values()).sort((a, b) => b.value - a.value || b.open - a.open || b.won - a.won),
     flow, wonSeries: flow.map((f) => f.won),
     convSeries: flow.map((f) => (f.won + f.lost ? Math.round((f.won / (f.won + f.lost)) * 100) : 0)),
     atRisk: atRiskRows, closingSoon, biggest, aging,

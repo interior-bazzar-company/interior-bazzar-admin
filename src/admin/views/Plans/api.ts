@@ -97,10 +97,15 @@ function adaptCycle(c: PlanCycle): Cycle {
   };
 }
 
+function normFam(k: unknown): string {
+  const low = String(k || "business").trim().toLowerCase();
+  return low === "autogrowth" || low === "automation" ? "automation" : (low || "business");
+}
+
 export function adaptPlan(p: PlanRow): Plan {
   return {
     id: p.id,
-    family: (p.planFamily || "business").trim().toLowerCase(),
+    family: normFam(p.planFamily),
     entityType: p.entityType || "",
     title: p.title || "",
     subtitle: p.subtitle || "",
@@ -176,7 +181,7 @@ export const savingOf = (c: Cycle) => (c.oldPrice > c.price ? c.oldPrice - c.pri
 export function familiesOf(plans: Plan[]): string[] {
   const out: string[] = [];
   plans.forEach((p) => {
-    const f = (p.family || "").trim().toLowerCase();
+    const f = normFam(p.family);
     if (f && out.indexOf(f) < 0) out.push(f);
   });
   return out;

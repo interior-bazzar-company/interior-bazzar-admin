@@ -33,7 +33,7 @@ import {
   labelOf, membersInScope, normaliseUrl, progressOf, readMember, readItems, stageOf, tagsOf,
   timePct, toneOf,
 } from "./store";
-import type { Priority as PriorityKey, WorkItem, WorkKind, WorkStage } from "./store";
+import type { Priority as PriorityKey, Scope, WorkItem, WorkKind, WorkStage } from "./store";
 
 /* ----------------------------------------------------------- rich text --- */
 
@@ -214,11 +214,12 @@ export function ProgressWindow({ item, showNote, bare }: {
   const pct = progressOf(item) ?? 0;
   const t = timePct(item);
   const behind = t !== null && t > pct + 5;
+  const stageLabel = labelOf(WORK_STATUS, stageOf(item));
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <div className="flex min-w-0 items-center gap-2">
         <span className="relative h-1.5 min-w-12 flex-1 rounded-full bg-quaternary" role="img"
-          aria-label={pct + "% done" + (t === null ? "" : ", " + t + "% of the window gone")}>
+          aria-label={pct + "% done" + (t === null ? "" : ", " + t + "% of the window elapsed") + " — " + stageLabel}>
           <i className={cx("absolute inset-y-0 left-0 rounded-full", behind ? "bg-fg-warning-primary" : "bg-fg-brand-primary")}
             style={{ width: Math.max(0, Math.min(100, pct)) + "%" }} />
           {t !== null ? (
@@ -226,10 +227,10 @@ export function ProgressWindow({ item, showNote, bare }: {
               style={{ left: Math.max(0, Math.min(100, t)) + "%" }} />
           ) : null}
         </span>
-        {bare ? null : <span className="shrink-0 text-xs font-medium text-secondary tnum">{pct}%</span>}
+        {bare ? null : <span aria-hidden="true" className="shrink-0 text-xs font-medium text-secondary tnum">{pct}%</span>}
       </div>
       {showNote && behind ? (
-        <span className="text-xs text-warning-primary">{t}% of the window gone, {pct}% done</span>
+        <span className="text-xs text-warning-primary">{t}% of the window elapsed, {pct}% done</span>
       ) : null}
     </div>
   );
@@ -259,9 +260,6 @@ export function ago(dateIso: string | null | undefined, todayIso: string = TODAY
 
 /* ------------------------------------------------------------ sort head --- */
 
-/* The sort head moved into the shared table vocabulary — two modules ranked
-   the same way, so it is `ui/data`'s now. Re-exported here so this module's
-   call sites keep one import. */
 export { SortHead } from "../../ui";
 
 /* ---------------------------------------------------------------- rows --- */
@@ -279,21 +277,13 @@ export function TaskRow({ item, onOpen, who }: { item: WorkItem; onOpen: (id: st
         <span className="truncate text-sm font-medium text-primary">{item.title}</span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tertiary">
           {m ? <span>{m.name.split(" ").slice(-1)[0]}</span> : null}
-          {/* THE PANEL'S OWN ICON, not an emoji. An emoji renders as a different
-              glyph on every platform, ignores currentColor so it cannot follow
-              the warn tone beside it, and is read out as "warning sign" in the
-              middle of a sentence. */}
           <span className={cx("inline-flex items-center gap-1", late && "font-medium text-warning-primary")}>
             {late
               ? <><Icon name="alert" size="xs" />{daysOver(item)}d over</>
               : item.dueDate === TODAY ? "due today"
-                /* `fmtDate(null)` is an em dash, so an undated task used to
-                   read "due —". It could not reach this row before. */
                 : item.dueDate ? "due " + fmtDate(item.dueDate) : "no date"}
           </span>
           <WaitFlag item={item} />
-          {/* The steps, when there are steps. A task closed with lines still
-              open is not this block's problem — it is not an open task. */}
           {ck.total ? (
             <span className="inline-flex items-center gap-1.5" title={ck.done + " of " + ck.total + " steps ticked"}>
               <span className="block h-1 w-10 rounded-full bg-quaternary">
@@ -309,10 +299,6 @@ export function TaskRow({ item, onOpen, who }: { item: WorkItem; onOpen: (id: st
   );
 }
 
-/** COMPACT IS THE RAIL'S ROW. One heading — the name and the one number that
- *  answers it — and the bar under it. The calendar beside it already carries
- *  the dates, the assignee and the due day; a second copy of them in a narrow
- *  column is detail nobody reads twice. */
 export function MarkRow({ item, onOpen, who, compact }: {
   item: WorkItem; onOpen: (id: string) => void; who?: boolean; compact?: boolean;
 }) {
@@ -348,7 +334,7 @@ export function MarkRow({ item, onOpen, who, compact }: {
           <span className="font-medium text-secondary tnum">{progressOf(item) ?? 0}%</span>
         </span>
       ) : null}
-      <span className="w-full"><ProgressWindow item={item} showNote={!target} /></span>
+      <span className="w-full"><ProgressWindow item={item} showNote={!target} bare={target} /></span>
       <span className="flex w-full flex-wrap items-baseline gap-x-2 text-xs text-tertiary">
         <span className="min-w-0 truncate">{(m ? m.name.split(" ").slice(-1)[0] + " · " : "") + (target ? windowNote(item) : noteOf(item))}</span>
         <span className="flex-1" />
@@ -360,7 +346,7 @@ export function MarkRow({ item, onOpen, who, compact }: {
 
 const windowNote = (i: WorkItem) => {
   const t = timePct(i);
-  return t === null ? "no window" : t + "% of the window gone";
+  return t === null ? "no window" : t + "% of the window elapsed";
 };
 
 /* -------------------------------------------------------------- blocks --- */
@@ -368,87 +354,70 @@ const windowNote = (i: WorkItem) => {
 const empty = (t: string) => <p className="px-2 py-3 text-sm text-quaternary">{t}</p>;
 const groupHead = (t: string) => <p className="label-mono px-2 pt-3 pb-1 first:pt-0">{t}</p>;
 
-/** WHAT IS ASSIGNED TO YOU — all of it, urgent end first.
- *
- *  IT WAS CALLED "TASKS" AND SHOWED A THREE-DAY WINDOW. Anything due later, and
- *  anything with no date at all, was dropped without a word — so a member
- *  carrying twelve tasks read a panel headed "Tasks · 3", and the count was a
- *  count of the window rather than of the work. The window is still how the
- *  list is ORDERED, because overdue above today above later is the order you
- *  would work in; it is no longer what the list contains.
- *
- *  UNDATED WORK LANDS IN "Later" RATHER THAN NOWHERE. A task nobody dated is
- *  the easiest kind to lose, which is the opposite of what a block like this is
- *  for.
- *
- *  `limit` is the rail's, not the page's: a sidebar that also has to hold
- *  milestones and targets cannot be a full backlog, and what it cuts is named
- *  rather than silently dropped — the same bargain `MarksBlock` makes. */
-export function TasksBlock({ who, withTeam, onOpen, limit }: {
-  who: string; withTeam?: boolean; onOpen: (id: string) => void; limit?: number;
+export function TasksBlock({ who, withTeam, scope, onOpen, limit }: {
+  who: string; withTeam?: boolean; scope?: Scope; onOpen: (id: string) => void; limit?: number;
 }) {
-  const ids = withTeam ? membersInScope("team", who).map((m) => m.memberId) : [who];
+  const effectiveScope: Scope = scope || (withTeam ? "team" : "self");
+  const ids = effectiveScope === "all" ? null : (effectiveScope === "team" ? membersInScope("team", who).map((m) => m.memberId) : [who]);
   const open = readItems().filter((i) =>
-    i.kind === "task" && ids.indexOf(i.assigneeId) >= 0 && !isTerminal(i.status));
+    (effectiveScope === "all" ? true : i.kind === "task") && (!ids || ids.indexOf(i.assigneeId) >= 0) && !isTerminal(i.status));
 
   const over = open.filter((i) => isDelayed(i));
   const now = open.filter((i) => !isDelayed(i) && i.dueDate === TODAY);
-  /* Everything else, dated or not — soonest first, and the undated last
-     because there is no date to sort them by, not because they matter least. */
   const later = open
     .filter((i) => !isDelayed(i) && i.dueDate !== TODAY)
     .sort((x, y) => (x.dueDate || "9999").localeCompare(y.dueDate || "9999"));
 
-  /* The cap is spent from the top, so it can never hide something overdue in
-     order to show something undated. */
   let left = limit ?? Infinity;
   const take = (list: WorkItem[]) => {
     const n = Math.max(0, Math.min(list.length, left));
     left -= n;
     return list.slice(0, n);
   };
-  const groups: [string, WorkItem[]][] = [
-    ["Overdue", take(over)], ["Due today", take(now)], ["Later", take(later)],
+  const groups: [string, WorkItem[], number][] = [
+    ["Overdue", take(over), over.length],
+    ["Due today", take(now), now.length],
+    ["Later", take(later), later.length],
   ];
   const shown = groups.reduce((n, g) => n + g[1].length, 0);
   const rest = open.length - shown;
 
   return (
-    /* The count is everything assigned, not everything drawn — a heading that
-       agrees with the list but not with the workload is the bug this block
-       had. */
     <Card tight title="Assigned" right={<Pill xs tone="neutral" text={String(open.length)} />}>
       {open.length ? (
         <div className="-mx-2 flex flex-col">
-          {groups.map(([label, list]) => (list.length ? (
+          {groups.map(([label, list, total]) => (list.length ? (
             <div key={label}>
-              {groupHead(label + " · " + list.length)}
-              {list.map((i) => <TaskRow key={i.itemId} item={i} onOpen={onOpen} who={withTeam} />)}
+              {groupHead(
+                total > list.length
+                  ? `${label} · ${total} (showing top ${list.length})`
+                  : `${label} · ${total}`
+              )}
+              {list.map((i) => <TaskRow key={i.itemId} item={i} onOpen={onOpen} who={withTeam || effectiveScope !== "self"} />)}
             </div>
           ) : null))}
           {rest > 0 ? <p className="px-2 pt-2 text-xs text-quaternary">{rest} more on the board.</p> : null}
         </div>
-      ) : empty(withTeam ? "Nothing open across the team." : "Nothing assigned to you.")}
+      ) : empty(withTeam || effectiveScope !== "self" ? "Nothing open across the team." : "Nothing assigned to you.")}
     </Card>
   );
 }
 
-/** Mine, then my team — `reportsTo`, one level. A member with no reports never
- *  sees the second heading, and there is no bar against a person anywhere. */
-export function MarksBlock({ kind, who, onOpen, compact, limit }: {
-  kind: Exclude<WorkKind, "task">; who: string; onOpen: (id: string) => void;
+export function MarksBlock({ kind, who, scope, onOpen, compact, limit }: {
+  kind: Exclude<WorkKind, "task">; who: string; scope?: Scope; onOpen: (id: string) => void;
   compact?: boolean; limit?: number;
 }) {
   const all = readItems().filter((i) => i.kind === kind && !isTerminal(i.status));
-  const team = membersInScope("team", who).map((m) => m.memberId).filter((id) => id !== who);
+  const team = scope === "all"
+    ? null
+    : membersInScope("team", who).map((m) => m.memberId).filter((id) => id !== who);
   const mine = all.filter((i) => i.assigneeId === who);
-  const theirs = all.filter((i) => team.indexOf(i.assigneeId) >= 0);
+  const theirs = team === null
+    ? all.filter((i) => i.assigneeId !== who)
+    : all.filter((i) => team.indexOf(i.assigneeId) >= 0);
   const title = kind === "target" ? "Targets" : "Milestones";
+  const groupLabel = scope === "all" ? "Everyone · " : "My team · ";
 
-  /* ONE HEADER, THEN BARS. No "Mine"/"My team" split and no meta line: at rail
-     width those headings cost more rows than the rows they introduce. `limit`
-     says how many belong on a panel that is meant to be read at a glance —
-     what it cuts is named rather than silently dropped. */
   if (compact) {
     const rows = mine.concat(theirs);
     const shownRows = limit ? rows.slice(0, limit) : rows;
@@ -477,7 +446,7 @@ export function MarksBlock({ kind, who, onOpen, compact, limit }: {
           ) : null}
           {theirs.length ? (
             <>
-              {groupHead("My team · " + theirs.length)}
+              {groupHead(groupLabel + theirs.length)}
               {theirs.map((i) => <MarkRow key={i.itemId} item={i} onOpen={onOpen} who />)}
             </>
           ) : null}
@@ -489,42 +458,68 @@ export function MarksBlock({ kind, who, onOpen, compact, limit }: {
 
 /* ========================================================== the board === */
 
-/** A KANBAN COLUMN. `label-mono` head, the count as a small pill, the cards
- *  under it — and the column keeps its width so five of them scroll sideways
- *  rather than squeezing each other into unreadable slivers. */
-export function StageColumn({ label, n, children, note }: {
-  label: ReactNode; n: number; children: ReactNode; note?: ReactNode;
+export function StageColumn({
+  label, n, children, note, isDropTarget, onDragOver, onDragLeave, onDrop,
+}: {
+  label: ReactNode;
+  n: number;
+  children: ReactNode;
+  note?: ReactNode;
+  isDropTarget?: boolean;
+  onDragOver?: React.DragEventHandler<HTMLElement>;
+  onDragLeave?: React.DragEventHandler<HTMLElement>;
+  onDrop?: React.DragEventHandler<HTMLElement>;
 }) {
   return (
-    <section className="flex w-72 shrink-0 flex-col rounded-xl bg-secondary ring-1 ring-secondary">
+    <section
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={cx(
+        "flex w-72 shrink-0 flex-col rounded-xl bg-secondary ring-1 ring-secondary transition-colors",
+        isDropTarget && "ring-2 ring-brand bg-brand-primary/5",
+      )}
+    >
       <header className="flex items-center gap-2 border-b border-secondary px-3 py-2.5">
         <h3 className="label-mono min-w-0 flex-1 truncate">{label}</h3>
         <Pill xs tone="neutral" text={String(n)} />
       </header>
-      <div className="flex min-h-24 flex-col gap-2 p-2">
+      <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
         {n ? children : <p className="px-1 py-4 text-center text-xs text-quaternary">{note || "Nothing here."}</p>}
       </div>
     </section>
   );
 }
 
-/** THE CARD. Title first, then the three facts you sort a column by — who has
- *  it, how urgent it is, when it is due — and the tags last because they are
- *  the reader's own vocabulary rather than the system's. */
-export function TaskCard({ item, parent, onOpen }: {
-  item: WorkItem; parent?: WorkItem | null; onOpen: (id: string) => void;
+export function TaskCard({
+  item, parent, onOpen, draggable, isDragging, onDragStart, onDragEnd,
+}: {
+  item: WorkItem;
+  parent?: WorkItem | null;
+  onOpen: (id: string) => void;
+  draggable?: boolean;
+  isDragging?: boolean;
+  onDragStart?: (id: string, e: React.DragEvent) => void;
+  onDragEnd?: () => void;
 }) {
   const m = readMember(item.assigneeId);
   const late = isDelayed(item);
   const dead = item.status === "cancelled";
   return (
-    <button type="button"
+    <button
+      type="button"
+      draggable={draggable}
+      onDragStart={(e) => onDragStart?.(item.itemId, e)}
+      onDragEnd={onDragEnd}
       className={cx(
         "flex w-full cursor-pointer flex-col gap-2 rounded-lg bg-primary p-3 text-left shadow-xs ring-1 ring-secondary outline-focus-ring transition duration-100 hover:ring-primary focus-visible:outline-2 focus-visible:outline-offset-2",
+        draggable && "cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-50 ring-2 ring-brand",
         late && "rail-warning",
         dead && "opacity-60",
       )}
-      onClick={() => onOpen(item.itemId)}>
+      onClick={() => onOpen(item.itemId)}
+    >
       <span className="flex min-w-0 items-start gap-2">
         <KindIcon kind={item.kind} className="mt-0.5" />
         <span className={cx("min-w-0 flex-1 text-sm font-medium text-primary", dead && "line-through")}>{item.title}</span>
@@ -781,22 +776,19 @@ export function StackBars({ days, legend }: {
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex h-40 items-end gap-1 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex h-40 w-full items-end justify-between gap-1.5 pb-1">
         {days.map((d) => {
           const total = Math.max(1, d.segs.reduce((a, s) => a + s.n, 0));
           return (
-            /* CAPPED, NOT STRETCHED. On `flex-1` alone a five-day window drew
-               five slabs the width of a hand — a stacked day is a bar, and a
-               bar that fills a third of the frame reads as an area. */
-            <span key={d.date} className="flex min-w-6 max-w-10 flex-1 flex-col items-center gap-1">
-              <span className="flex h-32 w-full flex-col-reverse overflow-hidden rounded-[3px] bg-secondary" role="img"
+            <span key={d.date} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+              <span className="flex h-32 w-full max-w-9 flex-col-reverse overflow-hidden rounded-[3px] bg-secondary" role="img"
                 aria-label={d.label + ": " + d.segs.filter((s) => s.n).map((s) => s.n + " " + s.what).join(", ")}>
                 {d.segs.map((s) => (s.n ? (
                   <i key={s.k} className={cx("block w-full", SEG[s.tone] || SEG.mute)}
                     style={{ height: (s.n / total) * 100 + "%" }} title={s.n + " " + s.what} />
                 ) : null))}
               </span>
-              <b className={cx("text-2xs font-medium tnum", d.today ? "text-brand-secondary" : "text-tertiary")}>{d.label}</b>
+              <b className={cx("text-2xs font-medium tnum whitespace-nowrap", d.today ? "text-brand-secondary" : "text-tertiary")}>{d.label}</b>
               <i className="text-2xs text-quaternary not-italic">{d.sub}</i>
             </span>
           );

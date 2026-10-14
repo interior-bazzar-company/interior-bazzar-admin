@@ -75,7 +75,7 @@ export function Snapshot({ d }: { d: OverviewData }) {
 
         {d.gates.deals ? dealTile("Pipeline value", "pipeline", () => (
           <Kpi k="Pipeline value" tip="pipeline" v={<Money paise={deals!.openInPeriod.value} />}
-            s={deals!.openInPeriod.n + " open" + (deals!.openInPeriod.unquoted ? " · " + deals!.openInPeriod.unquoted + " without a value" : "")}
+            s={deals!.openInPeriod.n + " open now" + (deals!.openInPeriod.unquoted ? " · " + deals!.openInPeriod.unquoted + " without a value" : "")}
             to="#/deals?view=board" />
         )) : null}
         {/* NAMED FOR ITS WINDOW. This counts deals that REACHED won inside the
@@ -155,12 +155,12 @@ export function Performance({ d }: { d: OverviewData }) {
      ordinal ramp keep the order and the hue and drop the ratio. */
   const stages: BarRow[] = m
     ? m.byStage.map((s, i) => ({
-        key: s.key, label: s.label, value: s.n, tone: "o" + (i + 1),
+        key: s.key, label: s.label, value: Math.max(0, s.value), display: String(s.n), tone: "o" + (i + 1),
         hint: s.n ? <Money paise={s.value} /> : <span className="text-quaternary">—</span>,
         title: s.n ? inr(s.value) + " across " + s.n + (s.n === 1 ? " deal" : " deals") : "no deals here",
       }))
     : [];
-  const anyStage = stages.some((s) => s.value > 0);
+  const anyStage = !!m && m.byStage.some((s) => s.n > 0);
 
   return (
     <Section id="ov-performance" title="Business performance" desc={d.periods.deals.label + " · " + grain}

@@ -49,7 +49,7 @@ import { MemberReinstateModal, MemberSuspendModal, MemberViewAsModal, isFullAcce
 import AccessRequests, { pendingRequests, usePendingRequests } from "./AccessRequests";
 import Orphans from "./Orphans";
 
-const CHIP_LABELS = { q: "Search", role: "Role", dept: "Department" };
+const CHIP_LABELS = { q: "Search", role: "Role" };
 const PAGE_SIZE = 25;
 
 export default function Team() {
@@ -69,7 +69,7 @@ export default function Team() {
   const [page, setPage] = useState(1);
 
   const p: Record<string, string> = {
-    q: sp.get("q") || "", role: sp.get("role") || "", dept: sp.get("dept") || "",
+    q: sp.get("q") || "", role: sp.get("role") || "",
     tab: sp.get("tab") || "",
   };
   const tab = p.tab === "requests" ? "requests" : p.tab === "orphans" && can("team", "status") ? "orphans" : "members";
@@ -87,17 +87,6 @@ export default function Team() {
   useMembers();
   const [requests, reloadRequests] = usePendingRequests();
 
-  /* TWO READS, NOT ONE PROMISE.ALL. The members list is this page; the role
-     REGISTRY is a lookup it uses to name what each member holds, and it is
-     gated on `roles.view` — which a sales manager does not have. Bundled into
-     one Promise.all, that refusal rejected the pair and the whole page
-     rendered "Permission denied" to somebody holding `team.view`. The roles
-     grid said they could open Members; the page said they could not; the
-     server had allowed it all along.
-
-     So they settle independently: a refused registry costs the role labels and
-     the role filter, not the team. `rolesDenied` is what stops the empty
-     registry from being read as "this member holds nothing" further down. */
   useEffect(() => {
     let cancelled = false;
     call(AdminOpsService.users())
@@ -110,21 +99,13 @@ export default function Team() {
   }, [tick]);
 
   /* A narrower list is a different list: page 4 of it does not exist. */
-  useEffect(() => { setPage(1); }, [p.q, p.role, p.dept, p.tab]);
+  useEffect(() => { setPage(1); }, [p.q, p.role, p.tab]);
 
   /* ------------------------------------------------------------ chrome -- */
   const crumbs = useMemo(() => {
-    /* "Members", matching the sidebar row that opens this — see LABEL_OVERRIDE
-       in shell/modules.ts. The crumb is written out here rather than read from
-       the module item because this page also renders the member and operation
-       crumbs below, and one source for all three is what keeps them a chain. */
     if (!id) return <TbTitle label="Members" to="#/team" />;
     const u = (rows || []).find((x) => String(x.id) === id);
     const name = u ? u.name : "Member";
-    /* ON AN OPERATION PAGE THE CRUMB SAYS BOTH. The name is the way back to the
-       person; the operation is where you are. A topbar that named only the
-       person on `/team/58/leave` would leave the deepest page in the module
-       looking identical to the one above it. */
     const op = sub ? opOf(sub) : null;
     if (!op) return <TbTitle label={name} to="#/team" />;
     return (
@@ -149,8 +130,6 @@ export default function Team() {
     q[name] = value;
     go("#/team" + (id ? "/" + id : "") + qs(q));
   }
-  /* Typing is debounced, and the caret is handed back afterwards — the input is
-     remounted by the new `q` in the URL, so the focus has to be re-asked for. */
   function setSearch(name: string, value: string) {
     window.clearTimeout(typing.current);
     typing.current = window.setTimeout(() => {
@@ -198,9 +177,6 @@ export default function Team() {
     );
   }
 
-  /* A ROW IS A PERSON AND IT OPENS THEIR PAGE. The drawer is gone: identity,
-     access, attendance, work, reports, documents and pay are one screen with
-     its own launcher, and the admin actions moved into its header. */
   if (id) {
     const u = rows.find((x) => String(x.id) === id) || null;
     return <MemberPage id={id} sub={sub || ""} live={u} members={rows} roles={roles} rolesDenied={rolesDenied} ops={ops} />;
@@ -208,11 +184,10 @@ export default function Team() {
 
   /* -------------------------------------------------------------- rows -- */
   let list = rows.slice();
-  /* DEPARTMENT IS THE ROLE NAME (team/d1): the backend has no department
-     column, and the Overview filter already reads it this way. */
-  const depts = uniq(rows.flatMap((u) => u.roles.map((r) => r.name)));
-  if (p.role) list = list.filter((u) => u.roles.some((r) => String(r.id) === p.role));
-  if (p.dept) list = list.filter((u) => u.roles.some((r) => r.name === p.dept));
+  if (p.role) {
+    const rl = p.role.toLowerCase();
+    list = list.filter((u) => u.roles.some((r) => String(r.id) === p.role || r.name.toLowerCase() === rl));
+  }
   if (p.q) {
     const s = p.q.toLowerCase();
     list = list.filter((u) =>
@@ -222,7 +197,9 @@ export default function Team() {
   const noRole = rows.filter((u) => !u.roles.length).length;
   const noDocs = rows.filter((u) => (u.missingDocuments || []).length).length;
   const waiting = pendingRequests(requests);
-  const filtered = !!(p.q || p.role || p.dept);
+  const filtered = !!(p.q || p.role);
+  const matchedRoleOpt = roles.find((r) => String(r.id) === p.role || r.name.toLowerCase() === p.role.toLowerCase());
+  const roleSelectValue = matchedRoleOpt ? String(matchedRoleOpt.id) : p.role;
 
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const at = Math.min(page, pages);
@@ -234,13 +211,9 @@ export default function Team() {
     { k: "no role", v: noRole, dot: noRole ? "warn" : "neutral", tone: noRole ? "warn" : "",
       title: "Signed-in and granted nothing — a successful login never implies access" },
     "sep",
-    /* A COUNT, NEVER A GATE. Nothing in the panel blocks on a missing document —
-       a hard gate would stop somebody working on their first day over a scan. */
     { k: "documents short", v: noDocs, dot: noDocs ? "warn" : "neutral", tone: noDocs ? "warn" : "",
       title: "Members missing at least one required document. Nothing blocks on it." },
     "sep",
-    /* "0 roles" over a registry this session was REFUSED is the same lie as an
-       empty list over a failed read — say nothing rather than nothing-exists. */
     { k: "roles", v: rolesDenied ? "—" : roles.length, to: "#/roles",
       title: rolesDenied ? "Reading the role registry needs Roles · View" : "Open Roles" },
   ];
@@ -248,7 +221,7 @@ export default function Team() {
   const addMember = can("team", "create")
     ? (
       <Button color="primary" ico="plus" data-act="tm-new"
-        onClick={() => modal(<MemberNewModal roles={roles} ops={ops} />, "lg")}>
+        onClick={() => modal(<MemberNewModal roles={roles} members={rows} ops={ops} />, "lg")}>
         Add member
       </Button>
     )
@@ -264,14 +237,9 @@ export default function Team() {
           {filtered ? <span>{list.length} shown</span> : null}
         </>}
         actions={tab === "members" ? addMember : null}
-        /* Two collections behind one module: the people, and the people asking
-           to get back in. Same `?tab=` convention the Platform surfaces use. */
         tabs={<Tabs cur={tab} items={[
           { k: "members", label: "Members", n: rows.length, quiet: true, to: tabTo("members") },
           { k: "requests", label: "Access requests", n: waiting, to: tabTo("requests") },
-          /* Same gate as suspend/delete (`team.status`) — the report reads
-             who left the roster while still owning records, which is the same
-             sensitivity as removing them from it. */
           ...(can("team", "status")
             ? [{ k: "orphans", label: "Orphaned records", quiet: true, to: tabTo("orphans") }]
             : []),
@@ -283,22 +251,12 @@ export default function Team() {
           <FilterBar
             search={<SearchField key={"q:" + p.q} ph="Search name, email or username…" val={p.q} onFilter={setSearch} />}
             filters={<>
-              <Select key={"role:" + p.role} name="role" label="Role"
+              <Select key={"role:" + roleSelectValue} name="role" label="Role"
                 options={roles.map((r) => ({ v: String(r.id), l: r.name }))}
-                value={p.role} onFilter={setFilter} />
-              {/* DEPARTMENT IS A FILTER, NOT AN ANSWER. `department` is already a
-                  string on every member, so filtering by it costs nothing. It
-                  does NOT settle what "my JD team" means — if that turns out to
-                  be a second company rather than a department, the roster needs a
-                  tenancy switch and this control is the wrong shape entirely. */}
-              {depts.length ? (
-                <Select key={"dept:" + p.dept} name="dept" label="Department"
-                  options={depts.map((d) => ({ v: d, l: d }))}
-                  value={p.dept} onFilter={setFilter} />
-              ) : null}
+                value={roleSelectValue} onFilter={setFilter} />
             </>}
             chips={filtered
-              ? <FilterChips params={p} labels={CHIP_LABELS} onUnfilter={unfilter} />
+              ? <FilterChips params={{ ...p, role: matchedRoleOpt ? matchedRoleOpt.name : p.role }} labels={CHIP_LABELS} onUnfilter={unfilter} />
               : null}
           />
 
@@ -310,7 +268,7 @@ export default function Team() {
                 <th className="rail" />
                 <th scope="col">Member</th>
                 <th scope="col">Role</th>
-                <th scope="col">Department</th>
+                <th scope="col">Reports To</th>
                 <th scope="col">Documents</th>
                 <th scope="col">Account</th>
                 <th scope="col">Last sign-in</th>
@@ -323,12 +281,9 @@ export default function Team() {
                       <Rail tone={u.roles.length ? undefined : "warn"}
                         title={u.roles.length ? undefined : "Active with no role — can sign in, can do nothing"} />
                       <td className="cell-1">
-                        <Person name={u.name} sub={(u.username || "—") + " · " + u.email} to={to} />
+                        <Person name={u.name} sub={[u.username, u.email].filter(Boolean).join(" · ")} to={to} />
                       </td>
                       <td>
-                        {/* Superuser is not a role, so it is not a role chip —
-                            but it is the loudest thing about an account and it
-                            belongs in the column a reader scans for access. */}
                         <span className="inline-flex flex-wrap items-center gap-1">
                           {u.isSuperAdmin
                             ? <Pill xs tone="brand" text="Full access" title="Superuser — every module, by definition" />
@@ -373,7 +328,7 @@ export default function Team() {
           )}
         </>
       ) : tab === "orphans" ? (
-        <Orphans />
+        <Orphans members={rows} onChanged={ops.refresh} />
       ) : (
         <AccessRequests q={requests} reload={reloadRequests} roles={roles} ops={ops} />
       )}
@@ -383,9 +338,6 @@ export default function Team() {
 
 /* ===================================================== the row's actions === */
 
-/* Locked actions are ABSENT, not greyed — a disabled row action invites a
-   click and a support ticket. Delete goes last and apart: `MoreMenu` pulls a
-   `bad` item under its own separator. */
 function RowMenu({ u, roles, members, ops }: { u: Member; roles: Role[]; members: Member[]; ops: Ops }) {
   const mine = getSession()?.user;
   const isSelf = mine != null && String(mine.id) === String(u.id);
@@ -393,14 +345,11 @@ function RowMenu({ u, roles, members, ops }: { u: Member; roles: Role[]; members
     { icon: "user", label: "Open member", act: () => ops.go("#/team/" + u.id) },
   ];
   if (can("team", "edit"))
-    items.push({ icon: "edit", label: "Edit member", act: () => ops.modal(<MemberEditModal u={u} ops={ops} />) });
+    items.push({ icon: "edit", label: "Edit member", act: () => ops.modal(<MemberEditModal u={u} roles={roles} members={members} ops={ops} />) });
   if (can("team", "roles"))
     items.push({ icon: "shield", label: "Roles", act: () => ops.modal(<MemberRolesModal u={u} roles={roles} ops={ops} />) });
   if (can("team", "edit"))
     items.push({ icon: "lock", label: "Send new password", act: () => ops.modal(<MemberSendCredentialsModal u={u} ops={ops} />) });
-  /* Full access only, and never on yourself or another full-access holder —
-     the server refuses both anyway (view_as_forbidden), this just does not
-     invite the click. */
   if (!!getSession()?.isFullAccess && !isSelf && !isFullAccessMember(u, roles))
     items.push({ icon: "eye", label: "See as this member", act: () => ops.modal(<MemberViewAsModal u={u} ops={ops} />) });
   if (can("team", "status") && !isSelf) {
@@ -416,22 +365,11 @@ function RowMenu({ u, roles, members, ops }: { u: Member; roles: Role[]; members
 
 /* ================================================== two derived columns === */
 
-/** WHO REVIEWS THIS PERSON, one level and never transitive. It is the same
- *  `reportsTo` the leave inbox routes on and the member page derives `senior`
- *  from — a second hierarchy for the word "captain" would give the module two
- *  answers to the same question and they would drift within a month. */
 function ReportsTo({ u }: { u: Member }) {
-  /* No work-settings row: the server leaves `reportsTo` out, which is "not set
-     up" — not "reports to nobody". */
-  if (!("reportsTo" in u)) return <span className="text-quaternary">—</span>;
-  return (
-    <>
-      <span className="font-medium text-primary">{u.roles.map((r) => r.name).join(", ") || u.designation?.label}</span>
-      <span className="block cell-2">
-        {u.reportsTo ? "reports to " + u.reportsTo.name : "reports to nobody"}
-      </span>
-    </>
-  );
+  if (u.reportsTo?.name) {
+    return <span className="font-medium text-primary">{u.reportsTo.name}</span>;
+  }
+  return <span className="text-quaternary">—</span>;
 }
 
 /** MISSING DOCUMENTS, ON THE ROW. This is the whole enforcement: it shows here,

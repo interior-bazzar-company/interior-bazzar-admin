@@ -102,6 +102,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
       meta={totals.data ? <>
         <span><b className="font-medium text-secondary tnum">{c.total.toLocaleString("en-IN")}</b> registered</span>
         <span><b className="font-medium text-secondary tnum">{c.active.toLocaleString("en-IN")}</b> active</span>
+        {narrowed ? <span><b className="font-medium text-secondary tnum">{page.total.toLocaleString("en-IN")}</b> matching filters</span> : null}
         <span>as of {AS_OF}</span>
       </> : totals.error
         ? <span className="text-error-primary">Could not load the user count — {totals.error}</span>

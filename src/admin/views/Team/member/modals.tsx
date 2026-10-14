@@ -51,11 +51,24 @@ function Foot({ label, tone, disabled, onSave, onClose }: {
 
 /* -------------------------------------------------------------- leave --- */
 
+import { can } from "../../../shell/AdminShell";
+import { getSession } from "../../../auth/session";
+import { isHumanEmployee, useMembers } from "../store";
+
 /** The two dates, the kind, and the sentence that says why — and above the
  *  buttons, the one thing that will make this impossible, named before it is
- *  sent rather than after. */
+ *  sent rather than after. Admins can also select any active staff member to
+ *  submit leave on their behalf. */
 export function LeaveRequestModal({ memberId }: { memberId: string }) {
   const shell = useShell();
+  const members = useMembers();
+  const isAdmin = !!getSession()?.isFullAccess || can("attendance", "approve") || can("attendance", "all");
+  const activeMembers = members.filter(isHumanEmployee).filter((m) => m.status === "active");
+  const defaultTarget =
+    activeMembers.some((m) => m.memberId === memberId)
+      ? memberId
+      : (activeMembers[0]?.memberId || memberId);
+  const [targetId, setTargetId] = useState(defaultTarget);
   const [from, setFrom] = useState(addDays(TODAY, 3));
   const [to, setTo] = useState(addDays(TODAY, 3));
   const [kind, setKind] = useState("casual");
@@ -63,14 +76,17 @@ export function LeaveRequestModal({ memberId }: { memberId: string }) {
 
   const backwards = to < from;
   const days = backwards ? 0 : datesIn(from, to).length;
-  const clash = backwards ? { worked: [], taken: [] } : leaveClash(memberId, from, to);
-  const blocked = backwards || !!clash.worked.length || !!clash.taken.length;
+  const clash = backwards ? { worked: [], taken: [] } : leaveClash(targetId, from, to);
+  const blocked = backwards || !!clash.worked.length || !!clash.taken.length || !targetId;
 
   const save = async () => {
-    const r = await requestLeave(memberId, { fromDate: from, toDate: to, kind, reason: why });
+    const onBehalf = targetId !== meId();
+    const r = onBehalf
+      ? await recordLeave(targetId, { fromDate: from, toDate: to, kind, reason: why })
+      : await requestLeave(targetId, { fromDate: from, toDate: to, kind, reason: why });
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
-    shell.toast("Requested. It is with your senior now.");
+    shell.toast(onBehalf ? "Leave recorded for team member." : "Requested. It is with your senior now.");
   };
 
   return (
@@ -81,6 +97,20 @@ export function LeaveRequestModal({ memberId }: { memberId: string }) {
       actions={<Foot label="Send request" disabled={blocked || !why.trim()} onSave={save} onClose={() => shell.closeLayer()} />}
     >
       <FormSection>
+        {isAdmin && activeMembers.length > 0 ? (
+          <FormField id="lvMember" label="Team member" req hint="Select yourself or submit on behalf of a team member.">
+            <SelectInput
+              id="lvMember"
+              value={targetId}
+              onChange={setTargetId}
+              options={activeMembers.map((m) => ({
+                v: m.memberId,
+                l: m.name + (m.memberId === meId() ? " (You)" : m.designation ? " — " + m.designation : ""),
+              }))}
+            />
+          </FormField>
+        ) : null}
+
         <FieldRow>
           <FormField id="lvFrom" label="First day" req>
             <DateInput id="lvFrom" value={from} onChange={setFrom} className="w-full" />
@@ -98,7 +128,7 @@ export function LeaveRequestModal({ memberId }: { memberId: string }) {
               ({ v: k.key, l: labelOf(LEAVE_KIND, k.key) }))} />
         </FormField>
 
-        <FormField id="lvWhy" label="Reason" req hint="Your senior reads this and nothing else.">
+        <FormField id="lvWhy" label="Reason" req hint="Kept on the leave record for review.">
           <Input id="lvWhy" value={why} ph="Family function, out of Delhi" onChange={setWhy} />
         </FormField>
 
@@ -109,7 +139,7 @@ export function LeaveRequestModal({ memberId }: { memberId: string }) {
           </Alert>
         ) : clash.taken.length ? (
           <Alert tone="warn" ico="alert" title={fmtDate(clash.taken[0]) + " is already covered"}>
-            A request of yours already covers it. Edit that one rather than sending a second over the
+            A leave record already covers it. Edit that one rather than sending a second over the
             same day.
           </Alert>
         ) : (

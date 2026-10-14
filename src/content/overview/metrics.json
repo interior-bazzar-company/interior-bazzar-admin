@@ -10,10 +10,10 @@
     },
     "pipeline": {
       "label": "Pipeline value",
-      "what": "The value of the deals opened in the period that are still open now.",
-      "how": "Σ deal value over deals created inside the period whose current stage is not a final one (the server marks Won and Lost final). A deal with no value yet is counted in the number of deals, shown as \"without a value\", and adds nothing to the value.",
+      "what": "The value of all deals that are open right now.",
+      "how": "Σ deal value over all deals whose current stage is not a final one (the server marks Won and Lost final). A deal with no value yet is counted in the number of deals, shown as \"without a value\", and adds nothing to the value.",
       "includes": "Deals this session can see: its own and co-owned deals, or every deal with full access, narrowed by the owner filter. Read from one list of up to 500 deals.",
-      "period": "Created in the selected period, open as of now. Live (today in IST). Not compared."
+      "period": "Open as of now, across all stages except Won and Lost. Live (today in IST). Not compared."
     },
     "won": {
       "label": "Won",
@@ -31,15 +31,15 @@
     },
     "outstanding": {
       "label": "Receivable",
-      "what": "Installment money that falls due in the period and has not arrived.",
-      "how": "Σ installments with status due or failed whose due date is inside the period. The line under it splits them into due and failed.",
-      "includes": "Installments of accepted quotations on deals this session can see. Deal values with no accepted quotation behind them are not receivable yet.",
-      "period": "Due dates inside the selected period, live (today in IST). Not compared."
+      "what": "Active installment money owed right now — due in the next 30 days plus any failed installment.",
+      "how": "Σ installments with status due in the next 30 days (today through today + 30) plus all installments with status failed. The line under it splits them into due and failed.",
+      "includes": "Installments of accepted quotations on deals this session can see (narrowed by the owner filter when set). Deal values with no accepted quotation behind them are not receivable yet.",
+      "period": "Due in the next 30 days plus any failed installment, live (today in IST). Not compared."
     },
     "team": {
       "label": "Today",
       "what": "Who has opened their day, who has not, and who is away.",
-      "how": "Counted by the server. Present: opened a day today, whatever state it is in now. Late: present and marked late. Absent: no day, not on approved leave, and past their auto-close time (never on a Sunday). On leave: no day, and approved leave covers today. Day never closed: a day still open past its auto-close time.",
+      "how": "Counted by the server. Present: opened a day today, whatever state it is in now. Late (of present): present and marked late. Absent: no day, not on approved leave, and past their auto-close time (never on a Sunday). On leave: no day, and approved leave covers today. Past days never closed: a shift left open past its auto-close time.",
       "includes": "The team roster — active admin accounts, superusers left out — narrowed to one role when the Department filter is set.",
       "period": "Today in IST."
     },
@@ -60,9 +60,9 @@
     "health": {
       "label": "Health",
       "what": "Four one-line reads on the parts of the business that fail quietly.",
-      "how": "Pipeline: share of the deals created in the period and still open that are flagged stalled (under 15% ok, under 35% watch, else a problem). Collections: any failed installment is a problem, any installment still due past its due date is a watch. Team: attendance days in the period that were opened and not left unclosed — the share not marked late (85% ok, 65% watch). Delivery: overdue work items as a share of every open one (under 10% ok, under 30% watch).",
+      "how": "Pipeline: share of all currently open deals that are flagged stalled (under 15% ok, under 35% watch, else a problem). Collections: any failed installment is a problem, any installment still due past its due date is a watch. Team: attendance days in the period that were opened and not left unclosed — the share not marked late (85% ok, 65% watch). Delivery: overdue work items as a share of every open one (under 10% ok, under 30% watch).",
       "includes": "One read per area in this session's access. It is not a score and is not averaged. Team and Delivery follow the Department filter.",
-      "period": "Pipeline and Team use the selected period; Collections and Delivery are as of now. All live, today in IST."
+      "period": "Team uses the selected period; Pipeline, Collections and Delivery are as of now. All live, today in IST."
     },
     "dealflow": {
       "label": "Deal flow",
@@ -102,9 +102,9 @@
     "teamtable": {
       "label": "Team performance",
       "what": "One row per member: their deals, what their deals have collected, their tasks and their attendance.",
-      "how": "Deals: open deals they own, plus how many they won in the period. Collected: Σ money collected on deals they own, all time. Tasks: completed in the period (by completion date) / open now / overdue now. On time: days they opened in the period and did not leave unclosed, the share not marked late. Ranked by collected, then completed, then fewest overdue.",
-      "includes": "Active accounts on the team roster, narrowed to one role by the Department filter; the subtitle is the roles they hold. Deals and money come from the Deals API, joined on the owner.",
-      "period": "Tasks completed and attendance use the selected period; deals and open work are as of now. Live, today in IST."
+      "how": "Deals: open deals they own, plus how many they won in the period. Collected: Σ money collected in the period on deals they own. Tasks: completed in the period (by completion date) / open now / overdue now. On time: days they opened in the period and did not leave unclosed, the share not marked late. Ranked by collected, then completed, then fewest overdue.",
+      "includes": "Active accounts on the team roster, narrowed to one role by the Department filter; the subtitle is the roles they hold. Deals and money come from the Deals and Finance APIs, joined on the owner.",
+      "period": "Collected, tasks completed and attendance use the selected period; deals and open work are as of now. Live, today in IST."
     },
     "load": {
       "label": "Load",
@@ -129,8 +129,8 @@
     },
     "payroll": {
       "label": "Payroll owed",
-      "what": "Salary that has been run and not paid.",
-      "how": "The open salary run: Σ net of its slips with no paid date, and how many people those slips are for.",
+      "what": "Salary that has been run and not yet paid, split between pending payout and slips on hold.",
+      "how": "The open salary run: pending slips awaiting payout, held slips, and total unpaid net amount across both.",
       "includes": "Only shown to a session holding Salaries A/C access.",
       "period": "As of now. Live."
     },

@@ -17,6 +17,7 @@
    revoke an unsigned one, and sign one — and signing is the member's own act.
    ============================================================================= */
 import { Alert, Button, ListTable, Notice, Pill, Rail } from "../../../ui";
+import { go } from "../../../ui/nav";
 import { useShell } from "../../../shell/ShellContext";
 import {
   AGREEMENT_KIND, AGREEMENT_STATE, TODAY, agreementsFor, fmtDate, labelOf, readMember,
@@ -56,14 +57,19 @@ export default function AgreementsPage({ m, viewer }: { m: Member; viewer: Viewe
       <OpHead
         title="Agreements"
         desc="Company to member. Sent, opened, signed — and every one of those is a moment on the record."
-        right={viewer === "admin"
-          ? (
-            <Button color="primary" ico="plus"
-              onClick={() => shell.modal(<SendAgreementModal memberId={m.memberId} />)}>
-              Send an agreement
+        right={
+          <>
+            <Button color="secondary" ico="ext" onClick={() => go("#/agreements")}>
+              All agreements
             </Button>
-          )
-          : null} />
+            {viewer === "admin" ? (
+              <Button color="primary" ico="plus"
+                onClick={() => shell.modal(<SendAgreementModal memberId={m.memberId} />)}>
+                Send an agreement
+              </Button>
+            ) : null}
+          </>
+        } />
 
       {unopened.length ? (
         <Alert tone="warn" ico="clock" title={unopened.length + " sent and never opened"}>

@@ -80,11 +80,9 @@ export default function PlanDrawer({ plan, act, go }: { plan: Plan; act: Act; go
             ["On quotations", pl.usage.quotationLines
               ? <>{pl.usage.quotationLines} line{pl.usage.quotationLines === 1 ? "" : "s"}{" "}
                   <span className="text-quaternary">· matched by the title they name</span></>
-              : <span className="text-quaternary">none</span>],
-            ["Members", pl.usage.members
-              ? <>{pl.usage.members} bought{" "}
-                  <span className="text-quaternary">· {pl.usage.membersActive} still active</span></>
-              : <span className="text-quaternary">none</span>]
+              : <span className="text-quaternary">0 lines</span>],
+            ["Subscribers", <>{pl.usage.membersActive} active subscriber{pl.usage.membersActive === 1 ? "" : "s"}{" "}
+              <span className="text-quaternary">· {pl.usage.members} total bought</span></>]
           ]} />
         </section>
 

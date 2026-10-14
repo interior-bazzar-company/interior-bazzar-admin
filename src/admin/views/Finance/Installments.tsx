@@ -212,18 +212,25 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
 
   const today = todayIso().slice(0, 10);
 
-  // Compute metrics across all rows
+  // Compute metrics across all rows using the shared module clock (`today`)
   const stats = useMemo(() => {
     let totalPaise = 0;
+    let cancelledPaise = 0;
     let overduePaise = 0;
     let overdueCount = 0;
+    let failedPaise = 0;
+    let failedCount = 0;
+    let pastDuePaise = 0;
+    let pastDueCount = 0;
     let dueSoonPaise = 0;
     let dueSoonCount = 0;
+    let upcomingPaise = 0;
+    let upcomingCount = 0;
     let paidPaise = 0;
     let paidCount = 0;
 
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+    const baseDate = new Date((today || "2026-10-10") + "T00:00:00Z");
+    const sevenDaysFromNow = new Date(baseDate.getTime() + 7 * 86400000);
     const sevenDaysIso = sevenDaysFromNow.toISOString().slice(0, 10);
 
     for (const r of rows) {
@@ -236,27 +243,47 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
       if (isPaid) {
         paidPaise += amt;
         paidCount++;
-      } else if (!isCancelled) {
-        const isOverdue = r.dueDate < today || statusKey === "failed";
+      } else if (isCancelled) {
+        cancelledPaise += amt;
+      } else {
+        const isFailed = statusKey === "failed";
+        const isOverdue = r.dueDate < today || isFailed;
+        if (isFailed) {
+          failedPaise += amt;
+          failedCount++;
+        } else if (r.dueDate < today) {
+          pastDuePaise += amt;
+          pastDueCount++;
+        }
         if (isOverdue) {
           overduePaise += amt;
           overdueCount++;
-        } else if (r.dueDate >= today && r.dueDate <= sevenDaysIso) {
-          dueSoonPaise += amt;
-          dueSoonCount++;
+        } else {
+          upcomingPaise += amt;
+          upcomingCount++;
+          if (r.dueDate >= today && r.dueDate <= sevenDaysIso) {
+            dueSoonPaise += amt;
+            dueSoonCount++;
+          }
         }
       }
     }
 
-    const outstandingPaise = totalPaise - paidPaise;
+    const outstandingPaise = totalPaise - paidPaise - cancelledPaise;
 
     return {
       totalPaise,
       outstandingPaise,
       overduePaise,
       overdueCount,
+      failedPaise,
+      failedCount,
+      pastDuePaise,
+      pastDueCount,
       dueSoonPaise,
       dueSoonCount,
+      upcomingPaise,
+      upcomingCount,
       paidPaise,
       paidCount,
       totalCount: rows.length,
@@ -271,10 +298,11 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
     if (p.flag === "overdue") {
       list = list.filter((r) => (r.status?.key !== "paid" && r.status?.key !== "cancelled" && r.dueDate < today) || r.status?.key === "failed");
     } else if (p.flag === "due_soon") {
-      const sevenDays = new Date();
-      sevenDays.setDate(sevenDays.getDate() + 7);
-      const sevenDaysIso = sevenDays.toISOString().slice(0, 10);
+      const baseDate = new Date((today || "2026-10-10") + "T00:00:00Z");
+      const sevenDaysIso = new Date(baseDate.getTime() + 7 * 86400000).toISOString().slice(0, 10);
       list = list.filter((r) => r.status?.key === "due" && r.dueDate >= today && r.dueDate <= sevenDaysIso);
+    } else if (p.flag === "upcoming") {
+      list = list.filter((r) => r.status?.key === "due" && r.dueDate >= today);
     } else if (p.flag === "paid" || p.status === "paid") {
       list = list.filter((r) => r.status?.key === "paid");
     } else if (p.status) {
@@ -304,6 +332,11 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
 
     return list;
   }, [rows, p, today]);
+
+  const filteredPaise = useMemo(
+    () => filteredRows.reduce((acc, r) => acc + (r.amountPaise || 0), 0),
+    [filteredRows]
+  );
 
   // Pagination
   const page = Math.max(1, Number(p.page) || 1);
@@ -386,7 +419,7 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
       v: stats.totalCount,
       on: !p.flag && !p.status,
       to: "#/finance-installments",
-      tip: <>Every installment recorded across all deals ({inr(stats.totalPaise)} grand total).</>,
+      tip: <>Every installment recorded across active deals ({inr(stats.totalPaise)} grand total · {inr(stats.outstandingPaise)} outstanding).</>,
     },
     "sep",
     {
@@ -399,19 +432,31 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
       dot: stats.overdueCount > 0 ? "warn" : undefined,
       on: p.flag === "overdue",
       to: "#/finance-installments?flag=overdue",
-      tip: <>Unpaid installments past their due date requiring sales follow-up.</>,
+      tip: <>Unpaid installments past their due date: {stats.pastDueCount} scheduled past due ({inr(stats.pastDuePaise)}) + {stats.failedCount} marked failed ({inr(stats.failedPaise)}).</>,
     },
     {
       k: (
         <>
-          Due Next 7 Days <b className="tnum">{inr(stats.dueSoonPaise)}</b>
+          Fail to Pay <b className="tnum text-error-primary">{inr(stats.failedPaise)}</b>
         </>
       ),
-      v: stats.dueSoonCount,
-      dot: stats.dueSoonCount > 0 ? "info" : undefined,
-      on: p.flag === "due_soon",
-      to: "#/finance-installments?flag=due_soon",
-      tip: <>Upcoming installments due in the next 7 days.</>,
+      v: stats.failedCount,
+      dot: stats.failedCount > 0 ? "bad" : undefined,
+      on: p.status === "failed",
+      to: "#/finance-installments?status=failed",
+      tip: <>Installments explicitly recorded as failed or declined ({inr(stats.failedPaise)}).</>,
+    },
+    {
+      k: (
+        <>
+          Upcoming (30d) <b className="tnum">{inr(stats.upcomingPaise)}</b>
+        </>
+      ),
+      v: stats.upcomingCount,
+      dot: stats.upcomingCount > 0 ? "info" : undefined,
+      on: p.flag === "upcoming" || p.flag === "due_soon",
+      to: "#/finance-installments?flag=upcoming",
+      tip: <>Upcoming scheduled installments on or after {today} ({stats.dueSoonCount} due in next 7 days · {inr(stats.dueSoonPaise)}).</>,
     },
     "sep",
     {
@@ -441,10 +486,16 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
     />
   );
 
+  const isFiltered = filteredRows.length !== rows.length;
+
   return (
     <Frame
       title="Receivables & Overdue Installments"
-      meta={`${filteredRows.length} installment${filteredRows.length === 1 ? "" : "s"} · ${inr(stats.outstandingPaise)} total outstanding`}
+      meta={
+        isFiltered
+          ? `${filteredRows.length} of ${rows.length} installments · ${inr(filteredPaise)} shown (${inr(stats.outstandingPaise)} total outstanding)`
+          : `${rows.length} installment${rows.length === 1 ? "" : "s"} · ${inr(stats.outstandingPaise)} total outstanding`
+      }
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -622,6 +673,8 @@ export default function Installments({ p, onFilter, onSearch, onUnfilter, onPara
                       <td className="px-4 py-3">
                         {isPaid ? (
                           <Pill tone="ok" dot text="Paid" />
+                        ) : statusKey === "failed" ? (
+                          <Pill tone="bad" dot text="Failed" />
                         ) : isOverdue ? (
                           <Pill tone="warn" dot text="Overdue" />
                         ) : statusKey === "cancelled" ? (

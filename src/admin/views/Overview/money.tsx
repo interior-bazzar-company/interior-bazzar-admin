@@ -22,8 +22,6 @@ import { Retry } from "./top";
 
 /** Lakh to two places for the axis; the exact figure rides as `display`. */
 const lakh = (paise: number) => Math.round(paise / 100000) / 100;
-/** Thousands of rupees for an axis. The exact figure rides in the tooltip. */
-const thousands = (paise: number) => Math.round(paise / 100000);
 
 const MONEY: Series[] = [
   { key: "in", label: "In", slot: 1 },
@@ -75,7 +73,7 @@ export function Finance({ d }: { d: OverviewData }) {
   }
   const inNow = f.cur.collectedPaise + f.cur.otherInPaise;
   const inPrev = f.prev.collectedPaise + f.prev.otherInPaise;
-  const money: ColumnPoint[] = f.flow.map((x) => ({ key: x.key, label: x.label, values: { in: thousands(x.collected), out: thousands(x.out) } }));
+  const money: ColumnPoint[] = f.flow.map((x) => ({ key: x.key, label: x.label, values: { in: lakh(x.collected), out: lakh(x.out) } }));
   const anyMoney = money.some((p) => p.values.in || p.values.out);
   const net: SignedPoint[] = f.months.map((m) => ({ key: m.month, label: shortMonth(m.month), value: lakh(m.netPaise), display: inr(m.netPaise) }));
   /* ONE DENIAL DOES NOT KILL THE TILE (d5). Each figure is drawn only when the
@@ -106,7 +104,7 @@ export function Finance({ d }: { d: OverviewData }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tile("Net", "net", MONEY_SOURCES, () => (
           <Kpi k="Net" tip="net" v={<Money paise={f.cur.netPaise} />} tone={f.cur.netPaise < 0 ? "bad" : undefined}
-            s={f.cur.salaryN ? undefined : "no salary run paid into this period"}
+            s={f.cur.salaryPaise ? undefined : "no salary paid into this period"}
             now={f.cur.netPaise} before={f.prev.netPaise} of={of} to="#/finance-analytics" />
         ))}
         {tile("In", "collected", ["ledger", "plans", "income", "refunds"], () => (
@@ -145,7 +143,7 @@ export function Finance({ d }: { d: OverviewData }) {
             : moneyGap === "error"
             ? <Empty title="Money in and out did not load." why={<Retry onPress={d.retryFinance} />} />
             : anyMoney
-            ? <ColumnChart series={MONEY} points={money} labelSeries="in" unit="₹ thousand · in is collections plus other income, out is salaries, spend and refunds" />
+            ? <ColumnChart series={MONEY} points={money} labelSeries="in" unit="₹ lakh · in is collections plus other income, out is salaries, spend and refunds" />
             : <Empty title="No money moved in this period." why="Nothing was collected or paid out between these dates on the Finance clock." />}
         </ChartFrame>
         <ChartFrame
@@ -177,7 +175,12 @@ export function Finance({ d }: { d: OverviewData }) {
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="label-mono inline-flex items-center gap-1.5">Payroll<Tip k="payroll" /></span>
               {d.payLive.openRun
-                ? <span className="text-sm text-secondary">Run <b className="font-mono font-medium text-primary tnum">{d.payLive.openRun}</b> open · {d.payLive.people ? d.payLive.people + " unpaid · " : ""}<Money paise={d.payLive.owedPaise} /> owed</span>
+                ? <span className="text-sm text-secondary">
+                    Run <b className="font-mono font-medium text-primary tnum">{d.payLive.openRun}</b> open
+                    {d.payLive.pendingPeople ? <> · {d.payLive.pendingPeople} pending (<Money paise={d.payLive.pendingPaise} />)</> : null}
+                    {d.payLive.heldPeople ? <> · {d.payLive.heldPeople} on hold (<Money paise={d.payLive.heldPaise} />)</> : null}
+                    {" · "}<Money paise={d.payLive.owedPaise} /> total unpaid
+                  </span>
                 : <span className="text-sm text-success-primary">No run open · nothing owed</span>}
               <span className="ml-auto"><Go to="#/finance-salaries">Salaries</Go></span>
             </span>

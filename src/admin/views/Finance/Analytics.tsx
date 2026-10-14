@@ -36,7 +36,7 @@
    ONE CLOCK. `PERIOD` and `ago()` read the store's clock: the server's once
    read, the browser's until then.
    ============================================================================= */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useShell } from "../../shell/ShellContext";
 import {
   ActivityFeed, Card, ChartFrame, Icon, ListTable, Meter, Rail, SelectInput, Table, Tiles,
@@ -52,7 +52,7 @@ import type { BarRow, SignedPoint, WaterStep } from "../charts";
 import {
   PERIOD, accountOf, ago, delta, eventMeta, fmtDate, fmtMonth, fmtMonthLong, inr, kpiSeries, pct, periodOf, todayIso,
   useActivity, useAtRisk, useKpis, useMonthPoints, useOverview,
-  useReconciliation, useTagTotals, useTaxSummary, useWaterfall,
+  useReconciliation, useStatements, useTagTotals, useTaxSummary, useWaterfall,
 } from "./store";
 import type { Kpi } from "./store";
 
@@ -174,26 +174,23 @@ function Overview({ month }: { month?: string }) {
   const risk = useAtRisk(month);
   const months = useMonthPoints();
   const tags = useTagTotals(month);
-  const recon = useReconciliation();
-  /* THE SAME SCOPE ON BOTH SIDES. This is ONE statement's share, printed over
-     that statement's line count; the aggregate figure the server keeps over
-     every statement answers a different question and sat here reading as a
-     contradiction ("33.3%" above "0 of 1 lines"). */
+  const stmts = useStatements();
+  const [stmtId, setStmtId] = useState<string>("");
+  const recon = useReconciliation(stmtId || undefined);
   const matched = recon.matchedPct;
   const tax = useTaxSummary();
   const activity = useActivity(8);
+  const multiOpen = !stmtId && recon.openStmts.length > 1;
 
   const wf: WaterStep[] = steps.map((s) => ({
     key: s.key, label: s.label, sub: s.sub, kind: s.kind,
-    value: thousands(s.paise), display: inr(s.paise),
+    value: lakh(s.paise), display: inr(s.paise),
   }));
 
   const net: SignedPoint[] = months.map((m) => ({
-    key: m.month, label: fmtMonth(m.month).slice(0, 1),
+    key: m.month, label: fmtMonth(m.month).slice(0, 3),
     value: lakh(m.netPaise), display: inr(m.netPaise),
   }));
-  /* The year bands under the axis, sized by how many months each holds, so a
-     twenty-column strip of single letters still says which year it is in. */
   const years: { label: string; n: number }[] = [];
   months.forEach((m) => {
     const y = m.month.slice(0, 4);
@@ -201,45 +198,50 @@ function Overview({ month }: { month?: string }) {
     if (last && last.label === y) last.n += 1; else years.push({ label: y, n: 1 });
   });
 
-  /* Zero-spend tags are dropped rather than drawn as empty tracks. A tag with
-     nothing against it this month is not a small bar, it is not a bar.
-
-     EXCLUDED TAGS ARE DROPPED TOO -- tax and statutory money is counted apart
-     from spend on every other figure in this module, and drawing it as a bar
-     under a total that does not contain it is how the same month came to have
-     two different "spend" numbers on one screen. Transactions shows it on its
-     own `Excluded spend` cell. */
   const spendRows: BarRow[] = tags.rows
     .filter((r) => r.spentPaise > 0 && r.tag.kind !== "excluded")
     .map((r) => ({
       key: r.tag.tagKey,
       label: <TagChip k={r.tag.tagKey} />,
       value: Math.round(r.spentPaise / 100),
+      display: inr(r.spentPaise),
       hint: r.pctOfBudget === null
         ? <>{r.n} payment{r.n === 1 ? "" : "s"}</>
         : <span className={r.overBudget ? "text-error-primary" : undefined}>{r.pctOfBudget}% of budget</span>,
-      /* The hover line is a description too, and it was a sentence. Four facts,
-         separated, is what a tooltip is for. */
       title: inr(r.spentPaise) + " · " + r.n + " payment" + (r.n === 1 ? "" : "s")
         + " · " + r.tag.kind + (r.overBudget ? " · over budget" : ""),
     }));
 
+  const stmtOptions = useMemo(() => {
+    const open = stmts.filter((s) => !s.closed);
+    const opts: { v: string; l: string }[] = [];
+    if (open.length > 1) {
+      opts.push({ v: "", l: "All open statements (" + open.length + ")" });
+    }
+    stmts.forEach((s) => {
+      const acc = accountOf(s.accountId)?.name || s.accountId;
+      opts.push({
+        v: s.stmtId,
+        l: s.stmtId + " · " + acc + (s.closed ? " (closed)" : " (open)"),
+      });
+    });
+    return opts;
+  }, [stmts]);
+
   return (
     <div className="flex min-w-0 flex-col gap-5">
-      {/* ================================================== the arithmetic ===
-          THE FOUR FIGURES THE WATERFALL DRAWS, as tiles above it. They stood in
-          a tall panel BESIDE the chart, which meant a 90px card stretched to a
-          400px chart's height with nothing in the gap — and the reading order
-          was sideways where every other page in the panel reads down. */}
       <Tiles cols={4} list={[
         { k: <>Net · {curPeriod.label}<MetricTip k="net" /></>,
           v: inr(o.netPaise), tone: o.netPaise >= 0 ? "ok" : "bad", s: "cash, not profit",
           foot: <span className="label-mono">as of {fmtDate(todayIso())}</span> },
-        { k: "Collected", v: inr(o.collectedPaise),
-          s: o.collectedN + " installment" + (o.collectedN === 1 ? "" : "s") + " settled" },
-        { k: "Other income", v: inr(o.otherInPaise),
+        { k: "Collected · " + curPeriod.label, v: inr(o.collectedPaise),
+          s: o.collectedN + " installment" + (o.collectedN === 1 ? "" : "s") + " settled in " + curPeriod.label },
+        { k: "Other income · " + curPeriod.label, v: inr(o.otherInPaise),
           s: o.otherInN + " credit" + (o.otherInN === 1 ? "" : "s") + " · never revenue" },
-        { k: "Out", v: inr(o.outPaise), s: "salary, other spend and refunds together" },
+        { k: "Out · " + curPeriod.label, v: inr(o.outPaise),
+          s: (o.salaryN ? inr(o.salaryPaise) + " salary (" + o.salaryN + " slips) · " : "")
+            + inr(o.otherOutPaise) + " spend"
+            + (o.refundsPaidPaise ? " · " + inr(o.refundsPaidPaise) + " refunds" : "") },
       ]} />
 
       <ChartFrame title={"Where " + curPeriod.label + " went"}
@@ -250,7 +252,7 @@ function Overview({ month }: { month?: string }) {
             figures above.
           </span>
         )}>
-        <Waterfall steps={wf} unit="₹ thousand" />
+        <Waterfall steps={wf} unit="₹ lakh" />
       </ChartFrame>
 
       {/* ==================================================== net by month === */}
@@ -274,10 +276,6 @@ function Overview({ month }: { month?: string }) {
                 why="An empty list is a month with no outgoing transaction, not a missing figure." />}
         </ChartFrame>
 
-        {/* NO FOOTER SAYING THESE ARE NEVER ADDED. The table has no total row, the
-            rails are four different colours and the neutral one is on the row that
-            is not a problem — the form already refuses the sum a sentence was
-            asking the reader not to make. */}
         <Card flush title="Not where it should be" sub="never added together">
           <Table list
             cols={[
@@ -309,11 +307,24 @@ function Overview({ month }: { month?: string }) {
       <Card
         title="Matched to bank"
         sub="completeness, never correctness"
-        right={recon.stmt
-          ? <span className="label-mono">
-              {recon.stmt.closed ? "window closed" : "window open"} · {recon.stmt.stmtId}
-            </span>
-          : null}
+        right={recon.stmt ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {stmtOptions.length > 1 ? (
+              <div className="w-64">
+                <SelectInput
+                  ariaLabel="Select Bank Statement"
+                  value={stmtId}
+                  onChange={setStmtId}
+                  options={stmtOptions}
+                />
+              </div>
+            ) : (
+              <span className="label-mono">
+                {recon.stmt.closed ? "window closed" : "window open"} · {recon.stmt.stmtId}
+              </span>
+            )}
+          </div>
+        ) : null}
         foot={<Assumed id="FN-OD-02" />}>
         {recon.stmt ? (
           <div className="flex min-w-0 flex-col gap-4">
@@ -322,28 +333,47 @@ function Overview({ month }: { month?: string }) {
                 <div className="text-display-xs font-semibold tracking-tight text-primary tnum">
                   {matched === null ? "—" : pct(matched)}
                 </div>
-                <div className="label-mono mt-0.5">{recon.matchedN} of {recon.lines.length} lines</div>
+                <div className="label-mono mt-0.5">
+                  {recon.matchedN} of {recon.lines.length} lines
+                  {recon.resolvedN ? " · " + recon.resolvedN + " resolved" : ""}
+                  {multiOpen ? " · " + recon.openStmts.length + " open statements" : ""}
+                </div>
               </div>
               <div className="min-w-0">
                 <Meter value={matched === null ? 0 : matched} tone={recon.bankOnly.length ? "warn" : "ok"}
                   label="Share of bank lines matched to a record" />
                 <div className="mt-1.5 flex flex-wrap justify-between gap-x-4 text-xs">
-                  <span className="text-tertiary">matched to a record</span>
+                  <span className="text-tertiary">
+                    {recon.matchedN} matched to a record{recon.resolvedN ? " · " + recon.resolvedN + " resolved" : ""}
+                  </span>
                   <span className={recon.bankOnly.length ? "text-error-primary" : "text-quaternary"}>
                     {recon.bankOnly.length
-                      ? recon.bankOnly.length + " unexplained · this period cannot be closed yet"
+                      ? recon.bankOnly.length + " unexplained (net " + inr(recon.variancePaise) + ") · this period cannot be closed yet"
                       : "every line ties to a record"}
                   </span>
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="label-mono">Account</div>
-                <div className="text-sm font-medium text-primary">
-                  {accountOf(recon.stmt.accountId)?.name || recon.stmt.accountId}
-                </div>
-                <div className="font-mono text-xs text-tertiary tnum">
-                  {accountOf(recon.stmt.accountId)?.masked || "—"}
-                </div>
+                <div className="label-mono">{multiOpen ? "Open statements" : "Account"}</div>
+                {multiOpen ? (
+                  <>
+                    <div className="text-sm font-medium text-primary">
+                      {recon.openStmts.map((s) => accountOf(s.accountId)?.name || s.accountId).join(" + ")}
+                    </div>
+                    <div className="font-mono text-xs text-tertiary tnum">
+                      {recon.openStmts.map((s) => s.stmtId).join(" · ")}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm font-medium text-primary">
+                      {accountOf(recon.stmt.accountId)?.name || recon.stmt.accountId}
+                    </div>
+                    <div className="font-mono text-xs text-tertiary tnum">
+                      {accountOf(recon.stmt.accountId)?.masked || "—"}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -351,6 +381,7 @@ function Overview({ month }: { month?: string }) {
               <ListTable min="52rem" head={<tr>
                 <th className="rail" />
                 <th scope="col">Date</th>
+                {multiOpen ? <th scope="col">Statement</th> : null}
                 <th scope="col">Direction</th>
                 <th scope="col" className="n">Amount</th>
                 <th scope="col">Reference</th>
@@ -360,6 +391,12 @@ function Overview({ month }: { month?: string }) {
                   <tr key={b.line.lineId}>
                     <Rail tone="bad" />
                     <td className="whitespace-nowrap">{fmtDate(b.line.date)}</td>
+                    {multiOpen ? (
+                      <td className="whitespace-nowrap">
+                        <div className="cell-1">{accountOf(b.line.accountId || "")?.name || b.line.accountId}</div>
+                        <div className="cell-2 font-mono">{b.line.stmtId}</div>
+                      </td>
+                    ) : null}
                     <td><Dir d={b.line.dir === "credit" ? "in" : "out"} /></td>
                     <td className="n"><Money paise={b.line.amountPaise} /></td>
                     <td className="mono">{b.line.reference}</td>

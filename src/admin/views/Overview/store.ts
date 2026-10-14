@@ -29,8 +29,8 @@ import { getSession, wideScope } from "../../auth/session";
 import { fmtDate } from "../../ui/format";
 import { attentionItems, dealMetrics, periodFor, planningSignals, todayLocal } from "./derive";
 import {
-  attentionTeam, liveHealth, liveMoney, liveTeam, liveTeamRows, useAttentionLive, useLive, useOperationsLive,
-  useSignalsLive,
+  attentionTeam, isSystemOrBotRole, isSystemOrBotUser, liveHealth, liveMoney, liveTeam, liveTeamRows,
+  matchesOwner, useAttentionLive, useLive, useOperationsLive, useSignalsLive, within, ymd,
 } from "./live";
 import type { LiveMoney, LiveState, LiveTeamTable, OpsState } from "./live";
 import type { OverviewOperations } from "../../../api/modules/adminOps";
@@ -117,10 +117,17 @@ function useDepartments(enabled: boolean): Departments {
     Promise.all([rolesPromise, usersPromise])
       .then(([roles, users]) => {
         if (!live) return;
+        const cleanUsers = (users || []).filter((u) => !isSystemOrBotUser(u));
         const rolesOf = new Map<string, string[]>();
-        users.forEach((u) => rolesOf.set(String(u.id), (u.roles || []).map((r) => r.name)));
-        const names = roles.roles.map((r) => r.name).sort((a, b) => a.localeCompare(b));
-        setD({ names, rolesOf, people: users, state: "ready" });
+        cleanUsers.forEach((u) => {
+          const rNames = (u.roles || []).map((r) => r.name).filter((n) => !isSystemOrBotRole(n));
+          rolesOf.set(String(u.id), rNames);
+        });
+        const names = (roles.roles || [])
+          .map((r) => r.name)
+          .filter((n) => !isSystemOrBotRole(n))
+          .sort((a, b) => a.localeCompare(b));
+        setD({ names, rolesOf, people: cleanUsers, state: "ready" });
       })
       /* A refusal (no roles.view) and a failed request land here alike: no
          options, and the control says it could not load rather than showing
@@ -203,24 +210,65 @@ export function useOverview(p: Params): OverviewData {
   const sig = useSignalsLive(p.dept || undefined);
 
   const dealsReady = gates.deals && !api.loading && !api.error && !api.forbidden;
+  const ownerRef = useMemo(() => {
+    if (!p.owner) return undefined;
+    const fromDeals = api.owners.find((o) => String(o.id) === p.owner || o.name === p.owner);
+    if (fromDeals) return fromDeals;
+    const fromTeam = dept.people.find((u) => String(u.id) === p.owner || u.name === p.owner || u.username === p.owner);
+    return fromTeam ? { id: fromTeam.id, name: fromTeam.name || fromTeam.username } : undefined;
+  }, [p.owner, api.owners, dept.people]);
+  const ownerName = ownerRef ? ownerRef.name : p.owner;
+  const dealList = useMemo(() => {
+    const list = api.list as DealRec[];
+    if (!p.owner) return list;
+    const matched = list.filter((d) => d.owner_id === ownerName || d.owner_id === p.owner);
+    return matched.length || !/^\d+$/.test(p.owner) ? matched : list;
+  }, [api.list, p.owner, ownerName]);
+  const ownerDealIds = useMemo(() => {
+    if (!p.owner) return undefined;
+    const ids = new Set<string>();
+    dealList.forEach((d) => {
+      if (d.deal_id) ids.add(String(d.deal_id));
+      const rawId = (d as unknown as { id?: string | number }).id;
+      if (rawId !== undefined && rawId !== null) ids.add(String(rawId));
+    });
+    return ids;
+  }, [p.owner, dealList]);
   const deals = useMemo(
-    () => (dealsReady ? dealMetrics(api.list as DealRec[], periods.deals, ck.deals.today, api.stages) : null),
-    [dealsReady, api.list, api.stages, periods.deals, ck]);
+    () => (dealsReady ? dealMetrics(dealList, periods.deals, ck.deals.today, api.stages) : null),
+    [dealsReady, dealList, api.stages, periods.deals, ck]);
 
   /* Deal owner → team member. The API names the owner and gives the id on the
      owners vocabulary; the Team store keys a member by the same id once the
-     roster is adopted, and by name before it. Both keys go in the map. */
+     roster is adopted, and by name before it. Both keys go in the map.
+     Collected is period-scoped from the deal-payment ledger (live.raw.ledger)
+     so the Team table and the Executive snapshot agree on the selected window. */
   const owners = useMemo(() => {
     const m = new Map<string, OwnerStat>();
     if (!deals) return m;
+    const periodPayments = live.money === "ready"
+      ? live.raw.ledger.filter((x) => x.type === "payment" && !x.reversed && within(ymd(x.paymentDate), periods.money.from, periods.money.to))
+      : null;
     deals.byOwner.forEach((o) => {
-      const stat = { open: o.open, won: o.won, value: o.value, collected: o.collected };
+      const ref = api.owners.find((x) => x.name === o.name)
+        || dept.people.find((u) => (u.name || u.username) === o.name);
+      const refId = ref ? String(ref.id) : undefined;
+      let collected = o.collected;
+      if (periodPayments) {
+        const dealIds = new Set<string>();
+        dealList.forEach((d) => {
+          if (d.owner_id === o.name && d.deal_id) dealIds.add(String(d.deal_id));
+        });
+        collected = periodPayments
+          .filter((x) => matchesOwner(x, refId || o.name, o.name, dealIds))
+          .reduce((a, x) => a + x.amountPaise, 0);
+      }
+      const stat = { open: o.open, won: o.won, value: o.value, collected };
       m.set(o.name, stat);
-      const ref = api.owners.find((x) => x.name === o.name);
-      if (ref) m.set(String(ref.id), stat);
+      if (refId) m.set(refId, stat);
     });
     return m;
-  }, [deals, api.owners]);
+  }, [deals, api.owners, dept.people, dealList, live.money, live.raw.ledger, periods.money.from, periods.money.to]);
 
   const finLive = useMemo(
     () => (finance.state === "ready"
@@ -233,9 +281,10 @@ export function useOverview(p: Params): OverviewData {
     () => (finance.state === "ready" && gates.payroll ? livePayroll(finance.raw) : null),
     [finance.state, finance.raw, gates.payroll]);
 
+  const moneyState: LiveState = p.owner && gates.deals && api.loading ? "loading" : live.money;
   const money = useMemo(
-    () => (live.money === "ready" ? liveMoney(live.raw, periods.money) : null),
-    [live.money, live.raw, periods.money]);
+    () => (moneyState === "ready" ? liveMoney(live.raw, periods.money, p.owner, ownerDealIds, ownerName) : null),
+    [moneyState, live.raw, periods.money, p.owner, ownerDealIds, ownerName]);
   const teamLive = useMemo(
     () => (live.team === "ready" ? liveTeam(live.raw, p.dept || undefined, dept.rolesOf) : null),
     [live.team, live.raw, p.dept, dept.rolesOf]);
@@ -245,8 +294,8 @@ export function useOverview(p: Params): OverviewData {
       : null),
     [live.team, live.raw, dept.state, dept.people, p.dept, dept.rolesOf, owners, ck]);
   const health = useMemo(
-    () => liveHealth(deals, money, live.money, teamLive, live.team),
-    [deals, money, live.money, teamLive, live.team]);
+    () => liveHealth(deals, money, moneyState, teamLive, live.team),
+    [deals, money, moneyState, teamLive, live.team]);
   /* NEEDS ATTENTION ON THE BACKEND, ON THE REAL CLOCK (d6). Deals as before;
      finance and payroll are the Finance section's own reads (d5); the team
      rows are the Team table's reads plus today's plans, reports, days, leave
@@ -324,7 +373,7 @@ export function useOverview(p: Params): OverviewData {
     ops: ops.data, opsState: ops.state, retryOps: ops.retry,
     /* BOTH READS, because the section waits on both. `retryLive` is the Team
        section's and the two money tiles' one button. */
-    money, moneyState: live.money, retryLive: () => { live.retry(); dept.retry(); },
+    money, moneyState, retryLive: () => { live.retry(); dept.retry(); },
     intake: gates.enquiries ? intake : null,
     health, attention, attentionState, signals, signalWaits,
     retryAttention: () => { refetchDeals(); live.retry(); dept.retry(); finance.retry(); attnLive.retry(); },

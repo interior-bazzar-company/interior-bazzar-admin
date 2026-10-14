@@ -37,7 +37,7 @@ import { ChartFrame, SelectInput, Tiles } from "../../ui";
 import type { TileProps } from "../../ui";
 import { Unavailable } from "./bits";
 import InfoTip, { PayrollMetricTip } from "./InfoTip";
-import { ColumnChart } from "../charts";
+import { BarRows, ColumnChart } from "../charts";
 import type { Series } from "../charts";
 import { inr, pct } from "./store";
 import type { Params } from "./store";
@@ -51,7 +51,7 @@ import type { PayrollYear } from "./payrollYear";
    an axis fed integer paise would read 5,78,20,000. This converts FOR THE MARKS
    ONLY — no rupee figure on this page comes from it. The y-axis gutter is 38px
    and a tick reading 6,00,000 does not fit in it; every caption says so. */
-const thousands = (paise: number) => Math.round(paise / 100000);
+const lakh = (paise: number) => Math.round(paise / 100000) / 100;
 
 /* Fixed slot order, assigned once and never cycled, so a colour means one thing
    across all three charts: slot 1 is money committed or gone, slot 2 is money
@@ -59,10 +59,6 @@ const thousands = (paise: number) => Math.round(paise / 100000);
 const FLOW: Series[] = [
   { key: "paid", label: "Paid out", slot: 1 },
   { key: "unpaid", label: "Not yet paid", slot: 2 },
-];
-const MIX: Series[] = [
-  { key: "fixed", label: "Base salary", slot: 1 },
-  { key: "incentive", label: "Incentive", slot: 2 },
 ];
 
 /* ============================================================== pieces === */
@@ -224,33 +220,64 @@ function Chart({ year, by, onPick }: {
   const people = useEmployeeTotals(year);
 
   const isMonth = by === "month";
-  const series = isMonth ? FLOW : MIX;
 
-  const points = isMonth
-    ? y.months.map((m) => ({
-      key: m.month,
-      label: m.label,
-      values: {
-        paid: thousands(m.paidPaise),
-        unpaid: thousands(m.unpaidPaise + m.heldPaise),
-      },
+  const monthPoints = y.months.map((m) => ({
+    key: m.month,
+    label: m.label,
+    values: {
+      paid: lakh(m.paidPaise),
+      unpaid: lakh(m.unpaidPaise + m.heldPaise),
+    },
+  }));
+
+  const barRows = by === "department"
+    ? dept.map((r) => ({
+      key: r.department,
+      label: (
+        <span>
+          {r.department}{" "}
+          <span className="font-normal text-tertiary">
+            · {r.people} {r.people === 1 ? "member" : "members"}
+          </span>
+        </span>
+      ),
+      value: Math.round((r.fixedPaise + r.incentivePaise) / 100),
+      display: inr(r.fixedPaise + r.incentivePaise),
+      slot: (r.incentivePaise > 0 ? 2 : 1) as 1 | 2,
+      hint: (
+        <span className="tnum">
+          Base {inr(r.fixedPaise)}
+          {r.incentivePaise > 0 ? ` + Incentive ${inr(r.incentivePaise)}` : ""}
+          {` · Net paid ${inr(r.paidPaise)} (${r.slips} ${r.slips === 1 ? "slip" : "slips"})`}
+        </span>
+      ),
     }))
-    : by === "department"
-      ? dept.map((r) => ({
-        key: r.department,
-        label: r.department,
-        values: { fixed: thousands(r.fixedPaise), incentive: thousands(r.incentivePaise) },
-      }))
-      : people.map((r) => ({
-        key: r.salaryAccountId,
-        label: r.shortName,
-        values: { fixed: thousands(r.fixedPaise), incentive: thousands(r.incentivePaise) },
-      }));
+    : people.map((r) => ({
+      key: r.salaryAccountId,
+      label: (
+        <span>
+          {r.name}{" "}
+          <span className="font-normal text-tertiary">· {r.department}</span>
+        </span>
+      ),
+      value: Math.round(r.grossPaise / 100),
+      display: inr(r.grossPaise),
+      slot: (r.incentivePaise > 0 ? 2 : 1) as 1 | 2,
+      hint: (
+        <span className="tnum">
+          Base {inr(r.fixedPaise)}
+          {r.incentivePaise > 0
+            ? ` + Incentive ${inr(r.incentivePaise)} (${r.incentiveSharePct ?? 0}%)`
+            : ""}
+          {` · ${r.slips} ${r.slips === 1 ? "slip" : "slips"}`}
+        </span>
+      ),
+    }));
 
   /* Empty for a real reason, and the reason differs by grouping. */
   const empty = isMonth
     ? !y.months.some((m) => m.hasRun)
-    : points.length === 0;
+    : barRows.length === 0;
 
   /* THE CAUTIONS THAT WERE A CARD FOOTER, behind the i on the title instead.
      They are real rules and none of them was dropped — but a paragraph under a
@@ -260,7 +287,7 @@ function Chart({ year, by, onPick }: {
     <InfoTip label={"the " + by + " view"}
       intro={isMonth
         ? <>Net <b>paid</b> against net <b>not yet paid</b>, per month.</>
-        : <>Gross <b>base salary</b> against <b>incentive</b> earned, before deductions.</>}
+        : <>Gross <b>base salary</b> plus <b>incentive</b> earned, before deductions.</>}
       rows={[
         { label: "Window", hint: "January to December — the calendar year, NOT the April-to-March "
           + "one the books, TDS and PF close on, so a total here will not match a filed return." },
@@ -268,20 +295,19 @@ function Chart({ year, by, onPick }: {
           ? { label: "Why two bars", hint: "Paid and not-yet-paid partition each month exactly: "
             + "every slip is in one and none is in both, so the pair reads against one baseline "
             + "without double-counting." }
-          : { label: "Why two bars", hint: "They are halves of one gross figure, so something "
-            + "almost all base pay and something a fifth incentive are different SHAPES rather "
-            + "than two similar totals." },
+          : { label: "Base & incentive breakdown", hint: "Each row shows total gross alongside the exact "
+            + "base salary, incentive earned, and net paid out across paid slips." },
         { label: "Grouped, not stacked", hint: isMonth
           ? "What a month still owes is not part of what it cost, and a stack would claim it was."
-          : "The question is the ratio between the two, and a stack makes a ratio the hardest "
-            + "thing on the chart to see." },
+          : "Horizontal rows keep every department and member name legible in full while displaying "
+            + "both base and incentive figures side by side." },
         isMonth
           ? { label: "Empty columns", hint: "Months that have not happened stay on the chart. A "
             + "run nobody opened and a month nobody was paid look identical once a chart omits "
             + "them. A held slip counts as not yet paid here; why it is held is on the slip." }
           : { label: "Paid slips only", hint: "A slip nobody has paid is a commitment rather than "
             + "a cost. A fixed monthly Performance allowance is committed pay under a hopeful "
-            + "name and is counted on the left, where it belongs." },
+            + "name and is counted in base salary, where it belongs." },
         { label: "Three cuts, one set of rupees", hint: "A month, a department and a person are "
           + "three ways of cutting the same money, so they cannot share an axis — side by side "
           + "every rupee would be counted three times." },
@@ -300,12 +326,14 @@ function Chart({ year, by, onPick }: {
           why={isMonth
             ? "This year is built from the salary runs themselves, not from a calendar. It fills in the moment a run is opened for one of its months."
             : "This sums the PAID slips of the year. It appears with the first paid run."} />
+      ) : isMonth ? (
+        <ColumnChart series={FLOW} points={monthPoints}
+          labelSeries="paid"
+          unit={"₹ lakh · " + yearLabel(year) + " · net paid against net owed · hover or tab a column for both figures"} />
       ) : (
-        <ColumnChart series={series} points={points}
-          labelSeries={isMonth ? "paid" : "fixed"}
-          unit={"₹ thousand · " + yearLabel(year) + " · "
-            + (isMonth ? "net paid against net owed" : "gross, before deductions")
-            + " · hover or tab a column for both figures"} />
+        <BarRows
+          rows={barRows}
+          unit={"₹ · " + yearLabel(year) + " · gross (base + incentive) across paid slips"} />
       )}
     </ChartFrame>
   );

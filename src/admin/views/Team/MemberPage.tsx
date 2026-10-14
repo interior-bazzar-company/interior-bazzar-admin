@@ -124,7 +124,7 @@ export default function MemberPage({ id, sub, live, members, roles, rolesDenied,
             </Button>
           ) : null}
           {live && can("team", "edit") ? (
-            <Button onClick={() => ops.modal(<MemberEditModal u={live} ops={ops} />)}>Edit member</Button>
+            <Button onClick={() => ops.modal(<MemberEditModal u={live} roles={roles} members={members || [live]} ops={ops} />)}>Edit member</Button>
           ) : null}
           {menu.length ? <MoreMenu small items={menu} /> : null}
         </>
@@ -268,7 +268,7 @@ function Overview({ q, live, roles, rolesDenied, viewer }: {
           <KvList
             pairs={[
               ["Designation", live.designation?.label || ""],
-              ["Department", roleNames(live)],
+              ["Role", roleNames(live)],
               ["Reports to", live.reportsTo ? live.reportsTo.name : "Nobody"],
               ["Employment", live.employmentType?.label || ""],
             ]}
@@ -355,7 +355,7 @@ function NeedsYou({ q, live, viewer }: { q: MemberReads; live: LiveMember; viewe
     } else if (report && report.submittedAt && !report.acknowledgedAt && viewer !== "self") {
       rows.push({
         tone: "warn", op: "reports", title: "Today's report is unread",
-        note: "A report nobody opened teaches the person writing it that it is paperwork.",
+        note: "End-of-day report submitted and awaiting review.",
       });
     }
 
@@ -375,7 +375,9 @@ function NeedsYou({ q, live, viewer }: { q: MemberReads; live: LiveMember; viewe
     if (late.length) {
       rows.push({
         tone: "warn", op: "work",
-        title: late.length + " work item" + (late.length > 1 ? "s are" : " is") + " past its date",
+        title: late.length === 1
+          ? "1 work item is past its due date"
+          : late.length + " work items are past their due date",
         note: late.slice(0, 3).map((i) => i.title).join(" · ") + (late.length > 3 ? " · …" : ""),
       });
     }
@@ -582,12 +584,40 @@ function opStats(q: MemberReads, live: LiveMember): Record<string, Stat> {
 /** The live row exists but the operational store has no record — a fetch still
  *  in flight, or an id the adoption never saw. Identity still renders. */
 function NotAdopted({ live, roles, rolesDenied, sub }: { live: LiveMember; roles: Role[]; rolesDenied?: boolean; sub: string }) {
+  const memberParam = encodeURIComponent(String(live.id));
+  const subAction: Record<string, { label: string; to: string; ico: string }> = {
+    attendance: { label: "View all attendance for this member", to: "#/attendance?member=" + memberParam, ico: "clock" },
+    work: { label: "View all tasks for this member", to: "#/work?member=" + memberParam, ico: "calendar" },
+    leave: { label: "View leave requests", to: "#/attendance?face=requests&member=" + memberParam, ico: "inbox" },
+    reports: { label: "Open team reports", to: "#/reports", ico: "doc" },
+    agreements: { label: "Open agreements module", to: "#/agreements", ico: "shield" },
+    documents: { label: "View attendance for this member", to: "#/attendance?member=" + memberParam, ico: "clock" },
+    resources: { label: "Open data forms", to: "#/resources", ico: "flag" },
+    pay: { label: "Open salaries ledger", to: "#/finance-salaries", ico: "cash" },
+  };
+  const act = subAction[sub] || subAction.attendance;
+
   return (
     <div className="flex flex-col gap-5">
       {sub ? <OpHead title="Nothing here yet" /> : null}
-      <Alert tone="info" title="No operational record yet">
-        Attendance, work, leave and pay arrive with the API.
-      </Alert>
+      <Card
+        title="No operational record yet"
+        sub="Work settings have not been configured for this member yet, or no attendance has been logged today."
+        right={
+          <Button
+            size="sm"
+            color="secondary"
+            ico={act.ico}
+            onClick={() => go(act.to)}
+          >
+            {act.label}
+          </Button>
+        }
+      >
+        <p className="text-sm text-tertiary">
+          You can view or manage this member's records directly in the module view, or assign their reporting line via <b>Edit member</b> above to initialize their operational record.
+        </p>
+      </Card>
       <IdentityBlock live={live} roles={roles} rolesDenied={rolesDenied} showAccess />
     </div>
   );

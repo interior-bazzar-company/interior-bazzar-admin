@@ -30,7 +30,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { qs, TbTitle } from "../../ui";
 import type { Params } from "./store";
-import { PERIOD, RECORD_TYPES, inr, useActiveCount, useOverview, useSalaryRows, useSalaryTotals, useSubTotals } from "./store";
+import { PERIOD, RECORD_TYPES, fmtMonth, inr, useActiveCount, useOverview, useSalaryRows, useSalaryTotals, useSubTotals } from "./store";
 import { ROUTE_OF, VIEW_OF } from "./Frame";
 import Subscriptions from "./Subscriptions";
 import Installments from "./Installments";
@@ -116,7 +116,8 @@ export default function Finance() {
   /* All time, and the one definition the strip and the Analytics tab read too. */
   const subs = useSubTotals();
   /* Live overview figures across all modules (installments, transactions, refunds, analytics). */
-  const ov = useOverview();
+  const ov = useOverview(view === "analytics" ? p.month : undefined);
+  const analyticsLabel = p.month ? fmtMonth(p.month) : PERIOD.label;
   const crumbs = useMemo(() => (
     <>
       {/* The title says WHICH SECTION you are in — each is its own sidebar
@@ -138,50 +139,35 @@ export default function Finance() {
             <TbStat k="Total members" v={totals.membersAll}
               title={"Every salary account of every kind, closed ones included. "
                 + membersN + " of them are on the payroll right now."} />
-            {/* MONEY IN THE TOPBAR, WHICH THIS MODULE ONCE REFUSED — and the
-                refusal is worth restating, because it still holds where it was
-                made. Three totals used to sit here on EVERY section, including
-                the ones that had nothing to do with them. These two are the
-                opposite case: they belong to the section they appear on, and
-                they are derived from the same `dueOf` the rows below use — so
-                the header and the table cannot disagree. */}
             <TbStat k="Total paid" v={inr(totals.paidAllPaise)} tone="ok"
               title={"Every rupee ever paid out as salary, summed off the paid slips. "
                 + inr(totals.paidPaise) + " of it in " + PERIOD.label + "."} />
-            {/* "Everybody is paid up" is a claim about people, and with no
-                salary accounts at all there are no people to make it about.
-                The screen read "0 accounts, 0 slips, Monthly payroll Rs 0" and
-                still said everybody was paid — reassurance where the honest
-                answer was that there is nothing here yet. */}
             <TbStat k="Total unpaid" v={totals.unpaidPaise ? inr(totals.unpaidPaise) : "—"} tone="warn"
               title={totals.unpaidPeople
-                ? totals.unpaidPeople + " " + (totals.unpaidPeople === 1 ? "person is" : "people are") + " owed, arrears included."
+                ? totals.unpaidPeople + " " + (totals.unpaidPeople === 1 ? "person is" : "people are")
+                  + " owed (" + inr(totals.pendingPaise) + " unpaid"
+                  + (totals.heldPaise ? " + " + inr(totals.heldPaise) + " on hold" : "") + ")."
                 : totals.membersAll
                   ? "Everybody is paid up."
                   : "No salary accounts yet — nothing is owed because nobody is set up."} />
           </>
         ) : view === "subscriptions" ? (
-          /* THE SAME THREE-FIGURE HEADER SALARIES A/C CARRIES: how many, what
-             came in, what has not. All time, and every one of them summed by
-             `subTotals()` — the strip on the page below and the tiles on the
-             Analytics tab read that same function, so no two of them can print
-             different money under the same word. */
           <>
             <TbStat k="Active subscriptions" v={subs.activeN}
               title="Subscriptions running right now — a level, read at this moment, not a total for any period." />
-            <TbStat k="Total collection" v={inr(subs.collectedPaise)} tone="ok"
-              title={"Every rupee ever collected against an installment, across "
-                + subs.subs + " subscription" + (subs.subs === 1 ? "" : "s") + ". "
-                + subs.collectedN + " installment" + (subs.collectedN === 1 ? "" : "s") + " settled."} />
-            <TbStat k="Total outstanding" v={subs.outstandingPaise ? inr(subs.outstandingPaise) : "—"} tone="warn"
+            <TbStat k="All Subscriptions Collected" v={inr(subs.collectedPaise)} tone="ok"
+              title={"Every rupee ever collected across all subscription plans ("
+                + subs.subs + " subscription" + (subs.subs === 1 ? "" : "s") + ", "
+                + subs.collectedN + " installment" + (subs.collectedN === 1 ? "" : "s") + " settled)."} />
+            <TbStat k="Schedule Outstanding" v={subs.outstandingPaise ? inr(subs.outstandingPaise) : "—"} tone="warn"
               title={subs.outstandingPaise
-                ? "Agreed and not yet in the bank: " + inr(subs.duePaise) + " still expected and "
-                  + inr(subs.failedPaise) + " that did not clear."
-                : "Every installment that exists has been settled."} />
+                ? "Scheduled installment balance not yet in the bank: " + inr(subs.duePaise) + " upcoming/due and "
+                  + inr(subs.failedPaise) + " overdue or failed."
+                : "Every scheduled installment has been settled."} />
           </>
         ) : view === "installments" ? (
-          <TbStat k="Overdue" v={inr(ov.failedPaise)} tone={ov.failedN > 0 ? "warn" : "ok"}
-            title={ov.failedN + " installment" + (ov.failedN === 1 ? " is" : "s are") + " overdue or failed to pay across all deals."} />
+          <TbStat k="Installments Overdue / Failed" v={inr(ov.failedPaise)} tone={ov.failedN > 0 ? "warn" : "ok"}
+            title={ov.failedN + " installment" + (ov.failedN === 1 ? " is" : "s are") + " overdue or failed to pay across all installment deals."} />
         ) : view === "transactions" ? (
           <TbStat k="Monthly spend" v={inr(ov.otherOutPaise)} tone="ok"
             title={"Total spent on transactions in " + PERIOD.label + " across " + ov.otherOutN + " entries."} />
@@ -189,8 +175,14 @@ export default function Finance() {
           <TbStat k="Refunds owed" v={ov.refundsOwedPaise ? inr(ov.refundsOwedPaise) : "—"} tone={ov.refundsOwedN ? "warn" : undefined}
             title={ov.refundsOwedN ? inr(ov.refundsOwedPaise) + " approved and waiting for transfer." : "No refunds awaiting payout."} />
         ) : view === "analytics" ? (
-          <TbStat k="Net cash" v={inr(ov.netPaise)} tone={ov.netPaise >= 0 ? "ok" : "warn"}
-            title={"Net cash flow in " + PERIOD.label + " (income minus all expenses)."} />
+          <>
+            <TbStat k={"Collected · " + analyticsLabel} v={inr(ov.collectedPaise)} tone="ok"
+              title={"Total collected in " + analyticsLabel + " across " + ov.collectedN + " payments."} />
+            <TbStat k={"Outgoings · " + analyticsLabel} v={inr(ov.outPaise)}
+              title={"Salaries + operating spend + refunds settled in " + analyticsLabel + "."} />
+            <TbStat k={"Net cash · " + analyticsLabel} v={inr(ov.netPaise)} tone={ov.netPaise >= 0 ? "ok" : "warn"}
+              title={"Net cash flow in " + analyticsLabel + " (income minus all expenses)."} />
+          </>
         ) : (
           <TbStat k="Active subscriptions" v={activeN}
             title="Subscriptions running right now — a level, read at this moment, not a total for any period." />
@@ -198,15 +190,16 @@ export default function Finance() {
       </span>
     </>
   ), [view, activeN, membersN, subs, totals.membersAll, totals.paidPaise,
-    totals.paidAllPaise, totals.unpaidPaise, totals.unpaidPeople, ov]);
+    totals.paidAllPaise, totals.unpaidPaise, totals.pendingPaise, totals.heldPaise, totals.unpaidPeople, ov, analyticsLabel]);
 
   usePageChrome(
     { crumbs, right: null, parent: id ? listHash(view) : null },
     /* Keyed on the figures themselves: they arrive from the store after the
        first render, and without them in the key the topbar keeps the zeros it
        mounted with. */
-    (id ? "rec" : view) + ":" + activeN + "/" + membersN + "/" + totals.unpaidPaise
-      + "/" + subs.collectedPaise + "/" + subs.outstandingPaise + "/" + ov.failedPaise + "/" + ov.otherOutPaise,
+    (id ? "rec" : view) + ":" + (p.month || "") + ":" + activeN + "/" + membersN + "/" + totals.unpaidPaise
+      + "/" + subs.collectedPaise + "/" + subs.outstandingPaise + "/" + ov.failedPaise + "/" + ov.otherOutPaise
+      + "/" + ov.netPaise + "/" + ov.collectedPaise + "/" + ov.refundsOwedPaise,
   );
 
   const timer = useRef<number | undefined>(undefined);
