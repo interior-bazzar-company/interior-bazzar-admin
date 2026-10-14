@@ -22,6 +22,7 @@ import type { DealRow, DealPaymentRow, InvoiceRow, QuotationRow } from "../../ap
 import { Icon, cap } from "../ui";
 import { inr } from "../ui/format";
 import { go } from "../ui/nav";
+import { can } from "../auth/session";
 
 /** `note` is the pill's text, flattened: on one line a coloured pill for a
  *  status the header already carries is decoration, but the word is not. */
@@ -39,9 +40,12 @@ function useChain(dealRef: string): ChainData {
       AdminOpsService.invoices({ deal: dealRef, pageSize: 50 })
         .then((r) => (r.response === false ? [] : r.data.invoices || []))
         .catch(() => []),
-      AdminOpsService.dealPayments({ deal: dealRef, pageSize: 50 })
-        .then((r) => (r.response === false ? [] : r.data.payments || []))
-        .catch(() => []),
+      /* The ledger is gated on payments.view; asking without it is a 403 (BUG-03). */
+      can("payments", "view")
+        ? AdminOpsService.dealPayments({ deal: dealRef, pageSize: 50 })
+          .then((r) => (r.response === false ? [] : r.data.payments || []))
+          .catch(() => [])
+        : Promise.resolve([] as DealPaymentRow[]),
     ]).then(([deal, invoices, payments]) => {
       if (!cancelled) setD({ deal, invoices, payments, loading: false });
     });
