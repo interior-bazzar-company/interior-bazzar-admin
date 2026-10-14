@@ -911,7 +911,7 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
             <button
               type="button"
               className="ml-2 inline-flex items-center gap-1 rounded bg-brand-primary/10 px-2 py-1 text-xs font-semibold text-brand-secondary hover:underline cursor-pointer"
-              onClick={() => go(`#/users?search=${encodeURIComponent(typeof dl.customer === "object" ? dl.customer.username : dl.customer)}`)}
+              onClick={() => go(`#/users?q=${encodeURIComponent(typeof dl.customer === "object" ? dl.customer.username : dl.customer)}`)}
             >
               View User
             </button>
