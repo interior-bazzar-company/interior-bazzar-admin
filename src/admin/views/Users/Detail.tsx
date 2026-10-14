@@ -58,7 +58,7 @@ export default function Detail({ id, p, rows, onParams }: {
   const { go: navGo } = useNav();
   const row = rows.filter((r) => r.user.userId === id)[0] || null;
   const timeline = useTimeline(row ? row.user.userId : null);
-  const record = useUserRecord(row ? row.user.userId : null);
+  const record = useUserRecord(id);
   const listing = useUsersPageState();
   const tab = p.tab || "profile";
 
@@ -73,7 +73,7 @@ export default function Detail({ id, p, rows, onParams }: {
   /* NOT FOUND IS A VERDICT, and the page has not answered yet. Until the read
      lands the loaded rows are empty for EVERY id, so saying "no user at that
      address" now would be false for most of the links that get here. */
-  if (!row && listing.loading) {
+  if (!row && (listing.loading || record.loading || (record.userId !== id && /^IB-U-\d+$/.test(id)))) {
     return (
       <div className="flex flex-col gap-4">
         <PaneLoading label="Loading the user…" />

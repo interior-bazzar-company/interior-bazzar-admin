@@ -1137,8 +1137,13 @@ function fromServer(r: ServerUserItem): PlatformUser {
  *  state "these rows arrived" without standing up a server. */
 export function applyUsersPage(users: PlatformUser[]): void {
   heldUsers = clone(users);
-  snap = { ...snap, users: clone(users) };
+  /* Keep a record opened by link that is not on this page (see applyUserRecord). */
+  const kept = openRecord && !users.some((u) => u.userId === openRecord!.userId) ? [openRecord] : [];
+  snap = { ...snap, users: clone(users).concat(kept) };
 }
+
+/** The last record read by useUserRecord, so a page landing after it does not drop it. */
+let openRecord: PlatformUser | null = null;
 
 /** Reads one page and plants it. Its own function because a WRITE re-reads the
  *  same query afterwards: the row on the directory carries the account status,
@@ -1220,7 +1225,13 @@ export function applyUserRecord(r: PlatformUserRecord): void {
     },
   };
   heldUsers = heldUsers.map(merge);
-  snap = { ...snap, users: snap.users.map(merge) };
+  /* A record opened by link may not be on the loaded page (page 2+, or after a
+     status filter dropped it): add it, so the detail resolves (F-AD-22). */
+  openRecord = merge({ ...fromServer(r) } as PlatformUser);
+  const users = snap.users.some((u) => u.userId === r.userId)
+    ? snap.users.map(merge)
+    : snap.users.concat([openRecord]);
+  snap = { ...snap, users };
 }
 
 /** Reads the open record once per mount (a dev double-mount shares the flight). */
