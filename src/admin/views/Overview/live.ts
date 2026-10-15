@@ -90,7 +90,7 @@ export function useLive(p: Period, on: { money: boolean; team: boolean }) {
            then nets its refund off, which is the only place it is counted. */
         every((n) => call(AdminOpsService.refunds({ pageNo: n, pageSize: 500 })), (r) => r.refunds).catch(() => [] as RefundRow[]),
       ]).then(([ledger, plans, income, installments, refunds]) => {
-        const cleanRefunds = (refunds || []).filter((r) => !isTestRefund(r));
+        const cleanRefunds = refunds || [];
         const settled = settledRefundPayments(cleanRefunds);
         if (live) setS((x) => ({ ...x, money: "ready", raw: { ...x.raw, ledger, plans, income, installments, settled } }));
       }).catch(() => { if (live) setS((x) => ({ ...x, money: "error" })); });
@@ -129,13 +129,6 @@ export const ymd = (v: string | null | undefined) => {
 export const within = (d: string, from: string, to: string) => !!d && d >= from && d <= to;
 /** "19500.0" rupees -> 1950000 paise. */
 export const paiseOf = (rupees: string | null | undefined) => Math.round((parseFloat(rupees || "0") || 0) * 100);
-
-/** Excludes test/demo refund rows (RF-12 ₹99,99,999 test check and RF-2 ₹198 LOCAL-DEMO)
- *  using the same rule as Finance/store.ts so Overview and Finance Analytics never drift. */
-export const isTestRefund = (r: { id?: number | null; detail?: string | null; payeeName?: string | null; decisionNote?: string | null }) => {
-  const text = ((r.detail || "") + " " + (r.payeeName || "") + " " + (r.decisionNote || "")).toLowerCase();
-  return text.includes("test only") || text.includes("local-demo") || r.id === 12 || r.id === 2;
-};
 
 /** The plan payments a settled refund request points at. */
 export const settledRefundPayments = (refunds: { settledAt: string | null; payment: { id: number } | null }[]) =>

@@ -30,7 +30,7 @@ import type {
   BankTotals, DealPaymentRow, IncomeRow, InstallmentRow, PlanPaymentRow, PlanPaymentsListResponse,
   RefundRow, SalariesResponse, SalaryRunRow, SpendRow, SpendTagTotal,
 } from "../../../api/modules/adminOps";
-import { every, isTestRefund, planCashPaise, settledRefundPayments, within, ymd } from "./live";
+import { every, planCashPaise, settledRefundPayments, within, ymd } from "./live";
 import type { LiveState } from "./live";
 import { inr } from "../../ui/format";
 import { addDays, bucketsOf, todayLocal } from "./derive";
@@ -138,7 +138,7 @@ export function useFinanceLive(p: Period, on: boolean) {
          which is the truth and not a load failure. */
       const list = Object.values(gaps);
       const dead = !list.some((g) => g === "ok") && list.some((g) => g === "error");
-      const cleanRefunds = refunds ? (refunds.refunds || []).filter((r) => !isTestRefund(r)) : [];
+      const cleanRefunds = refunds ? refunds.refunds || [] : [];
       const owedRows = cleanRefunds.filter((r) => r.state?.key === "approved" && !r.settledAt);
       const toDecideRows = cleanRefunds.filter((r) => r.state?.key === "requested");
       setS({
@@ -235,7 +235,7 @@ function windowOf(r: Raw, from: string, to: string): MoneyWindow {
       slipCount: x.paidSlips !== undefined ? x.paidSlips : x.slips,
     }))
     .filter((x) => x.paidAmt > 0 && !!x.paidDate && within(x.paidDate, from, to));
-  const refundsPaid = r.refunds.filter((x) => !isTestRefund(x) && !!x.settledAt && within(ymd(x.settledAt), from, to));
+  const refundsPaid = r.refunds.filter((x) => !!x.settledAt && within(ymd(x.settledAt), from, to));
 
   const collectedPaise = sum(deal, (x) => x.amountPaise) + sum(plans, (x) => x.net);
   const otherInPaise = sum(income, (x) => x.amountPaise);

@@ -517,14 +517,8 @@ async function loadLive(): Promise<void> {
       resolutions.push({ targetId: "L-" + l.id, kind: l.resolution.kind.key, reason: l.resolution.reason, by: "", at: l.resolution.at });
     }
   }));
-  /* FIX-12: Purge test and demo records from the refund queue and financial aggregations.
-     Filters out RF-12 (₹99,99,999 test integrity check) and RF-2 (LOCAL-DEMO),
-     as well as any records explicitly marked TEST ONLY or DEMO. */
-  const isTestRefund = (r: ApiRefundRow) => {
-    const text = ((r.detail || "") + " " + (r.payeeName || "") + " " + (r.decisionNote || "")).toLowerCase();
-    return text.includes("test only") || text.includes("local-demo") || r.id === 12 || r.id === 2;
-  };
-  const refundRows = (refunds || []).filter((r) => !isTestRefund(r));
+  // Test/demo refunds are soft-deleted on the server and never arrive here.
+  const refundRows = refunds || [];
   const refundPayment: Record<string, InstallmentPayment> = {};
   refundRows.forEach((r) => { const p = refundPaymentOf(r); if (p) refundPayment[RF + r.id] = p; });
 
