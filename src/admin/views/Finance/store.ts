@@ -50,7 +50,7 @@ import { CommonService } from "../../../api/modules/common";
 import { AppExceptions, errMessage } from "../../../api/apiService";
 import { every, paiseOf, planCashPaise, settledRefundPayments } from "../Overview/live";
 import { dateOnly } from "../Deals/adapter";
-import { getSession } from "../../auth/session";
+import { can, getSession } from "../../auth/session";
 import { moduleLabel } from "../../shell/modules";
 import { inr } from "../../ui/format";
 import type { LoadPart } from "../Team/store";
@@ -3408,7 +3408,8 @@ export async function createManualRefund(payeeName: string, amountPaise: number,
   return { error: "", refundId: RF + id };
 }
 
-/** FN-T14 · Decide. Super Admin, and never the requester. Approval AUTHORISES
+/** FN-T14 · Decide. Whoever holds finance-refunds.decide (the API's rule), and
+ *  never the requester. Approval AUTHORISES
  *  a transfer; it does not make one. Two verdicts, not three. */
 export async function decideRefund(id: string, verdict: "approve" | "decline", decisionNote: string): Promise<string> {
   const r = readRefund(id);
@@ -3417,10 +3418,10 @@ export async function decideRefund(id: string, verdict: "approve" | "decline", d
   if (r.state !== "requested") return "This request is already decided. (invalid_state_transition)";
   if (verdict !== "approve" && !decisionNote.trim())
     return "Say what is missing or why it is refused — the requester only sees this note. (reason_required)";
-  const sa = superAdminOnly("Deciding a refund"); if (sa) return sa;
+  if (!can("finance-refunds", "decide")) return "Your role cannot decide refunds.";
   const me = getSession()?.user?.username;
   if (me && me === r.requestedBy)
-    return "A refund cannot be approved by the person who requested it. That separation is the whole control. (super_admin_required)";
+    return "A refund cannot be approved by the person who requested it. That separation is the whole control.";
   try {
     await call(AdminOpsService.decideRefund(serverId, {
       state: verdict === "approve" ? "approved" : "declined", note: decisionNote.trim(),

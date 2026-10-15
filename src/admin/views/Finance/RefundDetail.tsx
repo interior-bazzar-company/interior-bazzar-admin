@@ -17,8 +17,9 @@ import {
   DecideRefundModal, RecordTransferModal,
 } from "./RefundModals";
 import {
-  REFUND_POLICY, accountOf, ago, fmtDate, fmtDateTime, groundMeta, inr, isSuperAdmin, useRefund,
+  REFUND_POLICY, accountOf, ago, fmtDate, fmtDateTime, groundMeta, inr, useRefund,
 } from "./store";
+import { getSession } from "../../auth/session";
 import type { Params } from "./store";
 
 export default function RefundDetail({ id, p, onParams }: {
@@ -41,7 +42,10 @@ export default function RefundDetail({ id, p, onParams }: {
 
   const r = row.r;
   const writable = can("finance-refunds", "decide");
-  const sa = isSuperAdmin();
+  // Who decides is the roles grid's call (finance-refunds.decide, the same grant the
+  // API checks — R3.8); the one fixed rule is that the requester never does.
+  const me = getSession()?.user?.username;
+  const mine = !!me && me === r.requestedBy;
   const deciding = r.state === "requested";
 
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
@@ -56,15 +60,14 @@ export default function RefundDetail({ id, p, onParams }: {
      can have done to it is behind the one control now, and which items are on
      it is decided by the state rather than by which buttons happen to render.
 
-     DISABLED RATHER THAN HIDDEN without Super Admin: somebody who cannot see
-     the action cannot ask for it either. */
-  const saTitle = sa ? undefined : "Deciding a refund requires full access.";
+     DISABLED RATHER THAN HIDDEN for the requester: they can see why. */
+  const saTitle = mine ? "You asked for this refund, so someone else decides it." : undefined;
   const actions = writable ? (
     <ActionMenu forWhat={r.refundId} items={[
       deciding && { icon: "check", label: "Approve", act: () => openDecide("approve"),
-        tone: "pri", disabled: !sa, title: saTitle },
+        tone: "pri", disabled: mine, title: saTitle },
       deciding && { icon: "x", label: "Decline", act: () => openDecide("decline"),
-        tone: "dgr", disabled: !sa, title: saTitle },
+        tone: "dgr", disabled: mine, title: saTitle },
       r.state === "approved" && { icon: "cash", label: "Record the transfer", act: openRecord, tone: "pri" },
       !deciding && r.state !== "approved" && { icon: "check", label: "Decided", act: () => {},
         disabled: true,
@@ -163,7 +166,7 @@ export default function RefundDetail({ id, p, onParams }: {
                 ["Note", r.decisionNote || <span className="text-quaternary">No note.</span>],
               ]} />
             ) : (
-              <Fine>Not yet decided. {deciding ? "Waiting on someone with full access." : ""}</Fine>
+              <Fine>Not yet decided. {deciding ? "Waiting on someone who can decide refunds." : ""}</Fine>
             )}
 
             {r.state === "approved" && !r.settlement ? (
