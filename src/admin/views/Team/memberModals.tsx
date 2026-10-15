@@ -19,6 +19,7 @@
    UNCONTROLLED — `val(id)` reads them out of the DOM at save, and
    `readRolePicks()` reads `#tmRoles` — so every field keeps its id.
    ===================================================================== */
+import { isHumanEmployee } from "./store";
 import { useEffect, useState } from "react";
 /* `call` unwraps the envelope: a refusal (HTTP 200, response:false) throws,
    so it lands in ErrSlot instead of a success toast (team/d2). */
@@ -40,7 +41,7 @@ export function MemberNewModal({ roles, members = [], ops }: { roles: Role[]; me
   const managerOptions = [
     { v: "", l: "No manager (reports to nobody)" },
     ...members
-      .filter((m) => m.isActive !== false)
+      .filter((m) => m.isActive !== false && isHumanEmployee(m))
       .map((m) => ({ v: String(m.id), l: m.name || m.username || m.email || ("#" + m.id) })),
   ];
 
@@ -156,7 +157,7 @@ export function MemberEditModal({ u, roles = [], members = [], ops }: { u: Membe
   const managerOptions = [
     { v: "", l: "No manager (reports to nobody)" },
     ...members
-      .filter((m) => m.id !== u.id && (m.isActive !== false || (u.reportsTo && u.reportsTo.id === m.id)))
+      .filter((m) => m.id !== u.id && (m.isActive !== false || (u.reportsTo && u.reportsTo.id === m.id)) && isHumanEmployee(m))
       .map((m) => ({ v: String(m.id), l: m.name || m.username || m.email || ("#" + m.id) })),
   ];
 
@@ -356,7 +357,7 @@ export function MemberDeleteModal({ u, ops }: { u: Member; ops: Ops }) {
     call(AdminOpsService.ownedBy(u.id)).then((d) => { if (!cancelled) setOwns(d.owns); })
       .catch((e: unknown) => { if (!cancelled) { setOwns({ deals: 0, quotations: 0, invoices: 0, enquiries: 0, tasks: 0 }); setOwnsErr(errOf(e)); } });
     call(AdminOpsService.users())
-      .then((rows) => { if (!cancelled) setPeople(rows.filter((m) => m.id !== u.id && m.isActive !== false)); })
+      .then((rows) => { if (!cancelled) setPeople(rows.filter((m) => m.id !== u.id && m.isActive !== false && isHumanEmployee(m))); })
       .catch(() => { if (!cancelled) setPeople([]); });
     return () => { cancelled = true; };
   }, [u.id]);

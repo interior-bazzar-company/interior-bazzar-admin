@@ -6,6 +6,7 @@
    (ModalShell, FormField, ErrSlot, Notice) so nothing here reads as a
    second dialog language.
    ============================================================================= */
+import { isHumanEmployee } from "../store";
 import { useEffect, useState } from "react";
 import AdminOpsService, { call } from "../../../../api/modules/adminOps";
 import type { OwnedCounts } from "../../../../api/modules/adminOps";
@@ -53,7 +54,7 @@ export function MemberSuspendModal({ u, members, ops }: { u: Member; members: Me
   }, [u.id]);
 
   const needsHeir = !!owns && ownsAnything(owns);
-  const successors = members.filter((m) => m.id !== u.id && m.isActive !== false);
+  const successors = members.filter((m) => m.id !== u.id && m.isActive !== false && isHumanEmployee(m));
 
   async function save() {
     if (busy) return;

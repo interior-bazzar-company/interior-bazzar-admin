@@ -10,6 +10,7 @@
    server-side, so the tab itself is hidden without it (Team/index.tsx) and the
    fetch would 403 anyway if reached by URL.
    ============================================================================= */
+import { isHumanEmployee } from "./store";
 import { useEffect, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { OrphanDealRow, OrphanOwnerRow, OrphansResponse } from "../../../api/modules/adminOps";
@@ -196,7 +197,7 @@ function ReassignOrphanModal({ target, members, onClose, onDone }: {
   onDone: () => void;
 }) {
   const { toast } = useShell();
-  const activeMembers = members.filter((m) => m.isActive !== false);
+  const activeMembers = members.filter((m) => m.isActive !== false && isHumanEmployee(m));
   const [toUserId, setToUserId] = useState<string>(activeMembers[0] ? String(activeMembers[0].id) : "");
   const [reason, setReason] = useState<string>("Reassigning orphaned records");
   const [err, setErr] = useState<EngineErr | null>(null);
