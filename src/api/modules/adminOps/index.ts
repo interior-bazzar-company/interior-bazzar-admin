@@ -359,9 +359,9 @@ export interface DealRow {
   updatedAt: string;
   /** The Q / I / ₹ chain. `quotationStatus` is the LIVE quotation's status
    *  ("none" when there is none, or a revision has superseded every one);
-   *  `invoiceStatus` is "none" | "draft" | "paid" — an invoice cannot be
-   *  issued without its payment, so there is no issued-but-unpaid state to
-   *  report; `paid` is a payment on the ledger that has not been reversed. */
+   *  `invoiceStatus` is "none" | "draft" | "issued" | "paid" — issuing only
+   *  numbers the invoice, so "issued" is billed but unpaid; `paid` is a payment
+   *  on the ledger that has not been reversed. */
   quotationStatus: string;
   invoiceStatus: string;
   paid: boolean;
