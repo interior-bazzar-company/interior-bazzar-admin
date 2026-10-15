@@ -55,6 +55,23 @@ export class ApiService {
     return this.returnResponse(response, options.responseType ?? "json");
   }
 
+  /* One write at a time per identical request (F-AD-13). A double click sent
+     the same POST twice and the server made two refunds / agreements / notes;
+     the second identical call while the first is in flight now shares its
+     answer. Keyed on method + URL + JSON body, so two different writes never
+     collapse. FormData bodies (uploads) are never shared. */
+  private inFlight = new Map<string, Promise<unknown>>();
+
+  private once<T>(method: string, url: string, body: unknown, run: () => Promise<T>): Promise<T> {
+    if (body instanceof FormData) return run();
+    const key = method + " " + url + " " + JSON.stringify(body ?? null);
+    const live = this.inFlight.get(key) as Promise<T> | undefined;
+    if (live) return live;
+    const p = run().finally(() => this.inFlight.delete(key));
+    this.inFlight.set(key, p);
+    return p;
+  }
+
   async getPostApiResponse<T>(
     url: string,
     body: any,
@@ -66,8 +83,10 @@ export class ApiService {
       options.responseType ?? "json",
       options.auth ?? true
     );
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
-    return this.returnResponse(response, options.responseType ?? "json");
+    return this.once("POST", url, body, async () => {
+      const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
+      return this.returnResponse<T>(response, options.responseType ?? "json");
+    });
   }
 
   async getPutApiResponse<T>(
@@ -81,8 +100,10 @@ export class ApiService {
       "json",
       options.auth ?? true
     );
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
-    return this.returnResponse(response, options.responseType ?? "json");
+    return this.once("PUT", url, body, async () => {
+      const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
+      return this.returnResponse<T>(response, options.responseType ?? "json");
+    });
   }
 
   async getPatchApiResponse<T>(
@@ -97,8 +118,10 @@ export class ApiService {
       options.auth ?? true
     );
 
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
-    return this.returnResponse(response, options.responseType ?? "json");
+    return this.once("PATCH", url, body, async () => {
+      const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
+      return this.returnResponse<T>(response, options.responseType ?? "json");
+    });
   }
 
   async getDeleteApiResponse<T>(
@@ -112,8 +135,10 @@ export class ApiService {
       "json",
       options.auth ?? true
     );
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
-    return this.returnResponse(response, options.responseType ?? "json");
+    return this.once("DELETE", url, body, async () => {
+      const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
+      return this.returnResponse<T>(response, options.responseType ?? "json");
+    });
   }
 
   // private createRequest(
