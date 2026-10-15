@@ -3,7 +3,22 @@ import appUrl from "../../endpoints";
 import { TokenService } from "./TokenService";
 
 export class AuthService {
-  static async refreshToken(): Promise<boolean> {
+  /** One refresh at a time. A screen fires several reads at once; when the access
+   *  token has expired they all 401 together, and each used to refresh on its own.
+   *  The server rotates AND blacklists refresh tokens, so only the first won and the
+   *  rest were refused — signing the member out mid-renewal. They share one now. */
+  private static inflight: Promise<boolean> | null = null;
+
+  static refreshToken(): Promise<boolean> {
+    if (!this.inflight) {
+      this.inflight = this.refreshOnce().finally(() => {
+        this.inflight = null;
+      });
+    }
+    return this.inflight;
+  }
+
+  private static async refreshOnce(): Promise<boolean> {
     const refreshToken = TokenService.getRefreshToken();
     if (!refreshToken) return false;
 
