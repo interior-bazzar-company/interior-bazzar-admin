@@ -61,16 +61,19 @@ export function Snapshot({ d }: { d: OverviewData }) {
     if (d.moneyState === "error") return <Kpi k={k} tip={tip} {...NA} s="could not load" foot={<Retry onPress={d.retryLive} />} />;
     return <Kpi k={k} tip={tip} {...NA} s="not in your access" />;
   };
-  const collected = (o: { collectedPaise: number; otherInPaise: number }) => o.collectedPaise + o.otherInPaise;
+  /* ONE SOURCE PER FIGURE: the tile is customer payments (deal ledger + plan
+     purchases) and its count is those same payments. Other income is not a
+     customer payment; it is in the Finance section's "In". */
+  const recvK = "Receivable · next 30 days";
 
   return (
     <Section id="ov-snapshot" title="Executive snapshot" desc={d.periods.deals.label}
       right={<><Stamp clock={d.clocks.deals} /><Stamp clock={d.clocks.money} /></>}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {d.gates.finance ? moneyTile("Collected", "collected", () => (
-          <Kpi k="Collected" tip="collected" v={<Money paise={collected(fin!.cur)} />}
-              s={fin!.cur.collectedN + " payment" + (fin!.cur.collectedN === 1 ? "" : "s") + " in"}
-              now={collected(fin!.cur)} before={collected(fin!.prev)} of={ofF} to="#/finance-analytics" />
+        {d.gates.finance ? moneyTile("Collected", "payments", () => (
+          <Kpi k="Collected" tip="payments" v={<Money paise={fin!.cur.collectedPaise} />}
+              s={fin!.cur.collectedN + " customer payment" + (fin!.cur.collectedN === 1 ? "" : "s")}
+              now={fin!.cur.collectedPaise} before={fin!.prev.collectedPaise} of={ofF} to="#/finance-analytics" />
         )) : null}
 
         {d.gates.deals ? dealTile("Pipeline value", "pipeline", () => (
@@ -94,8 +97,8 @@ export function Snapshot({ d }: { d: OverviewData }) {
             now={deals!.conversion} before={deals!.conversionPrev} kind="pts" of={ofD} to="#/deals?view=board" />
         )) : null}
 
-        {d.gates.finance ? moneyTile("Receivable", "outstanding", () => (
-          <Kpi k="Receivable" tip="outstanding" v={<Money paise={fin!.totals.outstandingPaise} />}
+        {d.gates.finance ? moneyTile(recvK, "outstanding", () => (
+          <Kpi k={recvK} tip="outstanding" v={<Money paise={fin!.totals.outstandingPaise} />}
               s={fin!.totals.dueN + " due · " + fin!.totals.failedN + " failed"}
               tone={fin!.totals.failedN ? "warn" : undefined} to="#/finance?flag=due" />
         )) : null}
@@ -109,7 +112,7 @@ export function Snapshot({ d }: { d: OverviewData }) {
             ? <Loading k="Enquiries · 7 days" tip="enquiries" />
             : d.intake.state === "error"
             ? <Kpi k="Enquiries · 7 days" tip="enquiries" {...NA} s="could not load" foot={<Retry onPress={d.intake.retry} />} />
-            : <Kpi k="Enquiries · 7 days" tip="enquiries" v={String(Number(d.intake.week) || 0)} s={(Number(d.intake.today) || 0) + " today"}
+            : <Kpi k="Enquiries · 7 days" tip="enquiries" v={String(Number(d.intake.week) || 0)} s={(Number(d.intake.today) || 0) + " today" + d.allOwners}
                 to="#/business-enquiries?received=7d" />
         ) : null}
       </div>
@@ -121,7 +124,10 @@ export function Snapshot({ d }: { d: OverviewData }) {
           <Eyebrow bare>
             <span className="inline-flex items-center gap-1.5">Health<Tip k="health" /></span>
           </Eyebrow>
-          <HealthStrip cells={d.health} />
+          {/* Team and Delivery read the whole team: say so while an owner is picked. */}
+          <HealthStrip cells={d.allOwners
+            ? d.health.map((h) => (h.key === "team" || h.key === "delivery" ? { ...h, label: h.label + d.allOwners } : h))
+            : d.health} />
         </div>
       ) : null}
     </Section>

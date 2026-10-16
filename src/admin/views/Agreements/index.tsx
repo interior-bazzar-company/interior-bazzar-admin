@@ -24,7 +24,7 @@ import { can } from "../../auth/session";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  Alert, Button, Card, EmptyState, FilterBar, FilterChips, Icon, KvList, ModalShell, PageHeader, qs,
+  Alert, Button, Card, ConfirmModal, EmptyState, FilterBar, FilterChips, Icon, KvList, ModalShell, PageHeader, qs,
   SearchField, Select, shareOrCopy, StatStrip, Table, Tabs, TbTitle,
 } from "../../ui";
 import type { StatCell } from "../../ui";
@@ -527,11 +527,17 @@ function DeedPage({ agreementId }: { agreementId: string }) {
   if (isSendable(a)) acts.push({ icon: "link", label: "Copy link",
     title: "The member signs through it", act: () => void copyLink(a, shell) });
   if (a.state !== "signed" && a.state !== "revoked") acts.push({ icon: "x", label: "Revoke", tone: "bad",
-    title: "The link stops working immediately", act: async () => {
-      const r = await revokeAgreement(a.agreementId);
-      if (!r.ok) shell.toast(r.message, "bad");
-      else shell.toast("Revoked. The link stops working.", "ok");
-    } });
+    title: "The link stops working immediately", act: () => shell.modal(
+      /* ASK FIRST (F-AD-52): revoking cannot be undone. */
+      <ConfirmModal tone="bad" title={"Revoke " + a.title + "?"} verb="Revoke"
+        body="The signing link stops working immediately and this copy can no longer be signed. To change anything, send a fresh one from the template."
+        onClose={shell.closeLayer}
+        onConfirm={async () => {
+          shell.closeLayer();
+          const r = await revokeAgreement(a.agreementId);
+          if (!r.ok) shell.toast(r.message, "bad");
+          else shell.toast("Revoked. The link stops working.", "ok");
+        }} />) });
 
   return (
     <div className="flex min-w-0 flex-col gap-5">

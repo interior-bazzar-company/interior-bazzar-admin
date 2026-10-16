@@ -760,6 +760,12 @@ export const activeAssignment = (e: Enquiry): Assignment | null =>
     ? e.assignments.filter((a) => a.assignmentId === e.activeAssignmentId)[0] || null
     : null;
 
+/** No matching run ranked this assignment. The server stores rank/score as
+ *  NULL for a hand-picked business and sends them as 0; a real rank starts at
+ *  1, so rank 0 is the tell. Printing "rank 0 of 0" or "score 0 / 100" would
+ *  claim a run that never happened. */
+export const handPicked = (a: Assignment): boolean => !a.candidateRank;
+
 export const pastAssignments = (e: Enquiry): Assignment[] =>
   e.assignments.filter((a) => a.assignmentId !== e.activeAssignmentId);
 

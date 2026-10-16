@@ -333,7 +333,11 @@ export function getGroupOf(): Record<string, string | null> {
 export const moduleKeys = () => Object.keys(getItems());
 export const moduleLabel = (k: string) => {
   const it = getItems()[k];
-  return it ? it.label : k;
+  if (it) return it.label;
+  /* A hidden module (no screen, so no nav row) still has the server's label —
+     the Audit log names "Sign-in / Sign-out" with it rather than "auth". */
+  const m = getSession()?.modules.find((x) => x.key === k);
+  return m ? m.label : k;
 };
 
 /** The PREFERRED landing route. The prototype booted to #/deals; the panel

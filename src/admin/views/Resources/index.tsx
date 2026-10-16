@@ -843,9 +843,8 @@ function FormFace({ r, p, onFilter }: {
                 <div className="flex flex-col gap-3">
                   <p className="text-xs text-tertiary">
                     One link each. Send it however you already talk to them — nothing here
-                    emails anybody, on purpose. The page it opens is the member’s own, and
-                    it is <b className="font-semibold text-secondary">not built yet</b>: these
-                    links will resolve when the member dashboard ships.
+                    emails anybody, on purpose. It opens the member’s own Data Forms page in
+                    this panel, where they fill it in after signing in.
                   </p>
                   {rowsFor(r).filter((x) => x.state === "pending").map((x) => (
                     <div key={x.member.memberId} className="flex flex-col">

@@ -14,9 +14,11 @@
    NOTHING HERE IS AWAITING VERIFICATION. `Due` is the absence of an event —
    nothing has happened to that installment yet. `Fail to pay` is the presence
    of one: a decline, a cancelled mandate, or a due date that demonstrably
-   passed, and the record carries the evidence. There is no third state meaning
-   "recorded but not yet believed", here or at the API.
+   passed, and the record carries the evidence. A manual bank transfer the
+   buyer SUBMITTED but nobody has checked is not in the table at all: it sits
+   in Pending verification above it, and no figure counts it until verified.
    ============================================================================= */
+import { useState } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
 import {
@@ -28,14 +30,14 @@ import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
 import { ActionMenu, InstStrip, Money, SourceTag, SubPill } from "./bits";
-import { RecordSubModal } from "./SubModals";
+import { RecordSubModal, RejectPaymentModal } from "./SubModals";
 import SubAnalytics from "./SubAnalytics";
 import {
   FILTER_LABELS, PERIOD, SUB_SOURCES, SUB_STATUSES,
   applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, subYears, todayIso,
-  useOverview, usePlansSeen, useSubRows, useSubTotals, useSubsLoading,
+  useOverview, usePendingPayments, usePlansSeen, useSubRows, useSubTotals, useSubsLoading, verifyPlanPayment,
 } from "./store";
-import type { Params, SubRow } from "./store";
+import type { Params, PendingPayment, SubRow } from "./store";
 
 /** One screen of rows. `?page=` is already a param every filter helper strips,
  *  so paging is a position in the list and never a filter. */
@@ -215,7 +217,7 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
           { k: <>Collected · {PERIOD.label} <b className="tnum">{inr(o.collectedPaise)}</b></>,
             v: o.collectedN, dot: "ok", on: p.flag === "settled",
             to: rows.some((r) => r.paidN > 0) ? queueHash("settled") : undefined,
-            tip: <>{o.collectedN} installments settled in {PERIOD.label} ({st.paidN} all-time across {rows.length} sales).
+            tip: <>{o.collectedN} installments settled in {PERIOD.label} ({st.collectedN} all-time across {rows.length} sales).
               Money that <b>actually arrived</b> — some of it from subscriptions that have since
               completed, defaulted or been refunded, so it does not describe the {activeN} running
               right now.</> },
@@ -239,6 +241,7 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
         ] as (StatCell | "sep")[])} />
       )}
     >
+      {tab === "subscriptions" && <PendingVerification />}
       {tab === "analytics" ? (
         /* The strip's queues cross back to the records with that filter
            applied — the charts are never narrowed, so "show only these" goes
@@ -291,6 +294,77 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
 }
 
 /* -------------------------------------------------------------------------- */
+
+/** MANUAL TRANSFERS THE BUYER SUBMITTED AND NOBODY HAS CHECKED. Read apart
+ *  from every collected figure: until Verify, it is a claim, not money. Shows
+ *  nothing when there is nothing to check, or when this session may not read
+ *  payments. */
+function PendingVerification() {
+  const { toast, modal, closeLayer } = useShell();
+  const rows = usePendingPayments();
+  const [busy, setBusy] = useState<number | null>(null);
+  if (!rows || !rows.length) return null;
+  const decides = can("payments", "record");
+
+  const verify = async (x: PendingPayment) => {
+    setBusy(x.id);
+    const e = await verifyPlanPayment(x.id);
+    setBusy(null);
+    if (e) toast(e, "bad");
+    else toast(x.reference + " verified · " + inr(x.amountPaise) + " collected and the plan is on.", "ok");
+  };
+  const reject = (x: PendingPayment) => modal(
+    <RejectPaymentModal pay={x} onClose={closeLayer}
+      onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />);
+
+  return (
+    <section className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-md font-semibold text-primary">Pending verification</h2>
+          <p className="mt-0.5 text-sm text-tertiary">
+            Bank transfers a buyer says they made. None of it is counted as collected until it is
+            verified against the bank; verifying switches the plan on.
+          </p>
+        </div>
+        <span className="label-mono">{rows.length} payment{rows.length === 1 ? "" : "s"}</span>
+      </div>
+      <ListTable min="52rem" head={<tr>
+        <th scope="col">Payer</th>
+        <th scope="col">Reference</th>
+        <th scope="col" className="n">Amount</th>
+        <th scope="col">Submitted</th>
+        <th scope="col">Proof</th>
+        {decides && <th scope="col" className="acts"><span className="sr-only">Actions</span></th>}
+      </tr>}>
+        {rows.map((x) => (
+          <tr key={x.id}>
+            <td className="cell-1">
+              {x.payer || "Unknown payer"}
+              <div className="cell-2">{x.paymentFor}</div>
+            </td>
+            <td className="font-mono tnum">{x.reference}</td>
+            <td className="n"><Money paise={x.amountPaise} /></td>
+            <td className="whitespace-nowrap">{fmtDate(x.submittedAt.slice(0, 10))}</td>
+            <td>
+              {x.proofUrl
+                ? <a href={x.proofUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-brand-secondary hover:underline">Open proof</a>
+                : <span className="text-sm text-quaternary">none uploaded</span>}
+            </td>
+            {decides && (
+              <td className="acts whitespace-nowrap">
+                <div className="flex items-center justify-end gap-1.5">
+                  <Button size="sm" color="primary" ico="check" isDisabled={busy !== null} onClick={() => void verify(x)}>Verify</Button>
+                  <Button size="sm" color="secondary" isDisabled={busy !== null} onClick={() => reject(x)}>Reject</Button>
+                </div>
+              </td>
+            )}
+          </tr>
+        ))}
+      </ListTable>
+    </section>
+  );
+}
 
 /** "due in 4 days" / "6 days overdue". One fragment, and it never says late
  *  about a date that has not passed. */

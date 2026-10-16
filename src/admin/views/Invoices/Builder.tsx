@@ -6,8 +6,8 @@
    shown a form that cannot save.
 
    The proof block lives here beside the form, not on a separate screen — the
-   reference and the evidence are the two things the issue transaction refuses
-   without, and they are entered in the same sitting.
+   reference and the evidence are entered in the same sitting. Issue does not
+   need them; it records no payment.
 
    The four guards are drawn exactly as Quotations/Builder draws them, and the
    header belongs to `BuilderBody` in Form.tsx exactly as the quotation's does:

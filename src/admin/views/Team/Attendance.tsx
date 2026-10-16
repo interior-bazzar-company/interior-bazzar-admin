@@ -887,20 +887,20 @@ function Analytics({ scope, span, memberFilter, onSpan }: {
         </ChartFrame>
 
         <ChartFrame title="When people arrive"
-          note="Continuous 30-minute arrival windows. Arrivals up to 09:30 are on time (green); arrivals after 09:30 are late (amber).">
+          note="Continuous 30-minute arrival windows. Each arrival is on time (green) or late (amber) against that member's own start time — the same rule as the On time tile.">
           {spread.length ? (
             <div className="[&_.bg-chart-1]:!bg-utility-green-500 [&_.fill-chart-1]:!fill-utility-green-500 [&_.bg-chart-3]:!bg-utility-yellow-500 [&_.fill-chart-3]:!fill-utility-yellow-500">
               <ColumnChart unit="arrivals" height={200}
                 series={[
-                  { key: "onTime", label: "On time (≤09:30)", slot: 1 },
-                  { key: "late", label: "Late (>09:30)", slot: 3 },
+                  { key: "onTime", label: "On time", slot: 1 },
+                  { key: "late", label: "Late", slot: 3 },
                 ]}
                 points={spread.map((b) => ({
                   key: String(b.at),
                   label: b.label,
                   values: {
-                    onTime: b.at <= 570 ? b.n : 0,
-                    late: b.at > 570 ? b.n : 0,
+                    onTime: b.onTime,
+                    late: b.late,
                   },
                 }))} />
             </div>

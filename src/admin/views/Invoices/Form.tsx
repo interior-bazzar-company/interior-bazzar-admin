@@ -4,9 +4,9 @@
    The same two-column builder the quotation has (Quotations/Form.tsx
    BuilderBody): numbered steps down the left, one summary rail on the right
    carrying the only Save on the page. What an invoice adds is step 3 —
-   the payment it records, and the proof of it — because an invoice here is
-   raised only AFTER the client has paid, and both the reference and the
-   evidence are what the issue transaction refuses without.
+   the payment details and the proof of it. Issue does not need them: it
+   numbers and freezes the invoice and records no payment; the money is
+   logged with Record payment, which writes the deal ledger.
    ===================================================================== */
 import { useRef, useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
@@ -191,7 +191,7 @@ export function BuilderBody({ inv, onSaved, detail }: { inv: InvoiceRow; onSaved
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={3} title="Payment received" hint="required before an invoice is raised" />
+            <StepHead n={3} title="Payment received" hint="optional — Issue records no payment" />
             <Card>
               <FormSection>
                 <FieldRow cols={3}>
@@ -203,8 +203,8 @@ export function BuilderBody({ inv, onSaved, detail }: { inv: InvoiceRow; onSaved
                       options={PAY_MODES.concat(inv.paymentMode && PAY_MODES.indexOf(inv.paymentMode) < 0
                         ? [inv.paymentMode] : []).map((m) => ({ v: m, l: m }))} />
                   </FormField>
-                  <FormField id="nvPayRef" label="Reference / UTR" req
-                    hint="Mandatory — without it the payment cannot be reconciled against the bank.">
+                  <FormField id="nvPayRef" label="Reference / UTR"
+                    hint="Without it the payment cannot be reconciled against the bank.">
                     <Input id="nvPayRef" defaultValue={inv.paymentReference} mono ph="NEFT0026JUN4471" />
                   </FormField>
                 </FieldRow>
@@ -344,16 +344,14 @@ function AddonBlock({ addons, busy, onAdd, onRemove }: {
    builders, carrying the figures, the tax decision and the one Save. */
 
 /* ---------------------------------------------------------------- proof --- */
-/* One line, not a section: what the issue transaction is still missing, and
-   the button that fixes it. Internal evidence — it never reaches the document,
+/* One line, not a section: whether a payment proof is on file, and the
+   button that attaches one. Internal evidence — it never reaches the document,
    and saying so beside it is cheaper than explaining it later.
 
    Attaching is a DRAFT-only affordance, because the server allows it nowhere
-   else (InvoicesController.AttachProof): the proof is a precondition of
-   issuing, so by the time an invoice is issued its evidence is already on
-   file and frozen with it. On an issued invoice this block still LISTS what
-   is on file -- that is the answer to "what was this issued on" -- it just
-   offers no button that would be refused. */
+   else (InvoicesController.AttachProof). Issue does not require a proof any
+   more (it records no payment). On an issued invoice this block still LISTS
+   what is on file -- it just offers no button that would be refused. */
 export function ProofsBlock({ inv, onChanged }: { inv: InvoiceRow; onChanged: () => void }) {
   const { toast } = useShell();
   const [busy, setBusy] = useState(false);
@@ -410,9 +408,7 @@ export function ProofsBlock({ inv, onChanged }: { inv: InvoiceRow; onChanged: ()
                 {proofs.length} proof{proofs.length === 1 ? "" : "s"}{" "}
                 {isDraft ? "attached" : "on file"}</b>
             : isDraft
-              ? <b className="inline-flex items-center gap-1 font-medium text-error-primary">
-                  <Icon name="alert" size="xs" />
-                  No payment proof attached yet — required to issue</b>
+              ? <b className="font-medium text-quaternary">No payment proof attached yet</b>
               : <b className="font-medium text-quaternary">No proof on file</b>}{" "}
           <span className="text-tertiary">· internal record, never shown to the customer</span>
         </span>

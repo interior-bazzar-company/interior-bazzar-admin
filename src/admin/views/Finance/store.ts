@@ -302,6 +302,10 @@ interface Live {
   statements: Statement[]; lineMatches: Record<string, LineMatch>; resolutions: Resolution[];
   bankMatchedPct: number | null;
   ledger: DealPaymentRow[]; plans: PlanPaymentRow[]; runs: SalaryRunRow[];
+  /** Manual plan payments still SUBMITTED — money claimed, not yet believed.
+   *  Kept OUT of `plans` so no collected figure ever counts them; null = this
+   *  session may not read them. */
+  submitted: PlanPaymentRow[] | null;
   /** Plan payments with a settled refund request (Overview/live.ts planCashPaise). */
   settledRefunds: Set<number>;
   installments: InstallmentRow[]; invoices: InvoiceRow[];
@@ -309,13 +313,16 @@ interface Live {
   revenue: RevenueOverview | null; activeSalaryAccounts: number | null;
   /** Spend, salary runs and refunds were all readable — burn is their sum. */
   outReadable: boolean;
+  /** salaries/ answered. A session without the payroll grant gets a 403, and
+   *  every OUT and net figure is then short by the whole wage bill. */
+  salaryReadable: boolean;
   /** The first month the windowed reads (ledger, plans, runs) cover. */
   sinceMonth: string;
 }
 const NO_LIVE: Live = {
   tags: [], txns: [], refunds: [], refundPayment: {}, statements: [], lineMatches: {}, resolutions: [],
-  bankMatchedPct: null, ledger: [], plans: [], runs: [], settledRefunds: new Set(), installments: [], invoices: [],
-  revenue: null, activeSalaryAccounts: null, outReadable: false, sinceMonth: "",
+  bankMatchedPct: null, ledger: [], plans: [], runs: [], submitted: null, settledRefunds: new Set(), installments: [], invoices: [],
+  revenue: null, activeSalaryAccounts: null, outReadable: false, salaryReadable: false, sinceMonth: "",
 };
 let live: Live = NO_LIVE;
 let loading: Promise<void> | null = null;
@@ -467,7 +474,7 @@ async function loadLive(): Promise<void> {
   const vocab = (name: string) => soft(call(AdminOpsService.vocab(name)).then((r) => r.items));
 
   const [tagItems, kinds, grounds, rStates, iStates,
-    spend, income, refunds, bank, ledger, plans, salaries, salaryAccounts, installments, invoices, revenue,
+    spend, income, refunds, bank, ledger, plans, submitted, salaries, salaryAccounts, installments, invoices, revenue,
     history, txnHistory] = await Promise.all([
     vocab("expense-tags"), vocab("income-kinds"),
     vocab("refund-grounds"), vocab("refund-states"), vocab("income-states"),
@@ -478,6 +485,9 @@ async function loadLive(): Promise<void> {
     soft(call(AdminOpsService.bankStatements())),
     soft(every((n) => call(AdminOpsService.dealPayments({ ...win, pageNo: n, pageSize: 200 })), (r) => r.payments)),
     soft(every((n) => call<PlanPaymentsListResponse>(AdminOpsService.payments({ ...win, status: "PAID,REFUNDED", pageNo: n, pageSize: 100 })), (r) => r.payments)),
+    /* NO DATE WINDOW: the window filters on verifiedAt, which a submitted
+       payment does not have yet — windowed, every one of them would vanish. */
+    soft(every((n) => call<PlanPaymentsListResponse>(AdminOpsService.payments({ status: "SUBMITTED", paymentMethod: "manual", pageNo: n, pageSize: 100 })), (r) => r.payments)),
     soft(call(AdminOpsService.salaries({ start: since, end: monthOf(today) }))),
     soft(call(AdminOpsService.salaryAccounts())),
     soft(every((n) => call(AdminOpsService.installments({ pageNo: n, pageSize: 500 })), (r) => r.installments)),
@@ -545,11 +555,12 @@ async function loadLive(): Promise<void> {
     })),
     lineMatches, resolutions,
     bankMatchedPct: bank ? bank.totals.matchedPct : null,
-    ledger: ledger || [], plans: plans || [], runs: salaries ? salaries.runs : [],
+    ledger: ledger || [], plans: plans || [], runs: salaries ? salaries.runs : [], submitted,
     settledRefunds: settledRefundPayments(refundRows),
     installments: installments || [], invoices: invoices || [],
     revenue, activeSalaryAccounts: salaryAccounts ? salaryAccounts.accounts.filter((a) => a.isActive).length : null,
     outReadable: !!(spend && salaries && refunds),
+    salaryReadable: !!salaries,
     sinceMonth: since,
   };
   server = { epoch: t.epochMs, at: Date.now() };
@@ -1126,7 +1137,6 @@ function saleSubscription(c: ApiSubscriptionRow): Subscription {
 let subsLoading: Promise<void> | null = null;
 let subsSeq = 0;
 let subsLoaded = false;
-const localDirectSubs: Subscription[] = [];
 
 async function loadSubs(): Promise<void> {
   const mine = ++subsSeq;
@@ -1142,12 +1152,10 @@ async function loadSubs(): Promise<void> {
   /* The purchases carry their commitment; a SALE has no purchase, so it is
      only on the commitments list. */
   const sales = (held || []).filter((c) => !!c.quotation);
-  snap.subscriptions = localDirectSubs.concat(
-    (rows || []).map((x) => ({
-      ...liveSubscription(x),
-      events: x.subscription ? history["subscription:" + x.subscription.id] || [] : [] }))
-      .concat(sales.map((c) => ({ ...saleSubscription(c), events: history["subscription:" + c.id] || [] })))
-  );
+  snap.subscriptions = (rows || []).map((x) => ({
+    ...liveSubscription(x),
+    events: x.subscription ? history["subscription:" + x.subscription.id] || [] : [] }))
+    .concat(sales.map((c) => ({ ...saleSubscription(c), events: history["subscription:" + c.id] || [] })));
   commitments = {};
   (rows || []).forEach((x) => {
     if (x.subscription) commitments["SUB-" + x.family + "-" + x.id] = x.subscription;
@@ -1985,11 +1993,6 @@ const sumOf = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((n, x) => n + f(x)
 const inP = (d: string | null | undefined, from: string, to: string) => !!d && inPeriod(d, from, to);
 const addDaysIso = (d: string, n: number) =>
   new Date(new Date(d + "T00:00:00Z").getTime() + n * DAY).toISOString().slice(0, 10);
-const addMonthsIso = (d: string, m: number) => {
-  const x = new Date(d + "T00:00:00Z");
-  x.setUTCMonth(x.getUTCMonth() + m);
-  return x.toISOString().slice(0, 10);
-};
 
 /** THE PERIOD'S MONEY, from ONE half. On a live section every field is the
  *  server's; on the Subscriptions face — the one seed face that reads this —
@@ -2350,15 +2353,20 @@ export function waterfall(from = livePeriodOf().from, to = livePeriodOf().to): W
       paise: o.collectedPaise, kind: "in" },
     { key: "other_in", label: "Other income", sub: n(o.otherInN, "credit"),
       paise: o.otherInPaise, kind: "in" },
-    { key: "salary", label: "Salary", sub: o.salaryN ? n(o.salaryN, "slip") : "no run paid yet",
+    { key: "salary", label: "Salary",
+      sub: !salariesReadable() ? "not included — no access" : o.salaryN ? n(o.salaryN, "slip") : "no run paid yet",
       paise: o.salaryPaise, kind: "out" },
     { key: "other_out", label: "Other spend", sub: n(o.otherOutN, "transaction"),
       paise: o.otherOutPaise, kind: "out" },
     { key: "refunds", label: "Refunds", sub: n(o.refundsPaidN, "refund"),
       paise: o.refundsPaidPaise, kind: "out" },
-    { key: "net", label: "Net", sub: "cash, not profit", paise: o.netPaise, kind: "total" },
+    { key: "net", label: "Net", sub: salariesReadable() ? "cash, not profit" : "excludes salaries", paise: o.netPaise, kind: "total" },
   ];
 }
+
+/** False only when the live read ran and salaries/ refused it. Until then, and
+ *  on the seed, there is nothing to warn about. */
+const salariesReadable = () => !onLive() || !server || live.salaryReadable;
 
 /* ============================================================ at risk === */
 
@@ -2641,8 +2649,6 @@ export interface RecordSubInput {
    *  SALE, recorded over the quotation whose invoice `invoiceNumber` names. */
   purchase?: { family: string; id: number };
   state?: string;
-  direct?: boolean;
-  totalPaise?: number;
 }
 
 /** One commitment against one purchase. Kept apart from `recordSubscription`
@@ -2658,59 +2664,6 @@ async function postCommitment(family: string, purchase: number,
 
 export async function recordSubscription(input: RecordSubInput):
   Promise<{ error: string; subscriptionId: string | null }> {
-  if (input.direct || (!input.purchase && !input.invoiceNumber)) {
-    const user = readUsers().find((u) => u.userId === input.userId);
-    const idNum = Math.floor(1000 + Math.random() * 9000);
-    const subId = "SUB-DIR-" + idNum;
-    const n = Math.max(1, input.installmentCount || 1);
-    const totalPaise = input.totalPaise || 0;
-    const paidN = input.paid ? Math.min(input.paid.count, n) : 0;
-    const sched = previewSchedule(input.startDate || todayIso(), n, totalPaise);
-    const installments: Installment[] = sched.map((s) => ({
-      seq: s.seq,
-      of: s.of,
-      dueDate: s.dueDate,
-      amountPaise: s.amountPaise,
-      status: s.seq <= paidN ? ("paid" as InstallmentStatus) : ("due" as InstallmentStatus),
-      invoiceNumber: null,
-      payment: s.seq <= paidN && input.paid ? {
-        paymentId: "DP-DIR-" + idNum + "-" + s.seq,
-        amountPaise: s.amountPaise,
-        mode: input.paid.mode,
-        reference: input.paid.reference,
-        valueDate: input.paid.valueDate,
-        accountId: input.paid.accountId,
-        recordedBy: "admin",
-        recordedAt: stamp(),
-        receipt: null, bankLineId: null, proof: null,
-      } : null,
-      failure: null,
-    }));
-    const paidAll = paidN === n;
-    const sub: Subscription = {
-      subscriptionId: subId,
-      source: input.source || "sales",
-      customer: { name: user ? user.name : "Customer " + input.userId, userId: input.userId },
-      planId: input.planId,
-      planName: input.planName,
-      cycleMonths: input.cycleMonths,
-      totalPaise,
-      startDate: input.startDate || todayIso(),
-      endDate: addMonthsIso(input.startDate || todayIso(), input.cycleMonths),
-      status: paidAll ? "completed" : "active",
-      installments,
-      invoiceNumber: null,
-      paidInFull: paidAll,
-      soldBy: "admin",
-      recordedBy: "admin",
-      recordedAt: stamp(),
-      events: [],
-    };
-    localDirectSubs.unshift(sub);
-    snap.subscriptions = [sub, ...snap.subscriptions];
-    emit();
-    return { error: "", subscriptionId: subId };
-  }
   if (!input.purchase) {
     /* THE INVOICE NAMES THE QUOTATION, and the quotation's deal names the
        customer. What is paid is the ledger's: `paid.count` is checked against
@@ -2788,7 +2741,7 @@ export async function recordInstallmentPayment(input: RecordPaymentInput):
   const sale = saleIdOf(input.subscriptionId);
   if (sale === null)
     return {
-      error: "This self-serve purchase is settled via payment gateway. To verify manual bank transfer for this purchase, use 'Verify Plan Payment' under Payments & transaction actions.",
+      error: "A plan purchase is one payment, settled by the payment gateway. A manual bank transfer is verified under Pending verification on the Subscriptions page.",
       paymentId: null,
     };
   try {
@@ -2864,6 +2817,40 @@ export async function reversePayment(paymentId: string, reason: string): Promise
   }
   await bootSubs(true);
   return "";
+}
+
+/* ------------------------------------------------- pending verification ---
+   A buyer who paid by bank transfer submits the UTR and a proof; the payment
+   sits SUBMITTED until somebody checks it against the bank. Verify puts it on
+   the books and switches the plan on (one server transaction); Reject keeps the
+   row, marked REJECTED, with the reason on its audit line. Neither deletes. */
+export interface PendingPayment {
+  id: number; orderId: string; reference: string; amountPaise: number;
+  paymentFor: string; submittedAt: string; payer: string; proofUrl: string;
+}
+function pendingPayments(): PendingPayment[] | null {
+  return live.submitted && live.submitted.map((x) => ({
+    id: x.id, orderId: x.orderId, reference: x.transactionId, amountPaise: paiseOf(x.amount),
+    paymentFor: x.paymentFor, submittedAt: x.createdAt,
+    payer: x.payer ? x.payer.name || x.payer.business : "", proofUrl: x.proofUrl || "",
+  }));
+}
+export function usePendingPayments(): PendingPayment[] | null { useVersion(); useLiveBoot(); return pendingPayments(); }
+
+async function decidePayment(write: () => Promise<unknown>): Promise<string> {
+  try {
+    await write();
+  } catch (e) {
+    return writeError(e);
+  }
+  await Promise.all([bootFinanceLive(true), bootSubs(true)]);
+  return "";
+}
+export const verifyPlanPayment = (id: number) =>
+  decidePayment(() => call(AdminOpsService.verifyPayment(id)));
+export function rejectPlanPayment(id: number, reason: string): Promise<string> {
+  if (!reason.trim()) return Promise.resolve("Say why it is rejected. It goes into the history verbatim. (reason_required)");
+  return decidePayment(() => call(AdminOpsService.rejectPayment(id, reason.trim())));
 }
 
 /** FN · It stops renewing, on a day, for a reason. NOT A REFUND: money already
@@ -3665,6 +3652,7 @@ export function useMatchedPct() { useVersion(); useLiveBoot(); return matchedPct
 export function useTaxSummary() { useVersion(); useLiveBoot(); return taxSummary(); }
 export function useActivity(limit = 30) { useVersion(); return snap.activity.slice(0, limit); }
 
+export function useSalariesReadable(): boolean { useVersion(); useLiveBoot(); return salariesReadable(); }
 export function useLiveLoading(): boolean { useVersion(); useLiveBoot(); return !server; }
 
 /* ========================================================= formatting === */

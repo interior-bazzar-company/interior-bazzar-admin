@@ -40,7 +40,7 @@ import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
   Alert, Button, Card, ChartFrame, DateInput, EmptyState, FieldRow, FilterBar, FilterChips,
-  FormField, Icon, IconButton, Input, ListTable, ModalShell, PageHeader, Pill, Rail,
+  FormField, Icon, IconButton, Input, ListTable, ModalShell, PageHeader, Pill,
   SearchField, SectionHead, Segmented, Select, SelectInput, StatStrip, Tabs, TbTitle, Tiles,
   cap, qs, tagClasses,
 } from "../../ui";
@@ -433,7 +433,7 @@ const slugOptions = (tags: Tag[]) => {
  *  other cell the moment one was pressed. */
 export function WorkStats({ p }: { p: Record<string, string> }) {
   const sansStatus = { ...p };
-  delete sansStatus.status;
+  delete sansStatus.status; delete sansStatus.wait;
   const t = workTotals(useWork(sansStatus, "all"));
 
   const route = (key?: string, val?: string) => {
@@ -458,6 +458,7 @@ export function WorkStats({ p }: { p: Record<string, string> }) {
       on: !!p.wait, to: p.wait ? route() : route("wait", "1"),
     },
     stage("complete", t.completed, "completed", "ok"),
+    stage("cancelled", t.cancelled, "cancelled", "neutral"),
   ];
   return <StatStrip cells={cells} />;
 }
@@ -1105,14 +1106,14 @@ function MonthRail({ anchor, rows, me, onOpen }: {
         right={<Pill xs tone="neutral" text={inMonth.length + " dated"} />}>
         <div className="flex flex-col gap-2">
           <span className="flex h-2 w-full overflow-hidden rounded-full bg-quaternary" role="img"
-            aria-label={t.completed + " done, " + (t.inProgress + t.planned) + " open, " + t.delayed + " in delay"}>
+            aria-label={t.completed + " done, " + (t.inProgress + t.planned + t.waiting) + " open, " + t.delayed + " in delay"}>
             <i className="block bg-utility-green-500" style={{ width: seg(t.completed) }} />
-            <i className="block bg-utility-blue-500" style={{ width: seg(t.inProgress + t.planned) }} />
+            <i className="block bg-utility-blue-500" style={{ width: seg(t.inProgress + t.planned + t.waiting) }} />
             <i className="block bg-utility-yellow-500" style={{ width: seg(t.delayed) }} />
           </span>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <span className="text-success-primary tnum">{t.completed} done</span>
-            <span className="text-tertiary tnum">{t.inProgress + t.planned} open</span>
+            <span className="text-tertiary tnum">{t.inProgress + t.planned + t.waiting} open</span>
             <span className="text-warning-primary tnum">{t.delayed} in delay</span>
           </div>
         </div>

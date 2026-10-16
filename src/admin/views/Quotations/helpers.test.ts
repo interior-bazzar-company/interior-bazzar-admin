@@ -8,7 +8,7 @@
 */
 import type { QuotationRow } from "../../../api/modules/adminOps";
 import {
-  blockersOf, discountFromServer, discountToServer, expiringSoon, filterQuotations, lineNet,
+  blockersOf, discountFromServer, discountToServer, evenSchedule, expiringSoon, filterQuotations, lineNet,
   lineNetOf, liveTotals, planLabel, summarize,
 } from "./helpers";
 
@@ -212,5 +212,11 @@ const typed = liveTotals({
 assert.equal(typed.discountAmountPaise, 500000, "₹5,000 off, not ₹50");
 assert.equal(typed.taxablePaise, 2449900);
 assert.equal(typed.grandTotalPaise, 2890882);
+
+// The stored schedule from F-AD-14: ₹15,928.94 over 3 -> ₹5,309 / ₹5,309 / ₹5,310.94.
+assert.equal(evenSchedule(1592894, 3).join(","), "530900,530900,531094", "even split, remainder last");
+assert.equal(evenSchedule(1592894, 3).reduce((a, b) => a + b, 0), 1592894, "parts foot to the total");
+assert.equal(evenSchedule(250, 3).join(","), "83,83,84", "under a rupee a row keeps the raw split");
+assert.equal(evenSchedule(1000, 1).join(","), "1000", "one payment is the total");
 
 console.log("quotations helpers: ok");

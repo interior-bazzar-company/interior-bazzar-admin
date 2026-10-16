@@ -17,7 +17,7 @@ import { useState } from "react";
 import { Button, Card, EmptyState, Icon, Pill, SectionHead, Tag } from "../../ui";
 import { BusinessSearch, CandidateCard, Disclose, FactorTable, InfoNote, PanelNote } from "./bits";
 import { can } from "../../shell/AdminShell";
-import { RULES, isTerminal, manualCandidate, needsOverrideReason } from "./store";
+import { RULES, handPicked, isTerminal, manualCandidate, needsOverrideReason } from "./store";
 import type { Candidate, Enquiry, MatchRun } from "./store";
 
 /* ---------------------------------------------------------- the panel --- */
@@ -315,7 +315,8 @@ export function MatchSnapshot({ e, run }: { e: Enquiry; run: MatchRun | null }) 
           It is recalculated on every matching run and reflects today's profiles. It becomes history
           only at the moment of assignment.
         </InfoNote>
-        <Card title={top.name} sub={"Rank 1 · score " + top.score + " · rule " + run!.ruleVersion} tight>
+        <Card title={top.name} sub={(run!.ranked ? "Rank 1 · score " + top.score : "Unranked · stage 1 only")
+          + " · rule " + run!.ruleVersion} tight>
           <FactorTable c={top} />
         </Card>
       </div>
@@ -333,8 +334,9 @@ export function MatchSnapshot({ e, run }: { e: Enquiry; run: MatchRun | null }) 
     <div className="flex flex-col gap-4">
       <Card
         title={a.businessName}
-        sub={"Rank " + a.candidateRank + " of " + a.eligibleCount + " eligible · score " +
-          a.candidateScore + " · rule " + a.ruleVersion}
+        sub={handPicked(a) ? "Hand-picked · no rank or score recorded"
+          : "Rank " + a.candidateRank + " of " + a.eligibleCount + " eligible · score " +
+            a.candidateScore + " · rule " + a.ruleVersion}
         tight
       >
         <FactorTable c={asCandidate} />

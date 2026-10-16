@@ -60,14 +60,13 @@
    route); the server checks it against its field, stores the key and reads it
    back as a signed URL.
 
-   STILL LOCAL — no backend: the share link's token (derived below, never
-   authorisation; Resource has no token column), and the static labels in
-   vocabularies.json (submitted/pending). Field types and tag suggestions are
+   STILL LOCAL — no backend: the static labels in vocabularies.json
+   (submitted/pending). The share link opens the member's own page in this
+   panel (see shareLink). Field types and tag suggestions are
    served (vocab/resource-field-types, vocab/resource-tag-suggestions).
    ============================================================================= */
 import { useEffect, useState } from "react";
 import vocabDoc from "../../../content/resources/vocabularies.json";
-import config from "../../../config";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import { CommonService } from "../../../api/modules/common";
 import type { ApiResponseType } from "../../../types/reqResType";
@@ -489,27 +488,14 @@ export function totalsFor(r: Resource): Totals {
  *  is free, and the module's second refusal — no member answers twice — has
  *  something to refuse on.
  *
- *  THE TOKEN HERE IS NOT A SECRET AND IS NOT PRETENDING TO BE. It is derived
- *  from the two ids so a link is stable across reloads of a fixture, which is
- *  what makes it testable. The real one is minted server-side, single-use and
- *  expiring, and it is on the work-list as exactly that — see
- *  BACKEND-INTEGRATION.md § Module 8. Nothing in this panel should ever treat
- *  this string as authorisation.
+ *  IT OPENS THIS PANEL, on the member's own Data Forms page, where "Fill it in"
+ *  is (F-AD-32). It used to point at a public /r/<token> page that was never
+ *  built and rendered the marketplace shell. A member's own record opens for
+ *  them without any team grant (registry.tsx), so the link works for whoever
+ *  it is sent to once they sign in, and for nobody else.
  */
-export function shareToken(resourceId: string, memberId: string): string {
-  return "r" + resourceId.replace(/[^A-Za-z0-9]/g, "").toLowerCase()
-    + "m" + memberId.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
-}
-
-/** Where the member goes to fill it in. `FRONTEND_URL` is the public site and
- *  is genuinely absent in some builds — the render harness defines
- *  `import.meta.env` as `{}` — so it degrades to a readable host rather than to
- *  the string "undefined" in front of somebody about to paste it into a
- *  message. Same guard `profileUrl` in Users/store.ts uses, for the same
- *  reason. */
-export function shareLink(resourceId: string, memberId: string): string {
-  const base = String(config.FRONTEND_URL || "").replace(/\/+$/, "");
-  return (base || "https://interiorbazzar.com") + "/r/" + shareToken(resourceId, memberId);
+export function shareLink(_resourceId: string, memberId: string): string {
+  return window.location.origin + "/team/" + encodeURIComponent(memberId) + "/resources";
 }
 
 /** A link is only worth sending while the resource is open. Anything else has

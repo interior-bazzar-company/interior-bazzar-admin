@@ -18,7 +18,7 @@
        is a link to a timeline.
    ============================================================================= */
 import { useState } from "react";
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   ActivityFeed, Button, Card, Checkbox, EmptyState, IconButton, InfoDot, KvList, Notice,
@@ -37,7 +37,7 @@ import {
   AssignModal, InvalidateModal, OutcomeModal, ReassignModal,
 } from "./Modals";
 import {
-  CHECKLIST, activeAssignment, addRemark, businessById, dateTimeLabel, durationLabel, isWorking,
+  CHECKLIST, activeAssignment, addRemark, businessById, dateTimeLabel, durationLabel, handPicked, isWorking,
   markNoMatch, matchCooldown, tierOf,
   isTerminal, lastResponse, pastAssignments, place, runMatching, statusOf,
   transitionOf, useEnquiry, useMatchRun, useWrite,
@@ -592,8 +592,10 @@ function AssignmentTab({ e }: { e: Enquiry }) {
           <Card title="The active assignment" tight>
             <KvList pairs={[
               ["Business", <b className="font-semibold">{a.businessName}</b>],
-              ["Rank at assign", a.candidateRank + " of " + a.eligibleCount + " eligible"],
-              ["Score at assign", <><b className="font-semibold tnum">{a.candidateScore}</b> / 100</>],
+              ...(handPicked(a)
+                ? [["Selection", <>Hand-picked <span className="text-tertiary">· no rank or score recorded</span></>] as [ReactNode, ReactNode]]
+                : [["Rank at assign", a.candidateRank + " of " + a.eligibleCount + " eligible"] as [ReactNode, ReactNode],
+                   ["Score at assign", <><b className="font-semibold tnum">{a.candidateScore}</b> / 100</>] as [ReactNode, ReactNode]]),
               ["Rule version", <span className="font-mono">{a.ruleVersion}</span>],
               ["Assigned by", a.assignedBy + " · " + a.assignedByRole],
               ["Assigned at", dateTimeLabel(a.assignedAt)],
@@ -602,7 +604,7 @@ function AssignmentTab({ e }: { e: Enquiry }) {
                 : a.deliveryStatus === "failed"
                   ? <span className="text-error-primary">Failed — the assignment stands; Operations is alerted</span>
                   : "Enqueued — the outbox has not published it yet"],
-              ["Override reason", a.overrideReason || <span className="text-quaternary">— none, top-ranked</span>],
+              ["Override reason", a.overrideReason || <span className="text-quaternary">{handPicked(a) ? "— none recorded" : "— none, top-ranked"}</span>],
               ["Capacity", b ? <>{b.name} is <b className="font-semibold">{b.capacity.active} of {b.capacity.configured}</b> this {b.capacity.period}</> : null],
             ]} />
             <FrozenBar at={"at " + dateTimeLabel(a.assignedAt)}>
@@ -660,7 +662,8 @@ function AssignmentTab({ e }: { e: Enquiry }) {
               <KvList pairs={[
                 ["Business", <b className="font-semibold">{p.businessName}</b>],
                 ["Assigned", dateTimeLabel(p.assignedAt) + " by " + p.assignedBy],
-                ["Rank · score", p.candidateRank + " · " + p.candidateScore + " · rule " + p.ruleVersion],
+                ["Rank · score", handPicked(p) ? "Hand-picked · no rank or score recorded"
+                  : p.candidateRank + " · " + p.candidateScore + " · rule " + p.ruleVersion],
                 ["Closed", dateTimeLabel(p.supersededAt)],
                 ["Reason", p.closedReason],
               ]} />

@@ -330,7 +330,7 @@ function ItemsTab({ q, onRevise }: { q: QuotationRow; onRevise: () => void }) {
             <td className="tnum">{it.termMonths ? it.termMonths + " mo" : <span className="text-quaternary">—</span>}</td>
             <td className="n">{it.ratePerMonthPaise ? inr(it.ratePerMonthPaise) + "/mo" : inr(it.amountPaise)}</td>
             <td className="n">{it.discountValue
-              ? it.discountType === "pct" ? it.discountValue + "%" : "−" + inr(it.discountValue * 100)
+              ? it.discountType === "pct" ? it.discountValue + "%" : "−" + inr(it.discountValue)
               : "—"}</td>
             <td className="n">{inr(it.taxableAmountPaise)}</td>
             <td className="n">{inr(it.taxAmountPaise)}<div className="cell-2">{it.taxRate}%</div></td>

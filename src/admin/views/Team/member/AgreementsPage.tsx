@@ -16,7 +16,7 @@
    somebody has to remember. The only writes on this page are: send a new one,
    revoke an unsigned one, and sign one — and signing is the member's own act.
    ============================================================================= */
-import { Alert, Button, ListTable, Notice, Pill, Rail } from "../../../ui";
+import { Alert, Button, ConfirmModal, ListTable, Notice, Pill, Rail } from "../../../ui";
 import { go } from "../../../ui/nav";
 import { useShell } from "../../../shell/ShellContext";
 import {
@@ -47,10 +47,16 @@ export default function AgreementsPage({ m, viewer }: { m: Member; viewer: Viewe
   const unopened = rows.filter((a) => a.state === "sent" && !a.viewedAt && !isExpired(a));
   const expired = rows.filter(isExpired);
 
-  const revoke = async (a: Agreement) => {
-    const r = await revokeAgreement(a.agreementId);
-    shell.toast(r.ok ? "Revoked. The link is dead." : (r as { message: string }).message, r.ok ? "" : "bad");
-  };
+  /* ASK FIRST (F-AD-52): revoking cannot be undone. */
+  const revoke = (a: Agreement) => shell.modal(
+    <ConfirmModal tone="bad" title={"Revoke " + a.title + "?"} verb="Revoke"
+      body="The signing link stops working immediately and this copy can no longer be signed. To change anything, send a fresh one."
+      onClose={shell.closeLayer}
+      onConfirm={async () => {
+        shell.closeLayer();
+        const r = await revokeAgreement(a.agreementId);
+        shell.toast(r.ok ? "Revoked. The link is dead." : (r as { message: string }).message, r.ok ? "" : "bad");
+      }} />);
 
   return (
     <div className="flex flex-col gap-5">

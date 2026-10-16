@@ -37,12 +37,15 @@ let unreachable = false;
  *              the "in your access, no surface yet" notice. Payment is already
  *              where it belongs — recorded against the invoice that received
  *              it, in Invoices.
+ *    auth      "Sign-in / Sign-out" — a server row that exists only so the
+ *              Audit log can filter and label sign-in events. It has no screen,
+ *              and the nav entry opened the "no surface yet" stub (F-AD-61).
  *  ponytail: hidden here rather than by deleting the server's Module rows,
  *  because those rows still carry the grants issued against them; drop them
  *  server-side and this set goes with them. Lives in this file (not modules.ts)
  *  because modules.ts already imports from here — the other direction would
  *  be a cycle. */
-export const HIDDEN_MODULES = new Set(["design", "payments", "finance-bank", "bank", "finance-reconciliation", "reconciliation"]);
+export const HIDDEN_MODULES = new Set(["design", "payments", "finance-bank", "bank", "finance-reconciliation", "reconciliation", "auth"]);
 
 /** THE MIRROR IMAGE OF HIDDEN_MODULES, AND NOW EMPTY — keep it that way.
  *

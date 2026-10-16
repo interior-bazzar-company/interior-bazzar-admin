@@ -13,7 +13,7 @@
 import type { ReactNode } from "react";
 import type React from "react";
 import { cx } from "@/utils/cx";
-import { Avatar as UIAvatar, Icon, Notice, Pill } from "../ui";
+import { Avatar as UIAvatar, Icon, Notice, Pill, errorHeadline } from "../ui";
 import { getGroupOf } from "../shell/modules";
 import { AppExceptions } from "../../api/apiService";
 import type { AdminRole, AdminUserRole, AdminUserRow, RoleActionDef, RoleModules, RolesModuleDef } from "../../api/modules/adminOps";
@@ -252,7 +252,7 @@ export function ActionMatrix({ mods, grants, editable }: { mods: RoleModuleDef[]
                         <label
                           key={a.key}
                           className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-secondary/60 px-2.5 py-1 text-xs ring-1 ring-secondary ring-inset hover:bg-secondary"
-                          title={a.label || a.key}
+                          title={(a as { label?: string }).label || a.key}
                         >
                           <NativeCheck
                             data-mod={m.key}
@@ -317,9 +317,8 @@ export function ErrSlot({ err }: { err: EngineErr | null }) {
     <div id="tmErr" className={cx(err && "mb-3")}>
       {err ? (
         <Notice tone="bad">
-          <b>
-            {err.http} — {err.message}
-          </b>
+          <b>{errorHeadline(err.http)}</b>
+          {err.message ? <div className="mt-0.5">{err.message}</div> : null}
         </Notice>
       ) : null}
     </div>

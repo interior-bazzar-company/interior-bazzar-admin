@@ -2,10 +2,11 @@
    ISSUE — the last guard, the prototype's `in-issue` dialog, and the same
    dialog the quotation gets before ITS irreversible step.
 
-   Issuing an invoice does more than freeze it: it allocates a number out of
-   the statutory sequence AND writes the payment to the deal ledger, both in
-   one transaction (InvoicesController.Issue). That is not something a button
-   should just do, so it gets a dialog that states what is about to be true.
+   Issuing allocates a number out of the statutory sequence and freezes the
+   document (InvoicesController.Issue). It records NO payment -- the money is
+   logged later with "Record payment", which writes the deal ledger. A spent
+   number cannot be taken back, so it gets a dialog that states what is about
+   to be true.
 
    The blocker list is the same check the server runs (see helpers.blockersOf).
    The server re-checks all of them — this only says, before you commit,
@@ -25,7 +26,6 @@ export default function IssueModal({ inv, onClose, run }: {
   const [busy, setBusy] = useState(false);
   const blockers = blockersOf(inv);
   const plan = planItemOf(inv);
-  const proofs = (inv.proofs || []).filter((p) => !p.removed);
 
   /* Left enabled even with blockers listed. The server is the authority on
      whether this can be issued, and its refusal — in its own words — is a
@@ -34,10 +34,6 @@ export default function IssueModal({ inv, onClose, run }: {
     setErr(null); setBusy(true);
     run().catch((e: unknown) => { setErr(errMessage(e)); setBusy(false); });
   };
-
-  /* A REQUIRED FIELD THAT IS EMPTY IS NOT A BLANK — it is the reason this
-     dialog will refuse, so it says so where the value would have been. */
-  const missing = (what: string) => <span className="text-error-primary">— {what} required</span>;
 
   return (
     <ModalShell
@@ -62,8 +58,8 @@ export default function IssueModal({ inv, onClose, run }: {
               </ul>
             </Alert>
           : <Alert tone="ok" ico="check" title="Validation passed.">
-              The line, the reference and the proof are all in place. That this total still fits what
-              is uninvoiced on the deal is the server's own last check.
+              The line, the billing block and the due date are in place. That this total matches the
+              accepted quotation and still fits what is uninvoiced on the deal is the server's own last check.
             </Alert>}
 
         <KvList pairs={[
@@ -76,12 +72,6 @@ export default function IssueModal({ inv, onClose, run }: {
                     : "full amount")}</span></>
             : <span className="text-quaternary">no plan line</span>],
           ["Grand total", <b className="font-mono tnum">{inr(inv.grandTotalPaise)}</b>],
-          ["Reference / UTR", inv.paymentReference
-            ? <span className="font-mono tnum">{inv.paymentReference}</span>
-            : missing("a reference is")],
-          ["Proof", proofs.length
-            ? proofs.length + " file" + (proofs.length === 1 ? "" : "s") + " attached"
-            : missing("a file is")],
           ["Due date", fmtDate(inv.dueDate)],
         ]} />
 
@@ -90,9 +80,9 @@ export default function IssueModal({ inv, onClose, run }: {
           way — the sequence is statutory, so it never has unexplained gaps.
         </Alert>
 
-        <Alert tone="ok" ico="check" title="This invoice is raised because the client has already paid.">
-          Issuing writes {inr(inv.grandTotalPaise)} to the deal ledger as the same action, in one
-          transaction — the reference and the proof above are what that ledger entry is built from.
+        <Alert tone="info" title="Issuing records no payment.">
+          It numbers and freezes this invoice as a demand for {inr(inv.grandTotalPaise)}. When the
+          money arrives, record the payment against it — that is what writes the deal ledger.
         </Alert>
       </div>
     </ModalShell>

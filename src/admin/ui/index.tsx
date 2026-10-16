@@ -21,7 +21,7 @@
 export { BRAND_MARK, BrandLogo } from "./brand";
 export { Icon, ICONS, iconOf } from "./icon";
 export type { IconName, IconComponent } from "./icon";
-export { avatarTone, initials, qs, cap, titleise, shareOrCopy, copyToClipboard, publicDocUrl, printHtml, AVATAR_TONES } from "./helpers";
+export { avatarTone, initials, qs, cap, titleise, errorHeadline, errorLine, shareOrCopy, copyToClipboard, publicDocUrl, printHtml, AVATAR_TONES } from "./helpers";
 export type { AvatarTone } from "./helpers";
 
 export { Button, IconButton, Segmented } from "./buttons";

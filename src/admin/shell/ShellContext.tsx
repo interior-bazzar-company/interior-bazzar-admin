@@ -354,8 +354,11 @@ export function ShellProvider({ children }: { children: ReactNode }) {
       {pop ? <PopBox pop={pop} onClose={closePop} /> : null}
 
       {/* ---------------------------------------------------------- toasts */}
+      {/* BOTTOM-LEFT, not bottom-right: every dialog's primary button sits at
+          the bottom-right, and a refusal toast landed on the very Create
+          button the reader had to press again (F-AD-49). */}
       {createPortal(
-        <div className="pointer-events-none fixed right-4 bottom-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2" id="toasts" aria-live="polite">
+        <div className="pointer-events-none fixed left-4 bottom-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2" id="toasts" aria-live="polite">
           {toasts.map((t) => (
             <div
               key={t.id}

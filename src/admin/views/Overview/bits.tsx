@@ -126,6 +126,10 @@ export function Kpi({ k, tip, v, s, now, before, kind, good, of, to, foot, tone 
   if (now !== undefined && before !== undefined && now !== null && before !== null) {
     const ch = kind === "pts" ? ptsChange(now, before) : kind === "n" ? now - before : pctChange(now, before);
     if (ch === null) delta = { dir: "flat", text: "no prior", of };
+    /* A NEAR-ZERO BASE IS NOT A BASE. "+13376%" off ₹4,000 is arithmetic, not
+       news: past a sixfold rise the percentage says nothing the figure does
+       not, so the tile says "new" instead. */
+    else if (kind !== "pts" && kind !== "n" && ch > 500) delta = { dir: "up", text: "new", of, good: (good || "up") === "up" };
     else {
       const dir = ch > 0 ? "up" : ch < 0 ? "down" : "flat";
       const text = kind === "pts" ? Math.abs(ch).toFixed(1) + " pts" : kind === "n" ? String(Math.abs(ch)) : Math.abs(ch).toFixed(1) + "%";

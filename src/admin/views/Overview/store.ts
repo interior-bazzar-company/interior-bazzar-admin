@@ -182,6 +182,11 @@ export interface OverviewData {
   departmentsState: DeptState;
   retryDepartments: () => void;
   isFullAccess: boolean;
+  /** " · all owners" while the Deal owner filter is set, else "". Appended to
+   *  every figure the owner filter cannot narrow (enquiries, team, delivery,
+   *  operations, the Finance section), so a filtered page never passes a
+   *  company-wide number off as one person's. */
+  allOwners: string;
 }
 
 export function useOverview(p: Params): OverviewData {
@@ -386,5 +391,6 @@ export function useOverview(p: Params): OverviewData {
        so its Owner picker is offered on the same test: wider than yourself,
        not full access. The key keeps its name — index.tsx reads it. */
     isFullAccess: wideScope("deals"),
+    allOwners: p.owner ? " · all owners" : "",
   };
 }

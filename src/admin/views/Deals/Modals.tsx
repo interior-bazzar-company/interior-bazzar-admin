@@ -287,6 +287,7 @@ function CreateModal({ onClose, done }: { onClose: () => void; done: (m: string,
   const [err, setErr] = useState<Refusal | null>(null);
   const [prio, setPrio] = useState("1");
   const [dupRef, setDupRef] = useState<string | null>(null);
+  const [dupWhy, setDupWhy] = useState("");
   const [busy, setBusy] = useState(false);
   const shell = useShell();
   useEffect(() => { const f = document.getElementById("cName"); if (f) setTimeout(() => f.focus(), 60); }, []);
@@ -298,16 +299,21 @@ function CreateModal({ onClose, done }: { onClose: () => void; done: (m: string,
       email: val("cEmail"), phone: val("cPhone"), city: val("cCity"), state: val("cState"),
       interestedIn: val("cInterest"), priorityKey: apiPriorityKey(prio), allowDuplicate,
     }))
-      .then((row) => done("Created " + row.ref + ", assigned to you.", row.ref))
+      /* Say who it went to: the server picks the owner (see the notice below),
+         so "assigned to you" was only true for a sales rep. */
+      .then((row) => done("Created " + row.ref + (row.owner ? ", owned by " + row.owner.name : "") + ".", row.ref))
       .catch((e: unknown) => {
         const r = refusalOf(e);
-        setErr(r); setBusy(false);
-        /* The server names the deal already open on this number. Offering to
-           open it is the useful half of the refusal — the duplicate check
-           exists so one customer does not become two pipelines each holding
-           half the history. */
+        setBusy(false);
+        /* The server names the deal already open on this number or business
+           name. Offering to open it is the useful half of the refusal — the
+           duplicate check exists so one customer does not become two pipelines
+           each holding half the history. The warning carries the server's own
+           sentence (it says what matched), so the error slot stays empty. */
         const m = /\b(DL-\d+)\b/.exec(r.detail || "");
         setDupRef(m ? m[1] : null);
+        setDupWhy(m ? r.detail || "" : "");
+        setErr(m ? null : r);
       });
   };
 
@@ -321,7 +327,7 @@ function CreateModal({ onClose, done }: { onClose: () => void; done: (m: string,
       <div className="flex flex-col gap-6">
         <ErrSlot err={err} />
         {dupRef
-          ? <Alert tone="warn" title={dupRef + " is already open on this number."}>
+          ? <Alert tone="warn" title={dupWhy || dupRef + " is already open."}>
               Add what was said as a remark there instead of starting a second pipeline — or create
               this one anyway if it is genuinely different business.
               <div className="mt-2.5 flex flex-wrap gap-2">
@@ -375,9 +381,10 @@ function CreateModal({ onClose, done }: { onClose: () => void; done: (m: string,
         </FormSection>
 
         <Notice ico="shield" text={<>
-          <b>This deal is yours.</b> It is assigned to you, the person taking the call — there is no
-          round-robin rotation behind this panel, so a deal goes to whoever created it and is
-          reassigned by name when it should sit with somebody else.
+          <b>Who owns it.</b> A sales rep keeps the deals they key in. Anyone else's deal goes to the
+          next sales rep in the same rotation the website leads use, and you stay on it as co-owner.
+          A repeat of an open deal goes to that deal's owner. Reassign it by name if it should sit
+          with somebody else.
         </>} />
       </div>
     </ModalShell>

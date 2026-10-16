@@ -12,7 +12,7 @@
    ============================================================================= */
 import type { ReactNode } from "react";
 import { cx } from "@/utils/cx";
-import { Avatar, DealStatus, Icon, MenuRow, Notice, Person, Pill, Pipeline, Priority, Tags, tagClasses } from "../../ui";
+import { Avatar, DealStatus, Icon, MenuRow, Notice, errorHeadline, Person, Pill, Pipeline, Priority, Tags, tagClasses } from "../../ui";
 import { go } from "../../ui/nav";
 import { D, STAGE, STRIP_STAGES, daysFrom, dealHash, inr, relativeDate, urgency } from "./useDeals";
 import type { Params, Refusal } from "./useDeals";
@@ -254,10 +254,8 @@ export function ErrSlot({ err }: { err: Refusal | null }) {
   return (
     <div id="dlErr" className="mb-4">
       <Notice tone="bad">
-        <b>
-          {err.http} {err.code ? <span className="font-mono tnum">{err.code}</span> : null}
-        </b>
-        <div className="mt-0.5">{err.detail}</div>
+        <b>{errorHeadline(err.http)}</b>
+        {err.detail ? <div className="mt-0.5">{err.detail}</div> : null}
       </Notice>
     </div>
   );

@@ -253,7 +253,11 @@ export default function AdminShell() {
   /* ------------------------------------------- title, scroll, mobile nav */
   useEffect(() => {
     const item = getItems()[route];
-    document.title = (item ? item.label + " · " : "") + "Interior bazzar Admin";
+    /* A record page names its record (F-AD-69): "191 · Quotations", not the
+       module alone. Member ids are bare numbers, so a member page keeps the
+       module title rather than print one. */
+    const rec = id && route !== "team" ? id + " · " : "";
+    document.title = rec + (item ? item.label + " · " : "") + "Interior bazzar Admin";
     if (scroller.current) scroller.current.scrollTop = 0;
     setStuck(false);
     setNavOpen(false);
@@ -558,7 +562,9 @@ function Crumbs({ claimed, route, id, isDeep }: { claimed?: ReactNode; route: st
           <Icon name="chevl" size="xs" className="text-fg-quaternary" />
           <span className="truncate">{item ? item.label : route}</span>
         </button>
-        {id && <span className="truncate font-mono text-xs text-tertiary tnum">{id}</span>}
+        {/* A member id is a bare number, not a name (F-AD-69); every other
+            record id is the ref people quote. */}
+        {id && route !== "team" && <span className="truncate font-mono text-xs text-tertiary tnum">{id}</span>}
       </>
     );
 

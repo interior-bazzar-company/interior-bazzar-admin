@@ -161,6 +161,20 @@ export function discountFromServer(type: string, stored: number | null | undefin
   return type === "amt" ? n / 100 : n;
 }
 
+/** The installment amounts the server will write on accept
+ *  (pricing.installment_schedule): the GST-inclusive grand total split evenly
+ *  over `count`, each row rounded down to whole rupees, and the whole
+ *  remainder on the LAST row so the parts foot exactly to the total. */
+export function evenSchedule(totalPaise: number, count: number): number[] {
+  const n = Math.max(1, Math.floor(count || 1));
+  const total = Math.floor(totalPaise || 0);
+  let base = Math.floor(total / n);
+  if (base - (base % 100) > 0) base -= base % 100;
+  const rows = Array.from({ length: n }, () => base);
+  rows[n - 1] += total - base * n;
+  return rows;
+}
+
 export type Blocker = { code: string; text: string };
 
 /** Why Issue would refuse, stated before you press it. These mirror the four

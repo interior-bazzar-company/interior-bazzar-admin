@@ -149,7 +149,7 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
             </FormField>
 
             {touched && !reason.trim() ? (
-              <Alert tone="bad" title="422 override_reason_required">
+              <Alert tone="bad" title="A reason is required for this pick">
                 The threshold for "materially lower" is {RULES.overrideThreshold} points and is
                 configurable — it is BE-OD-08, still open.
               </Alert>
@@ -188,7 +188,8 @@ export function ReassignModal({ e, run, onClose, onDone }: {
   const current = e.assignments.filter((a) => a.assignmentId === e.activeAssignmentId)[0] || null;
   const options = (run?.eligible || []).filter((c) => c.businessId !== current?.businessId);
   const [pick, setPick] = useState(options[0]?.businessId || "");
-  const [reason, setReason] = useState(VOCAB.reassignReasons[0]);
+  /* No reason preselected (F-AD-47): a default is a reason nobody gave. */
+  const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [touched, setTouched] = useState(false);
   const go = useWrite();
@@ -204,7 +205,7 @@ export function ReassignModal({ e, run, onClose, onDone }: {
   const chosenName = options.filter((c) => c.businessId === pick)[0]?.name
     || businessById(pick)?.name || "";
   const full = (reason + (note.trim() ? " — " + note.trim() : "")).trim();
-  const blocked = !pick || !note.trim();
+  const blocked = !pick || !reason || !note.trim();
 
   return (
     <ModalShell
@@ -298,12 +299,12 @@ export function ReassignModal({ e, run, onClose, onDone }: {
 
         <FormSection title="Why">
           <FormField id="be-rr" label="Reason" req>
-            <SelectInput id="be-rr" value={reason} onChange={setReason}
+            <SelectInput id="be-rr" value={reason} onChange={setReason} ph="Pick a reason" err={touched && !reason}
               options={VOCAB.reassignReasons.map((r) => ({ v: r, l: r }))} />
           </FormField>
           <FormField id="be-rn" label="What happened" req
-            hint="Mandatory. A reassignment with no recorded reason is indistinguishable from a mistake six months later — 422 override_reason_required without it."
-            err={touched && !note.trim() ? "422 override_reason_required — say what happened." : undefined}>
+            hint="Mandatory. A reassignment with no recorded reason is indistinguishable from a mistake six months later."
+            err={touched && !note.trim() ? "Say what happened." : undefined}>
             <Textarea id="be-rn" rows={3} err={touched && !note.trim()}
               ph="Went quiet after two reminders and a call…"
               value={note} onChange={setNote} />
@@ -322,16 +323,18 @@ export function ReassignModal({ e, run, onClose, onDone }: {
 export function OutcomeModal({ e, onClose, onDone }: {
   e: Enquiry; onClose: () => void; onDone: (msg: string) => void;
 }) {
-  const [outcome, setOutcome] = useState<"converted" | "not_converted">("converted");
-  const reasons = VOCAB.outcomeReasons[outcome];
-  const [reason, setReason] = useState(VOCAB.outcomeReasons.converted[0]);
+  /* Nothing preselected (F-AD-47): "Converted · Order placed" used to be the
+     answer before anybody gave one. */
+  const [outcome, setOutcome] = useState<"" | "converted" | "not_converted">("");
+  const reasons = outcome ? VOCAB.outcomeReasons[outcome] : [];
+  const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const go = useWrite();
 
   const pickOutcome = (v: string) => {
     const k = v as "converted" | "not_converted";
     setOutcome(k);
-    setReason(VOCAB.outcomeReasons[k][0]);
+    setReason("");
   };
 
   return (
@@ -344,8 +347,8 @@ export function OutcomeModal({ e, onClose, onDone }: {
       actions={
         <>
           <Button color="secondary" data-close="1" onClick={onClose}>Cancel</Button>
-          <Button color="primary" data-act="be-outcome-go" isDisabled={go.busy}
-            onClick={() => go.run(
+          <Button color="primary" data-act="be-outcome-go" isDisabled={go.busy || !outcome || !reason}
+            onClick={() => outcome && go.run(
               () => recordOutcome(e.enquiryId, outcome, reason, notes.trim()),
               () => onDone(statusOf(outcome).label + " — capacity released."))}>Record outcome</Button>
         </>
@@ -369,7 +372,8 @@ export function OutcomeModal({ e, onClose, onDone }: {
           hint={outcome === "not_converted"
             ? "Not Converted with a reason is worth more than Converted — it is how eligibility rules and weights get corrected."
             : "The reason list is BE-OD-10, still open, along with who may correct a business-reported outcome."}>
-          <SelectInput id="be-or" value={reason} onChange={setReason}
+          <SelectInput id="be-or" value={reason} onChange={setReason} disabled={!outcome}
+            ph={outcome ? "Pick a reason" : "Pick what happened first"}
             options={reasons.map((r) => ({ v: r, l: r }))} />
         </FormField>
 
@@ -395,7 +399,8 @@ export function OutcomeModal({ e, onClose, onDone }: {
 export function InvalidateModal({ e, onClose, onDone }: {
   e: Enquiry; onClose: () => void; onDone: (msg: string) => void;
 }) {
-  const [reason, setReason] = useState(VOCAB.invalidReasons[0]);
+  /* No reason preselected (F-AD-47). */
+  const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const hasException = !!e.exception;
   const go = useWrite();
@@ -415,7 +420,7 @@ export function InvalidateModal({ e, onClose, onDone }: {
       actions={
         <>
           <Button color="secondary" data-close="1" onClick={onClose}>Cancel</Button>
-          <Button color="primary-destructive" data-act="be-invalid-go" isDisabled={go.busy}
+          <Button color="primary-destructive" data-act="be-invalid-go" isDisabled={go.busy || !reason}
             onClick={() => go.run(
               () => invalidate(e.enquiryId, reason, note.trim()),
               () => onDone("Marked invalid, with a stored reason."))}>
@@ -436,7 +441,7 @@ export function InvalidateModal({ e, onClose, onDone }: {
 
         <FormField id="be-ir" label="Reason" req
           hint="Mandatory. “Discarded by ops” is not a reason — it is the absence of one, and it makes the rejection rate uninterpretable.">
-          <SelectInput id="be-ir" value={reason} onChange={setReason}
+          <SelectInput id="be-ir" value={reason} onChange={setReason} ph="Pick a reason"
             options={VOCAB.invalidReasons.map((r) => ({ v: r, l: r }))} />
         </FormField>
 

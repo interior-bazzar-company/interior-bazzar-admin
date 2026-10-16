@@ -38,7 +38,6 @@ import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { AgreementTemplateRow } from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
 import type { ApiResponseType } from "../../../types/reqResType";
-import config from "../../../config";
 import {
   AGREEMENT_KIND, TODAY, fmtDate, labelOf, loadFailure, readAgreements, readMember, readMembers,
   revokeAgreement, sendAgreement, signAgreement, toneOf, useAgreements,
@@ -232,12 +231,12 @@ export function bodyOf(a: Agreement): { clauses: Clause[]; frozen: boolean } {
 
 /* ------------------------------------------------------------- the link -- */
 
-/** One link, one agreement. It carries the agreement's own token — which the
- *  Team store already minted — so what comes back attributes itself and cannot
- *  be replayed against a different document. */
+/** One link, one member: their own Agreements page in this panel, where Sign
+ *  is (F-AD-32). It used to point at a public /sign/<token> page that was never
+ *  built and rendered the marketplace shell. A member's own record opens for
+ *  them without any team grant (registry.tsx). */
 export function signLink(a: Agreement): string {
-  const base = String(config.FRONTEND_URL || "").replace(/\/+$/, "");
-  return (base || "https://interiorbazzar.com") + "/sign/" + a.token;
+  return window.location.origin + "/team/" + encodeURIComponent(a.memberId) + "/agreements";
 }
 
 /** A link is worth sending while the document is out and not expired. A signed

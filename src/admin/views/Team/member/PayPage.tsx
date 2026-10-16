@@ -76,7 +76,7 @@ export default function PayPage({ m }: { m: Member }) {
     <div className="flex flex-col gap-5">
       <OpHead
         title="Pay"
-        desc="Every number here is a read. Team supplies the basis for an incentive; Finance approves and pays it."
+        desc="Every number here is a read of Finance's records."
         right={
           <Button color="secondary" ico="ext" onClick={() => go("#/finance-salaries")}>Open in Finance</Button>
         } />
@@ -211,9 +211,8 @@ export default function PayPage({ m }: { m: Member }) {
       </section>
 
       <Notice ico="lock" text={
-        <><b>Read-only, by construction.</b> Finance approves an incentive, not the captain — the
-          captain proposes it from a work item. If this page needs a shape Finance does not expose,
-          the change belongs in Finance's own operation doc and not here.</>
+        <><b>Read-only.</b> This panel has no screen yet for proposing or approving an incentive.
+          An approved incentive is paid on the member's payslip for its month, under Salaries A/C.</>
       } />
     </div>
   );

@@ -740,6 +740,8 @@ export interface PlanPaymentRow {
   orderStatus: string; paymentMethod: string; refundStatus: string; refundAmount: string;
   verifiedAt: string | null; createdAt: string;
   payer?: PayerRef | null;
+  /** The buyer's uploaded transfer proof (manual payments). */
+  proofUrl?: string;
 }
 export interface PlanPaymentsListResponse { payments: PlanPaymentRow[]; total: number; pageNo: number; pageSize: number; }
 
@@ -1170,6 +1172,8 @@ export interface SpendListResponse {
 export interface SalaryRunRow {
   id: number; month: string; state: VocabItem; totalNetPaise: number; slips: number;
   unpaidPeople: number; owedPaise: number; paidAt: string | null; recordedAt: string | null;
+  /** What the run's PAID slips came to, how many, and the last pay day. */
+  paidSlips?: number; paidPaise?: number; lastPaidAt?: string | null;
 }
 export interface SalariesResponse {
   runs: SalaryRunRow[]; total: number;

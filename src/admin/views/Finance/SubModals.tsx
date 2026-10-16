@@ -20,20 +20,18 @@
    write, and none of them ask "are you sure" — the consequences are stated
    before the button, which is the same question asked once and answered.
    ============================================================================= */
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, DateInput, Input, Pill, Segmented, SelectInput, Textarea } from "../../ui";
+import { useMemo, useState } from "react";
+import { Alert, Button, DateInput, Input, Pill, SelectInput, Textarea } from "../../ui";
 import { Check, Derived, DocCard, Fine, Ledger, LedgerRow, PickList, PickRow, Picked } from "./bits";
 import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick } from "./dialog";
 import type { Done } from "./dialog";
-import AdminOpsService from "../../../api/modules/adminOps";
-import type { PlanRow } from "../../../api/modules/adminOps";
 import {
   COMPANY_ACCOUNTS, FAILURE_REASONS, MODES,
   cancelSubscription, fmtDate, inr, markFailToPay,
-  useUsers, previewSchedule, recordSubscription, chainsFor, attachableInvoices, attachableForInstallment, readInvoice, recordInstallmentPayment, reversePayment, superAdminOnly, todayIso,
+  useUsers, previewSchedule, recordSubscription, rejectPlanPayment, chainsFor, attachableInvoices, attachableForInstallment, readInvoice, recordInstallmentPayment, reversePayment, superAdminOnly, todayIso,
 } from "./store";
-import type { Installment, InstallmentPayment, Subscription } from "./store";
+import type { Installment, InstallmentPayment, PendingPayment, Subscription } from "./store";
 
 /** The server's company accounts, read at render — the list fills after import. */
 const accountOptions = () => COMPANY_ACCOUNTS.filter((a) => a.active)
@@ -63,50 +61,20 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   const [remark, setRemark] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
-  /* Direct Plan Subscription state */
-  const [plans, setPlans] = useState<PlanRow[]>([]);
-  const [plansLoading, setPlansLoading] = useState(true);
-  const [directMode, setDirectMode] = useState<boolean | null>(null);
-  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
-  const [termMonths, setTermMonths] = useState<number>(12);
-  const [installmentCount, setInstallmentCount] = useState<number>(1);
-  const [customAmountRupees, setCustomAmountRupees] = useState<string>("");
-
-  useEffect(() => {
-    let cancelled = false;
-    AdminOpsService.plans()
-      .then((r) => {
-        if (cancelled) return;
-        if (r.response !== false && r.data?.plans) {
-          const activePlans = r.data.plans.filter((p) => p.isActive && !p.isArchived);
-          setPlans(activePlans);
-          if (activePlans.length > 0 && !selectedPlanId) {
-            setSelectedPlanId(String(activePlans[0].id));
-            setCustomAmountRupees(activePlans[0].payableAmount || activePlans[0].amount || "");
-            const m = parseInt(activePlans[0].duration || "12", 10);
-            if (!isNaN(m) && m > 0) setTermMonths(m);
-          }
-        }
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setPlansLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
-
-  /* ANY ACTIVE USER CAN BE SELECTED. If a chain (accepted quotation + invoice)
-     exists for the chosen user it is auto-attached in pickUser(); if not, the
-     operator will pick a plan directly. The old withChain pre-filter that
-     blocked users without a prior quotation is removed — operators can now
-     record direct cash/bank subscriptions without first completing the
-     Deals → Quotations → Invoices chain. */
+  /* ONLY BUSINESSES WITH A RECORDABLE CHAIN APPEAR — an accepted quotation
+     whose invoice is raised and not already carried. A business the write
+     would refuse is not offered; the sale that never went through the chain
+     is recorded once its documents exist, not before. */
   const shownUsers = useMemo(() => {
+    const withChain = users.filter((u) =>
+      chainsFor(u.userId).some((c) => !!c.attachable && !c.recordedAs));
     const q = uq.trim().toLowerCase();
     const list = q
-      ? users.filter((u) => u.name.toLowerCase().includes(q)
+      ? withChain.filter((u) => u.name.toLowerCase().includes(q)
         || (u.business || "").toLowerCase().includes(q)
         || u.userId.toLowerCase().includes(q)
         || u.email.toLowerCase().includes(q))
-      : users;
+      : withChain;
     return list.slice(0, 8);
   }, [users, uq]);
   const chosenUser = users.filter((u) => u.userId === userId)[0] || null;
@@ -116,19 +84,14 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      the chain's invoice — so the common case is one pick and one press.
      Nothing is locked by the pick that was not already locked by the chain:
      the block keeps its Change link, so a different quotation is one press
-     away. If no chain exists, directMode is enabled automatically. */
+     away. Every listed business has at least one open chain, by the filter
+     above. */
   const pickUser = (uid: string) => {
     setUserId(uid);
     setErr(null);
     setPaidStr("0");
     const opens = chainsFor(uid).filter((c) => !!c.attachable && !c.recordedAs);
-    if (opens.length) {
-      setQuotationNumber(opens[0].quotation.quotationNumber);
-      setDirectMode(false);
-    } else {
-      setQuotationNumber("");
-      setDirectMode(true);
-    }
+    setQuotationNumber(opens.length ? opens[0].quotation.quotationNumber : "");
   };
 
   /* ------------------------------------------------------- the chain ---
@@ -137,76 +100,29 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      for how much, and in how many installments. */
   const chains = userId ? chainsFor(userId) : [];
   const open = chains.filter((c) => !!c.attachable && !c.recordedAs);
-  const isDirect = directMode !== null ? directMode : open.length === 0;
-
-  const chain = !isDirect ? chains.filter((c) => c.quotation.quotationNumber === quotationNumber)[0] || null : null;
+  const chain = chains.filter((c) => c.quotation.quotationNumber === quotationNumber)[0] || null;
   const quote = chain ? chain.quotation : null;
   const invoice = chain && chain.attachable ? chain.attachable : null;
 
-  const currPlan = plans.find((p) => String(p.id) === selectedPlanId) || plans[0] || null;
-  const directAmountStr = customAmountRupees !== "" ? customAmountRupees : (currPlan?.payableAmount || currPlan?.amount || "0");
-  const directPaise = Math.round((parseFloat(directAmountStr) || 0) * 100);
-
-  const fullN = isDirect ? installmentCount : (quote ? quote.installments : 1);
+  const fullN = quote ? quote.installments : 1;
   const n = fullN;
   const paidN = Math.min(Math.max(Number(paidStr) || 0, 0), n);
 
-  const per = !isDirect && invoice ? invoice.grandTotalPaise : null;
-  const paise = isDirect ? directPaise : (per !== null ? per * fullN : null);
+  const per = invoice ? invoice.grandTotalPaise : null;
+  const paise = per !== null ? per * fullN : null;
   const sched = paise !== null && paise > 0 ? previewSchedule(startDate, n, paise) : [];
 
-  const months = isDirect ? termMonths : (quote ? quote.termMonths : 0);
-  const planName = isDirect ? (currPlan ? currPlan.title : "Direct Plan") : (quote ? quote.planName : "");
-  const planId = isDirect
-    ? "PL-" + (currPlan ? currPlan.title.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "") : "DIRECT")
-    : (quote ? "PL-" + quote.planName.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "") : "PL-MANUAL");
+  const months = quote ? quote.termMonths : 0;
+  const planName = quote ? quote.planName : "";
+  const planId = quote
+    ? "PL-" + quote.planName.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "")
+    : "PL-MANUAL";
 
-  const quotedVsBilled = !isDirect && quote && paise !== null && quote.grandTotalPaise !== paise
+  const quotedVsBilled = quote && paise !== null && quote.grandTotalPaise !== paise
     ? { quoted: quote.grandTotalPaise, billed: paise }
     : null;
 
   const submit = async () => {
-    if (isDirect) {
-      if (!currPlan && !selectedPlanId) {
-        setErr("Select a plan from the catalogue.");
-        return;
-      }
-      if (paise === null || paise <= 0) {
-        setErr("Total subscription amount must be greater than zero.");
-        return;
-      }
-      if (paidN > 0 && !payRef.trim()) {
-        setErr("A payment reference or UTR is required for recorded payments.");
-        return;
-      }
-      const r = await recordSubscription({
-        userId,
-        source: "sales",
-        planId,
-        planName,
-        cycleMonths: months,
-        installmentCount: n,
-        startDate,
-        remark: remark.trim() || undefined,
-        direct: true,
-        totalPaise: paise,
-        paid: paidN > 0
-          ? { count: paidN, mode: payMode, reference: payRef.trim(), valueDate: payDate, accountId: payAccount }
-          : undefined,
-      });
-      if (r.error) { setErr(r.error); return; }
-      const nextDue = sched.filter((i) => i.seq > paidN)[0] || null;
-      onDone(
-        r.subscriptionId + " recorded · " + planName + " · " + inr(paise)
-        + " (Direct Plan Subscription). "
-        + (chosenUser ? chosenUser.name : "The customer") + " is entitled from "
-        + fmtDate(startDate) + ", "
-        + (paidN > 0
-          ? (paidN === n ? "and every installment is collected." : paidN + " of " + n + " collected — installment " + (paidN + 1) + " is due " + fmtDate(nextDue ? nextDue.dueDate : startDate) + ".")
-          : "and the first installment is due " + fmtDate(sched[0] ? sched[0].dueDate : startDate) + "."), "ok");
-      return;
-    }
-
     if (!invoice) {
       setErr("Attach the invoice this subscription was raised on. It is what says how much the customer owes, and nothing here types that figure.");
       return;
@@ -254,7 +170,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
               {chosenUser.business ? " · " + chosenUser.business : ""}
               {chosenUser.status !== "active" ? " · " + chosenUser.status : ""}
             </>}
-            onChange={() => { setUserId(""); setUq(""); setQuotationNumber(""); setDirectMode(null); }} />
+            onChange={() => { setUserId(""); setUq(""); setQuotationNumber(""); }} />
         ) : (
           <>
             <Input value={uq} autoFocus ariaLabel="Search for the business"
@@ -270,29 +186,13 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
                 ))}
               </PickList>
             ) : (
-              <Fine>No active user matches that search. Try name, business name, email or user id.</Fine>
+              <Fine>No business with an accepted quotation and a raised invoice matches that. A subscription is recorded on its documents — raise them first.</Fine>
             )}
           </>
         )}
       </Fs>
 
-      {/* METHOD SWITCHER: QUOTATION CHAIN vs DIRECT PLAN */}
-      {userId && open.length > 0 && (
-        <div className="flex items-center justify-between gap-2 border-b border-secondary pb-3">
-          <span className="text-sm font-medium text-secondary">Recording method:</span>
-          <Segmented
-            label="Recording method"
-            value={isDirect ? "direct" : "chain"}
-            onPick={(v) => { setDirectMode(v === "direct"); setErr(null); setPaidStr("0"); }}
-            options={[
-              { v: "chain", l: `Quotation chain (${open.length})` },
-              { v: "direct", l: "Direct plan" },
-            ]}
-          />
-        </div>
-      )}
-
-      {userId && !isDirect ? (
+      {userId ? (
         <>
           <Fs legend="The sale it came from">
             {chain ? (
@@ -455,153 +355,6 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
                 <p className="py-1.5 text-sm text-tertiary">
                   {paise === null || paise <= 0
                     ? "Attach an invoice and the schedule appears here, dated, before anything is written."
-                    : "The schedule could not be built for " + inr(paise) + " over " + n + " installments."}
-                </p>
-              )}
-            </Ledger>
-          </Fs>
-        </>
-      ) : userId && isDirect ? (
-        <>
-          {open.length === 0 && (
-            <Alert tone="info" ico="doc" title="No unrecorded quotations found">
-              Recording via Direct Plan Subscription. Select a catalogue plan and payment terms below.
-            </Alert>
-          )}
-
-          <Fs legend="Catalogue plan" req>
-            <Field label="Plan">
-              {plansLoading ? (
-                <Fine>Loading catalogue plans...</Fine>
-              ) : plans.length === 0 ? (
-                <Fine>No active plans found in catalogue.</Fine>
-              ) : (
-                <SelectInput
-                  ariaLabel="Select Plan"
-                  value={selectedPlanId}
-                  onChange={(val) => {
-                    setSelectedPlanId(val);
-                    const p = plans.find((x) => String(x.id) === val);
-                    if (p) {
-                      setCustomAmountRupees(p.payableAmount || p.amount || "");
-                      const m = parseInt(p.duration || "12", 10);
-                      if (!isNaN(m) && m > 0) setTermMonths(m);
-                    }
-                  }}
-                  options={plans.map((p) => ({
-                    v: String(p.id),
-                    l: `${p.title} · ₹${p.payableAmount || p.amount} (${p.duration || "12m"})`,
-                  }))}
-                />
-              )}
-            </Field>
-            <Field label="Starts on">
-              <DateInput value={startDate} max={todayIso()} ariaLabel="Starts on" onChange={setStartDate} />
-            </Field>
-          </Fs>
-
-          <Fs legend="Terms & pricing" req>
-            <Field label="Billing term (months)">
-              <SelectInput
-                ariaLabel="Billing Term"
-                value={String(termMonths)}
-                onChange={(v) => setTermMonths(Number(v) || 12)}
-                options={[
-                  { v: "1", l: "1 month" },
-                  { v: "3", l: "3 months (Quarterly)" },
-                  { v: "6", l: "6 months (Half-yearly)" },
-                  { v: "12", l: "12 months (Annual)" },
-                  { v: "24", l: "24 months (2 Years)" },
-                  { v: "36", l: "36 months (3 Years)" },
-                ]}
-              />
-            </Field>
-            <Field label="Total amount (₹)">
-              <Input
-                mono
-                type="number"
-                value={customAmountRupees}
-                onChange={setCustomAmountRupees}
-                ariaLabel="Total Amount in Rupees"
-                ph="e.g. 50000"
-              />
-            </Field>
-            <Field label="Payment schedule">
-              <SelectInput
-                ariaLabel="Installments"
-                value={String(installmentCount)}
-                onChange={(v) => {
-                  setInstallmentCount(Number(v) || 1);
-                  setPaidStr("0");
-                }}
-                options={[
-                  { v: "1", l: "1 installment (Complete payment)" },
-                  { v: "2", l: "2 installments (50% each)" },
-                  { v: "3", l: "3 installments" },
-                  { v: "4", l: "4 installments (Quarterly)" },
-                  { v: "6", l: "6 installments (Bi-monthly)" },
-                  { v: "12", l: "12 installments (Monthly)" },
-                ]}
-              />
-            </Field>
-          </Fs>
-
-          <Fs legend="How it is paid" req>
-            <Field label="Paid so far">
-              <SelectInput
-                ariaLabel="Paid so far"
-                value={String(paidN)}
-                onChange={setPaidStr}
-                options={[{ v: "0", l: "Nothing yet — all " + n + " due" }].concat(
-                  Array.from({ length: n }, (_, i) => i + 1).map((k) => ({
-                    v: String(k),
-                    l: k === n
-                      ? "Complete payment — all " + n + " paid · " + inr(paise || 0)
-                      : k === 1
-                        ? "1st installment paid · " + inr(sched[0]?.amountPaise || 0)
-                        : "First " + k + " installments paid · " + inr(sched.slice(0, k).reduce((s, x) => s + x.amountPaise, 0)),
-                  }))
-                )}
-              />
-            </Field>
-            {paidN > 0 && (
-              <>
-                <Field label="Paid via">
-                  <SelectInput ariaLabel="Paid via" value={payMode} onChange={setPayMode} options={MODES.slice()} />
-                </Field>
-                <Field label="Credited to">
-                  <SelectInput ariaLabel="Credited to" value={payAccount} onChange={setPayAccount} options={accountOptions()} />
-                </Field>
-                <Field label="Reference / UTR">
-                  <Input mono value={payRef} ph="NEFT0019AUG2213" ariaLabel="Reference or UTR" onChange={setPayRef} />
-                </Field>
-                <Field label="Value date">
-                  <DateInput value={payDate} max={todayIso()} ariaLabel="Value date" onChange={setPayDate} />
-                </Field>
-              </>
-            )}
-
-            <Ledger>
-              {sched.length ? (
-                <>
-                  {sched.map((i) => (
-                    <LedgerRow key={i.seq}
-                      label={<>
-                        {i.of === 1 ? "Complete payment" : "Installment " + i.seq + " of " + i.of}
-                        {" · "}
-                        {i.seq <= paidN
-                          ? <b className="font-semibold text-success-primary">paid</b>
-                          : <>due {fmtDate(i.dueDate)}</>}
-                      </>}>
-                      {inr(i.amountPaise)}
-                    </LedgerRow>
-                  ))}
-                  <LedgerRow label="Total" grand>{inr(sched.reduce((t, i) => t + i.amountPaise, 0))}</LedgerRow>
-                </>
-              ) : (
-                <p className="py-1.5 text-sm text-tertiary">
-                  {paise === null || paise <= 0
-                    ? "Configure the plan and total amount above to generate the installment schedule."
                     : "The schedule could not be built for " + inr(paise) + " over " + n + " installments."}
                 </p>
               )}
@@ -955,6 +708,47 @@ export function CancelSubModal({ sub, onClose, onDone }: {
       <Fs legend="Why it is ending" req hint="It goes into the history verbatim.">
         <Textarea rows={3} value={reason} autoFocus ariaLabel="Why it is ending"
           ph="Customer closed the business · moved to a different plan · agreed exit on the deal."
+          onChange={setReason} />
+      </Fs>
+    </Dlg>
+  );
+}
+
+/* ============================================ reject a submitted payment === */
+
+export function RejectPaymentModal({ pay, onClose, onDone }: {
+  pay: PendingPayment; onClose: () => void; onDone: Done;
+}) {
+  const [reason, setReason] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    const e = await rejectPlanPayment(pay.id, reason);
+    setBusy(false);
+    if (e) { setErr(e); return; }
+    onDone(pay.reference + " rejected · " + inr(pay.amountPaise) + " was not counted, and the plan stays off.", "warn");
+  };
+
+  return (
+    <Dlg title="Reject this payment" err={err} onClose={onClose}
+      sub={<>{pay.payer || "Unknown payer"} · <span className="font-mono tnum">{pay.reference}</span> · {inr(pay.amountPaise)}</>}
+      footer={<>
+        <Cancel onClose={onClose} label="Keep it pending" />
+        <Button color="primary-destructive" isDisabled={busy} onClick={submit}>Reject the payment</Button>
+      </>}>
+      <div className="flex flex-col">
+        <Check warn>
+          <b>The plan is not switched on</b>, and the money is never counted as collected.
+        </Check>
+        <Check>
+          <b>Nothing is deleted.</b> The payment stays on record as rejected, with the reason below.
+        </Check>
+      </div>
+      <Fs legend="Why it is rejected" req hint="It goes into the history verbatim.">
+        <Textarea rows={3} value={reason} autoFocus ariaLabel="Why it is rejected"
+          ph="UTR not on the bank statement · amount does not match the plan · proof unreadable."
           onChange={setReason} />
       </Fs>
     </Dlg>

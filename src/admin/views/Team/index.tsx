@@ -195,7 +195,9 @@ export default function Team() {
   }
 
   const noRole = rows.filter((u) => !u.roles.length).length;
-  const noDocs = rows.filter((u) => (u.missingDocuments || []).length).length;
+  /* Same rule as the Documents column: bots and service accounts show "—"
+     there, so they are not counted here either. */
+  const noDocs = rows.filter((u) => isHumanEmployee(u) && (u.missingDocuments || []).length).length;
   const waiting = pendingRequests(requests);
   const filtered = !!(p.q || p.role);
   const matchedRoleOpt = roles.find((r) => String(r.id) === p.role || r.name.toLowerCase() === p.role.toLowerCase());
@@ -395,9 +397,3 @@ function DocsCell({ u }: { u: Member }) {
   );
 }
 
-/** Distinct, order preserved. */
-function uniq(list: string[]): string[] {
-  const out: string[] = [];
-  list.forEach((x) => { if (out.indexOf(x) < 0) out.push(x); });
-  return out.sort();
-}

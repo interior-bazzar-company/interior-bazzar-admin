@@ -602,7 +602,7 @@ function NotAdopted({ live, roles, rolesDenied, sub }: { live: LiveMember; roles
       {sub ? <OpHead title="Nothing here yet" /> : null}
       <Card
         title="No operational record yet"
-        sub="Work settings have not been configured for this member yet, or no attendance has been logged today."
+        sub="This member has no work settings on the server yet (this panel cannot set them), or no attendance has been logged today."
         right={
           <Button
             size="sm"

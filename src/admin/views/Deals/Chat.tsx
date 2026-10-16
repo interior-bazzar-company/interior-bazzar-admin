@@ -20,8 +20,8 @@ import type { KeyboardEvent as ReactKeyEvent, MouseEvent as ReactMouseEvent, Rea
 import { TextAreaBase } from "@/components/base/textarea/textarea";
 import { cx } from "@/utils/cx";
 import {
-  Avatar, Button, EmptyState, Eyebrow, FilterChips, Icon, IconButton, KvList, Meter, PageHeader,
-  PaneLoading, Pill, SearchField, Segmented, Select, Tabs, Tag, cap, qs
+  Avatar, Button, ConfirmModal, EmptyState, Eyebrow, FilterChips, Icon, IconButton, KvList, Meter, PageHeader,
+  PaneLoading, Pill, SearchField, Segmented, Select, Tabs, Tag, cap, errorLine, qs
 } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
@@ -994,7 +994,7 @@ function ChainAdd({ dl, kind, docs }: {
     ).then(({ base, r }) => {
       if (r.response === false) {
         setBusy(false);
-        shell.toast(r.code + " — " + (r.data as any).message, "bad");
+        shell.toast(errorLine(r.code, (r.data as any)?.message || r.message), "bad");
         return;
       }
       shell.toast(kind === "quotation" ? "Quotation drafted." : "Invoice drafted.");
@@ -1003,12 +1003,24 @@ function ChainAdd({ dl, kind, docs }: {
     }).catch((e: unknown) => {
       setBusy(false);
       const f = refusalOf(e);
-      shell.toast(f.http + " " + f.code + " — " + f.detail, "bad");
+      shell.toast(errorLine(f.http, f.detail), "bad");
     });
   };
 
+  /* ASK FIRST (F-AD-52): the press writes a draft on the server at once. */
+  const ask = () => shell.modal(
+    <ConfirmModal
+      title={kind === "quotation" ? "Create a draft quotation?" : "Raise a draft invoice?"}
+      body={(kind === "quotation"
+        ? "This saves a new draft quotation on " + dl.deal_id
+        : "This saves a new draft invoice against the accepted quotation on " + dl.deal_id)
+        + " now and opens it for editing. Nothing reaches the customer until you issue it."}
+      verb={kind === "quotation" ? "Create draft" : "Raise draft"}
+      onClose={shell.closeLayer}
+      onConfirm={() => { shell.closeLayer(); create(); }} />);
+
   return (
-    <button type="button" disabled={busy} onClick={create}
+    <button type="button" disabled={busy} onClick={ask}
       className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-brand px-3 py-3 text-sm font-semibold text-brand-secondary outline-focus-ring transition duration-100 hover:bg-brand-primary focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
       <Icon name="plus" size="sm" />{busy ? "Working…" : label}
     </button>

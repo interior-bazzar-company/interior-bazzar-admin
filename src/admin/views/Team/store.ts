@@ -1241,8 +1241,10 @@ export interface SpanRow {
   expected: number;
   lateMinutes: number;
   breakMinutes: number;
-  /** Start times as minutes past midnight, for the arrival spread. */
-  arrivals: number[];
+  /** Start times as minutes past midnight, each with the day's stored late
+   *  flag, so the arrival spread colours by the same per-member rule as the
+   *  Late count instead of a fixed clock cut. */
+  arrivals: { mins: number; late: boolean }[];
 }
 
 export function spanRows(from: string, to: string, scope: Scope): SpanRow[] {
@@ -1275,7 +1277,7 @@ export function spanRows(from: string, to: string, scope: Scope): SpanRow[] {
       row.breakMinutes += r.breakMins || 0;
       if (r.day.isLate) { row.late++; row.lateMinutes += r.day.lateByMinutes || 0; }
       const t = new Date(r.day.startedAt);
-      row.arrivals.push(t.getHours() * 60 + t.getMinutes());
+      row.arrivals.push({ mins: t.getHours() * 60 + t.getMinutes(), late: !!r.day.isLate });
     });
   });
   return Array.from(out.values());
@@ -1317,26 +1319,36 @@ export function spanTotals(rows: SpanRow[]): SpanTotals {
   return t;
 }
 
-/** WHEN PEOPLE ACTUALLY ARRIVE, in continuous half-hour buckets from ≤08:30 to 11:00+. */
-export function arrivalSpread(rows: SpanRow[]): { at: number; label: string; n: number }[] {
+/** WHEN PEOPLE ACTUALLY ARRIVE, in continuous half-hour buckets from ≤08:30 to 11:00+.
+ *  Each bucket splits into on-time and late by the day's stored `isLate` (the
+ *  member's own start time) — the same rule the Late count uses, so the chart
+ *  and the KPI cannot disagree. */
+export function arrivalSpread(rows: SpanRow[]): { at: number; label: string; n: number; onTime: number; late: number }[] {
   const FIXED_SLOTS = [510, 540, 570, 600, 630, 660];
-  const buckets = new Map<number, number>();
+  const buckets = new Map<number, { onTime: number; late: number }>();
   let total = 0;
-  rows.forEach((r) => r.arrivals.forEach((mins) => {
+  rows.forEach((r) => r.arrivals.forEach((a) => {
     total++;
-    const raw = Math.ceil(mins / 30) * 30;
+    const raw = Math.ceil(a.mins / 30) * 30;
     const slot = Math.min(660, Math.max(510, raw));
-    buckets.set(slot, (buckets.get(slot) || 0) + 1);
+    const b = buckets.get(slot) || { onTime: 0, late: 0 };
+    if (a.late) b.late++; else b.onTime++;
+    buckets.set(slot, b);
   }));
   if (!total) return [];
   FIXED_SLOTS.forEach((s) => {
-    if (!buckets.has(s)) buckets.set(s, 0);
+    if (!buckets.has(s)) buckets.set(s, { onTime: 0, late: 0 });
   });
-  return Array.from(buckets.keys()).sort((a, b) => a - b).map((at) => ({
-    at,
-    label: at === 510 ? "≤08:30" : at === 660 ? "11:00+" : String(Math.floor(at / 60)).padStart(2, "0") + ":" + String(at % 60).padStart(2, "0"),
-    n: buckets.get(at) || 0,
-  }));
+  return Array.from(buckets.keys()).sort((a, b) => a - b).map((at) => {
+    const b = buckets.get(at)!;
+    return {
+      at,
+      label: at === 510 ? "≤08:30" : at === 660 ? "11:00+" : String(Math.floor(at / 60)).padStart(2, "0") + ":" + String(at % 60).padStart(2, "0"),
+      n: b.onTime + b.late,
+      onTime: b.onTime,
+      late: b.late,
+    };
+  });
 }
 
 /** Each working day of the span, counted across everybody — the shape the
@@ -1442,6 +1454,17 @@ export function blockerOf(i: WorkItem, all = snap.items): WorkItem | null {
   if (!i.blockedByItemId) return null;
   const b = all.filter((x) => x.itemId === i.blockedByItemId)[0];
   return b && !isTerminal(b.status) ? b : null;
+}
+
+/** THE ONE STRIP BUCKET an item counts in, so the Work strip's cells are
+ *  disjoint and each cell's filter lists exactly what it counted. Delay is
+ *  derived and wins (as on the board); then waiting — the stored `blocked`, or
+ *  an open blocker on an item still planned or in progress; then the stage. */
+export function bucketOf(i: WorkItem, all = snap.items): WorkStage | "waiting" {
+  const st = stageOf(i);
+  if (st === "blocked") return "waiting";
+  if ((st === "planned" || st === "in_progress") && blockerOf(i, all)) return "waiting";
+  return st;
 }
 
 /** Where today sits between startDate and dueDate, as a percentage. Elapsed —
@@ -1759,10 +1782,10 @@ export function workRows(f: WorkFilter, scope: Scope): WorkItem[] {
   let rows = scope === "all" ? snap.items.slice() : snap.items.filter((i) => ids.indexOf(i.assigneeId) >= 0);
   if (f.member) rows = rows.filter((i) => i.assigneeId === f.member);
   if (f.kind) rows = rows.filter((i) => i.kind === f.kind);
-  if (f.status) rows = rows.filter((i) => stageOf(i) === f.status);
+  if (f.status) rows = rows.filter((i) => bucketOf(i) === f.status);
   if (f.tag) rows = rows.filter((i) => hasSlug(i, f.tag as string));
   if (f.priority) rows = rows.filter((i) => i.priority === f.priority);
-  if (f.wait) rows = rows.filter((i) => stageOf(i) === "blocked" || !!blockerOf(i));
+  if (f.wait) rows = rows.filter((i) => bucketOf(i) === "waiting");
   if (f.parent) rows = rows.filter((i) => i.parentId === f.parent || i.itemId === f.parent);
   if (f.due === "today") rows = rows.filter((i) => !isTerminal(i.status) && i.dueDate === TODAY);
   if (f.due === "week") {
@@ -1794,18 +1817,19 @@ export interface WorkTotals {
   completed: number; cancelled: number; delayed: number;
 }
 
-/** Counted by STAGE, not by stored status, so the strip and the columns agree:
- *  a late card is in Delay and is not also counted under In progress. */
+/** Counted by BUCKET (`bucketOf`), not by stored status: a late card is in
+ *  Delay and nowhere else, a waiting card is in Waiting and nowhere else, so
+ *  the cells add up to the total. */
 export function workTotals(rows: WorkItem[]): WorkTotals {
   const t: WorkTotals = { total: rows.length, planned: 0, inProgress: 0, waiting: 0, completed: 0, cancelled: 0, delayed: 0 };
   rows.forEach((i) => {
-    const st = stageOf(i);
+    const st = bucketOf(i);
     if (st === "planned") t.planned++;
     if (st === "in_progress") t.inProgress++;
     if (st === "delayed") t.delayed++;
     if (st === "completed") t.completed++;
     if (st === "cancelled") t.cancelled++;
-    if (st === "blocked" || blockerOf(i)) t.waiting++;
+    if (st === "waiting") t.waiting++;
   });
   return t;
 }

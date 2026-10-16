@@ -106,7 +106,7 @@ export default function InvoiceDetail({ id, tab, params }: {
      server's sum over the live ledger rows, so it is the only honest figure. */
   const received = inv.receivedPaise || 0;
   const balance = inv.grandTotalPaise - received;
-  const over = inv.status === "draft" ? Math.max(0, -daysFrom(inv.dueDate)) : 0;
+  const over = overdueDays(inv);
 
   const dealTo = "#/deals/" + inv.dealRef;
 
@@ -150,7 +150,7 @@ export default function InvoiceDetail({ id, tab, params }: {
         { k: "Amount", v: inr(inv.grandTotalPaise),
           sub: inv.taxMode === "not_applicable" ? "GST not applicable" : "incl. GST @ " + inv.gstRate + "%" },
         { k: "Received", v: inr(received), tone: received ? "ok" : undefined,
-          sub: received ? "written to the deal ledger by Issue" : "nothing on the ledger yet" },
+          sub: received ? "recorded payments on the deal ledger" : "no payment recorded yet" },
         { k: "Balance", v: inr(balance), tone: balance ? undefined : "ok",
           sub: balance ? "still owed" : "settled" },
         { k: inv.status === "cancelled" ? "Cancelled" : over ? "Overdue by" : "Due",
@@ -158,7 +158,7 @@ export default function InvoiceDetail({ id, tab, params }: {
             : over ? over + " day" + (over === 1 ? "" : "s")
               : fmtDate(inv.dueDate),
           tone: over ? "bad" : undefined,
-          sub: inv.status === "cancelled" ? "" : over ? "past its due date, never issued" : "due date" },
+          sub: inv.status === "cancelled" ? "" : over ? "past its due date, not paid in full" : "due date" },
       ]} />
 
       <ChainStrip dealRef={inv.dealRef} here="invoice" quotation={quotation} />
@@ -202,10 +202,16 @@ export default function InvoiceDetail({ id, tab, params }: {
    the document, one click away, rather than facts about the invoice. Invoice
    date stays because it is NOT the created date: it is the date the document
    carries, and an agent can set it. */
+/* ISSUED, PAST ITS DUE DATE, AND NOT PAID IN FULL -- the list's isOverdue
+   rule. Issue records no payment, so an issued invoice is a demand that may
+   still be unmet; a draft has never been sent, so it cannot be late. */
+function overdueDays(inv: InvoiceRow): number {
+  return inv.status === "issued" && (inv.receivedPaise || 0) < inv.grandTotalPaise
+    ? Math.max(0, -daysFrom(inv.dueDate)) : 0;
+}
+
 function facts(inv: InvoiceRow, go: (h: string) => void): [ReactNode, ReactNode][] {
-  /* Only a draft can be overdue -- issuing writes the ledger row in the same
-     transaction, so an issued invoice is paid. Same rule as the list. */
-  const over = inv.status === "draft" ? Math.max(0, -daysFrom(inv.dueDate)) : 0;
+  const over = overdueDays(inv);
   const rows: ([ReactNode, ReactNode] | null)[] = [
     ["Deal", <a href={"#/deals/" + inv.dealRef} className="font-mono text-brand-secondary tnum outline-focus-ring focus-visible:outline-2"
       onClick={(e) => { e.preventDefault(); go("#/deals/" + inv.dealRef); }}>{inv.dealRef}</a>],
@@ -225,12 +231,12 @@ function facts(inv: InvoiceRow, go: (h: string) => void): [ReactNode, ReactNode]
       {inv.igstPaise ? "inter-state · IGST" : "intra-state · CGST + SGST"}</span></>],
     ["Tax", <Pill xs text={inv.taxMode === "not_applicable" ? "Not applicable" : "Applicable"}
                   tone={inv.taxMode === "not_applicable" ? "warn" : "neutral"} />],
-    /* The money is the deal ledger's, written by the issue transaction itself
-       -- so an unissued invoice has none, whatever reference was typed on it. */
-    ["Payment", inv.status === "issued"
-      ? <><span className="font-mono tnum">{inv.paymentReference || "—"}</span>{" "}
-          <span className="text-quaternary">· from the deal ledger</span></>
-      : <span className="text-quaternary">none yet</span>],
+    /* The money is the deal ledger's, written by Record payment -- never by
+       Issue -- so this reads the server's ledger sum, not the status. */
+    ["Payment", inv.receivedPaise
+      ? <><span className="font-mono tnum">{inr(inv.receivedPaise)}</span>{" "}
+          <span className="text-quaternary">· recorded on the deal ledger</span></>
+      : <span className="text-quaternary">none recorded yet</span>],
     inv.cancelledAt
       ? ["Cancelled", fmtDate(inv.cancelledAt) + (inv.cancelledBy ? " by " + inv.cancelledBy.name : "")
           + (inv.cancellationReason ? " · " + inv.cancellationReason : "")]
@@ -311,14 +317,12 @@ function PlanTab({ inv }: { inv: InvoiceRow }) {
   );
 }
 
-/* The payment this invoice raises -- reference, mode, date and the proof. On a
-   draft these are the fields the issue transaction will refuse without, so the
-   tab doubles as the checklist. */
+/* The payment details typed on this invoice -- reference, mode, date and the
+   proof. Issue does not need them (it records no payment); the money itself is
+   logged with Record payment, which writes the deal ledger. */
 function PaymentTab({ inv, onChanged }: { inv: InvoiceRow; onChanged: () => void }) {
   const liveProofs = (inv.proofs || []).filter((p) => !p.removed);
-  /* A REQUIRED FIELD LEFT EMPTY IS THE REASON ISSUE WILL REFUSE, so it says so
-     where the value would have been rather than showing a neutral dash. */
-  const missing = <span className="text-error-primary">— required to issue</span>;
+  const missing = <span className="text-quaternary">—</span>;
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <Card tight>

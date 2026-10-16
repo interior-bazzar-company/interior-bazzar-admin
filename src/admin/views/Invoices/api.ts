@@ -2,10 +2,9 @@
    INVOICES — the real thing, from `v1/admin/invoices/`
    (interior_deals_billing.Invoice, via interior_admin InvoicesViews).
 
-   Raised against an ACCEPTED quotation, only after payment has already
-   been received — this is a log-what-came-in flow, never an online
-   checkout. Issuing writes the deal-payment ledger row itself, in the same
-   transaction as freezing the invoice. See
+   Raised against an ACCEPTED quotation. Issuing numbers and freezes the
+   invoice and writes NO ledger row; the money is logged with Record payment,
+   and `receivedPaise` is the server's sum over the live ledger. See
    interior_admin/Controllers/Invoices/InvoicesController.py.
 
    Failure envelope: same house style as everywhere else in this panel —

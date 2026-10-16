@@ -111,6 +111,9 @@ export default function AdminAuth() {
   const [who, setWho] = useState("");
   const [pass, setPass] = useState("");
   const [busy, setBusy] = useState(false);
+  /* Empty fields are stopped here, not sent: an empty sign-in used to round-trip
+     and come back as "That email or password isn't right" (F-AD-54). */
+  const [missing, setMissing] = useState<{ who?: boolean; pass?: boolean }>({});
   const [user, setUser] = useState<Identity | null>(null);
   const booted = useRef(false);
 
@@ -121,6 +124,9 @@ export default function AdminAuth() {
   async function handleLogin() {
     if (busy) return;
     setBanner(null);
+    const gap = { who: !who.trim(), pass: !pass };
+    setMissing(gap);
+    if (gap.who || gap.pass) return;
     setBusy(true);
     try {
       const res = await AuthService.signinAdmin({ username: who.trim(), password: pass });
@@ -142,7 +148,10 @@ export default function AdminAuth() {
         return;
       }
       setUser({ name: s.user.name, role: s.role, grants: grantsOf(s) });
-      setStep(isZeroAccess(s) ? "pending" : "active");
+      /* Straight in (F-AD-63): the "Continue to the panel" page cost a click on
+         every sign-in. A zero-access account still stops on "access pending". */
+      if (isZeroAccess(s)) setStep("pending");
+      else enterPanel();
     } catch (e) {
       if (isServiceError(e)) {
         setBanner(SERVICE_BANNER);
@@ -264,11 +273,13 @@ export default function AdminAuth() {
               }}
               className="mt-5 flex flex-col gap-4"
             >
-              <FormField id="loginEmail" label="Username or work email">
-                <Input id="loginEmail" type="text" ph="you@interiorbazzar.com" value={who} onChange={setWho} autoFocus />
+              <FormField id="loginEmail" label="Username or work email" err={missing.who ? "Enter your email or username" : undefined}>
+                <Input id="loginEmail" type="text" ph="you@interiorbazzar.com" value={who} err={missing.who}
+                  onChange={(v) => { setWho(v); if (missing.who) setMissing((m) => ({ ...m, who: false })); }} autoFocus />
               </FormField>
-              <FormField id="loginPass" label="Password">
-                <Input id="loginPass" type="password" ph="••••••••" value={pass} onChange={setPass} />
+              <FormField id="loginPass" label="Password" err={missing.pass ? "Enter your password" : undefined}>
+                <Input id="loginPass" type="password" ph="••••••••" value={pass} err={missing.pass}
+                  onChange={(v) => { setPass(v); if (missing.pass) setMissing((m) => ({ ...m, pass: false })); }} />
               </FormField>
               <Button type="submit" color="primary" size="lg" block className="mt-2" isLoading={busy} showTextWhileLoading>
                 {busy ? "Signing in…" : "Sign in"}

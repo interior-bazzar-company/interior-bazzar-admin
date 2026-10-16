@@ -43,6 +43,28 @@ export function cap(s?: string | null) {
     return String(s || "").charAt(0).toUpperCase() + String(s || "").slice(1);
 }
 
+/** A refused request's HEADLINE, in words. A status code ("202", "503",
+ *  "400 creation_failed") is not a sentence anybody can act on (F-AD-49), so
+ *  every refusal slot and refusal toast heads its message with this instead.
+ *  2xx shows up because some endpoints answer a refusal as 200/202 +
+ *  response:false. */
+export function errorHeadline(http: number): string {
+    if (!http || http < 0) return "Could not reach the server";
+    if (http === 400) return "Check the details";
+    if (http === 401) return "Your session has ended — sign in again";
+    if (http === 403) return "Not allowed";
+    if (http === 404) return "Not found";
+    if (http === 409) return "Already exists";
+    if (http === 423) return "Locked";
+    if (http === 429) return "Too many tries — wait a moment";
+    if (http >= 500) return "The server could not do this — try again";
+    return "That did not go through";
+}
+
+/** The one toast line for a refusal: the headline, then the server's reason when it gave one. */
+export const errorLine = (http: number, detail?: string | null) =>
+    errorHeadline(http) + (detail && detail.trim() ? " — " + detail.trim() : ".");
+
 /** `new-lead` → "New Lead". */
 export const titleise = (k: string) =>
     String(k || "")

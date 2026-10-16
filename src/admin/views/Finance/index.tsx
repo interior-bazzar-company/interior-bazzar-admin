@@ -30,7 +30,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { qs, TbTitle } from "../../ui";
 import type { Params } from "./store";
-import { PERIOD, RECORD_TYPES, fmtMonth, inr, useActiveCount, useOverview, useSalaryRows, useSalaryTotals, useSubTotals } from "./store";
+import { PERIOD, RECORD_TYPES, fmtMonth, inr, useActiveCount, useOverview, useSalariesReadable, useSalaryRows, useSalaryTotals, useSubTotals } from "./store";
 import { ROUTE_OF, VIEW_OF } from "./Frame";
 import Subscriptions from "./Subscriptions";
 import Installments from "./Installments";
@@ -117,6 +117,8 @@ export default function Finance() {
   const subs = useSubTotals();
   /* Live overview figures across all modules (installments, transactions, refunds, analytics). */
   const ov = useOverview(view === "analytics" ? p.month : undefined);
+  /* Without the payroll grant salaries/ is a 403: OUT and net leave the wage bill out. */
+  const salOk = useSalariesReadable();
   const analyticsLabel = p.month ? fmtMonth(p.month) : PERIOD.label;
   const crumbs = useMemo(() => (
     <>
@@ -178,10 +180,15 @@ export default function Finance() {
           <>
             <TbStat k={"Collected · " + analyticsLabel} v={inr(ov.collectedPaise)} tone="ok"
               title={"Total collected in " + analyticsLabel + " across " + ov.collectedN + " payments."} />
-            <TbStat k={"Outgoings · " + analyticsLabel} v={inr(ov.outPaise)}
-              title={"Salaries + operating spend + refunds settled in " + analyticsLabel + "."} />
-            <TbStat k={"Net cash · " + analyticsLabel} v={inr(ov.netPaise)} tone={ov.netPaise >= 0 ? "ok" : "warn"}
-              title={"Net cash flow in " + analyticsLabel + " (income minus all expenses)."} />
+            <TbStat k={(salOk ? "Outgoings · " : "Outgoings excl. salaries · ") + analyticsLabel} v={inr(ov.outPaise)}
+              title={salOk
+                ? "Salaries + operating spend + refunds settled in " + analyticsLabel + "."
+                : "Operating spend + refunds settled in " + analyticsLabel + ". Salaries not included — no access."} />
+            <TbStat k={(salOk ? "Net cash · " : "Net cash excl. salaries · ") + analyticsLabel} v={inr(ov.netPaise)}
+              tone={salOk && ov.netPaise >= 0 ? "ok" : "warn"}
+              title={salOk
+                ? "Net cash flow in " + analyticsLabel + " (income minus all expenses)."
+                : "Income minus spend and refunds in " + analyticsLabel + ". Salaries not included — no access, so this is not complete."} />
           </>
         ) : (
           <TbStat k="Active subscriptions" v={activeN}
@@ -190,7 +197,7 @@ export default function Finance() {
       </span>
     </>
   ), [view, activeN, membersN, subs, totals.membersAll, totals.paidPaise,
-    totals.paidAllPaise, totals.unpaidPaise, totals.pendingPaise, totals.heldPaise, totals.unpaidPeople, ov, analyticsLabel]);
+    totals.paidAllPaise, totals.unpaidPaise, totals.pendingPaise, totals.heldPaise, totals.unpaidPeople, ov, analyticsLabel, salOk]);
 
   usePageChrome(
     { crumbs, right: null, parent: id ? listHash(view) : null },
@@ -199,7 +206,7 @@ export default function Finance() {
        mounted with. */
     (id ? "rec" : view) + ":" + (p.month || "") + ":" + activeN + "/" + membersN + "/" + totals.unpaidPaise
       + "/" + subs.collectedPaise + "/" + subs.outstandingPaise + "/" + ov.failedPaise + "/" + ov.otherOutPaise
-      + "/" + ov.netPaise + "/" + ov.collectedPaise + "/" + ov.refundsOwedPaise,
+      + "/" + ov.netPaise + "/" + ov.collectedPaise + "/" + ov.refundsOwedPaise + "/" + salOk,
   );
 
   const timer = useRef<number | undefined>(undefined);

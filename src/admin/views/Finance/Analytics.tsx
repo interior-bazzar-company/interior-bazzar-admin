@@ -45,14 +45,14 @@ import type { TileProps } from "../../ui";
 import { go } from "../../ui/nav";
 import { Blocks, Frame, SubTabs } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { Assumed, Dir, Fine, Ledger, LedgerRow, Money, TagChip, Unavailable } from "./bits";
+import { Assumed, Dir, Ledger, LedgerRow, Money, TagChip, Unavailable } from "./bits";
 import { KpiTip, MetricTip } from "./InfoTip";
 import { BarRows, SignedColumns, Spark, Waterfall } from "../charts";
 import type { BarRow, SignedPoint, WaterStep } from "../charts";
 import {
   PERIOD, accountOf, ago, delta, eventMeta, fmtDate, fmtMonth, fmtMonthLong, inr, kpiSeries, pct, periodOf, todayIso,
   useActivity, useAtRisk, useKpis, useMonthPoints, useOverview,
-  useReconciliation, useStatements, useTagTotals, useTaxSummary, useWaterfall,
+  useReconciliation, useSalariesReadable, useStatements, useTagTotals, useTaxSummary, useWaterfall,
 } from "./store";
 import type { Kpi } from "./store";
 
@@ -62,9 +62,6 @@ import type { Kpi } from "./store";
    ONLY — every mark carries the untouched figure as `display`, and every rupee
    printed anywhere else on this page comes from `inr()` over paise. */
 
-/** Thousands of rupees: the y-axis gutter is 38px and a tick reading 6,00,000
- *  does not fit in it. */
-const thousands = (paise: number) => Math.round(paise / 100000);
 /** Lakh, to two places — twenty months of net need a label that fits between
  *  twenty columns, and −8.54 does where −8,54,000 does not. */
 const lakh = (paise: number) => Math.round(paise / 100000) / 100;
@@ -170,6 +167,9 @@ function kpiTile(k: Kpi, priorLabel: string | null, note?: string): TileProps {
 function Overview({ month }: { month?: string }) {
   const curPeriod = periodOf(month || PERIOD.key);
   const o = useOverview(month);
+  /* NO PAYROLL GRANT, NO SALARIES: salaries/ answers 403 and every OUT and
+     net figure below is short by the whole wage bill. Said on the figure. */
+  const salOk = useSalariesReadable();
   const steps = useWaterfall(month);
   const risk = useAtRisk(month);
   const months = useMonthPoints();
@@ -232,8 +232,11 @@ function Overview({ month }: { month?: string }) {
     <div className="flex min-w-0 flex-col gap-5">
       <Tiles cols={4} list={[
         { k: <>Net · {curPeriod.label}<MetricTip k="net" /></>,
-          v: inr(o.netPaise), tone: o.netPaise >= 0 ? "ok" : "bad", s: "cash, not profit",
-          foot: <span className="label-mono">as of {fmtDate(todayIso())}</span> },
+          v: inr(o.netPaise), tone: !salOk ? "warn" : o.netPaise >= 0 ? "ok" : "bad", s: "cash, not profit",
+          foot: <>
+            {salOk ? null : <span className="w-full text-xs leading-relaxed text-warning-primary">Not complete — salaries are left out.</span>}
+            <span className="label-mono">as of {fmtDate(todayIso())}</span>
+          </> },
         { k: "Collected · " + curPeriod.label, v: inr(o.collectedPaise),
           s: o.collectedN + " installment" + (o.collectedN === 1 ? "" : "s") + " settled in " + curPeriod.label },
         { k: "Other income · " + curPeriod.label, v: inr(o.otherInPaise),
@@ -241,15 +244,18 @@ function Overview({ month }: { month?: string }) {
         { k: "Out · " + curPeriod.label, v: inr(o.outPaise),
           s: (o.salaryN ? inr(o.salaryPaise) + " salary (" + o.salaryN + " slips) · " : "")
             + inr(o.otherOutPaise) + " spend"
-            + (o.refundsPaidPaise ? " · " + inr(o.refundsPaidPaise) + " refunds" : "") },
+            + (o.refundsPaidPaise ? " · " + inr(o.refundsPaidPaise) + " refunds" : ""),
+          foot: salOk ? undefined
+            : <span className="w-full text-xs leading-relaxed text-warning-primary">Salaries not included — no access.</span> },
       ]} />
 
       <ChartFrame title={"Where " + curPeriod.label + " went"}
-        note={o.salaryN ? undefined : (
+        note={salOk && o.salaryN ? undefined : (
           <span className="inline-flex items-start gap-1.5 text-warning-primary">
             <Icon name="alert" size="xs" className="mt-0.5 shrink-0" />
-            No salary run has been paid into this period yet — the largest cost is not in the
-            figures above.
+            {salOk
+              ? "No salary run has been paid into this period yet — the largest cost is not in the figures above."
+              : "Salaries not included — no access to payroll. Out and net leave the wage bill out, so net reads higher than it is."}
           </span>
         )}>
         <Waterfall steps={wf} unit="₹ lakh" />
@@ -257,7 +263,7 @@ function Overview({ month }: { month?: string }) {
 
       {/* ==================================================== net by month === */}
       <ChartFrame title="Net by month"
-        right={<span className="label-mono">{months.length} month{months.length === 1 ? "" : "s"} in these records</span>}>
+        right={<span className="label-mono">{months.length} month{months.length === 1 ? "" : "s"} in these records{salOk ? "" : " · excludes salaries"}</span>}>
         {months.length > 1 ? (
           <SignedColumns points={net} groups={years} unit="₹ lakh" />
         ) : (
@@ -460,7 +466,8 @@ function Overview({ month }: { month?: string }) {
 /** The one caveat per group that stops a wrong reading, keyed to the condition
  *  that makes it true. A caveat that is always on screen is decoration; these
  *  appear only while the figure beside them is misleading. */
-function caveatFor(k: Kpi, salaryPaid: boolean): string | undefined {
+function caveatFor(k: Kpi, salaryPaid: boolean, salOk: boolean): string | undefined {
+  if (!salOk && (k.key === "burn" || k.key === "net_margin")) return "Salaries not included — no access to payroll.";
   if (salaryPaid) return undefined;
   if (k.key === "burn") return "Salary is not in this yet — the run for this period is still open.";
   if (k.key === "net_margin") return "No salary cost in this period, so this is not a steady-state margin.";
@@ -473,6 +480,7 @@ function Kpis({ month }: { month?: string }) {
   const list = useKpis(month);
   const months = useMonthPoints();
   const o = useOverview(month);
+  const salOk = useSalariesReadable();
 
   /* Which month a `prior` is measured against, so a movement is never an
      unlabelled arrow. Derived from the same month series the charts draw. */
@@ -502,7 +510,7 @@ function Kpis({ month }: { month?: string }) {
               {priorLabel ? "movement against " + priorLabel : curPeriod.label}
             </span>
           </div>
-          <Tiles cols={3} list={byGroup[g].map((k) => kpiTile(k, priorLabel, caveatFor(k, !!o.salaryN)))} />
+          <Tiles cols={3} list={byGroup[g].map((k) => kpiTile(k, priorLabel, caveatFor(k, !!o.salaryN, salOk)))} />
         </section>
       ))}
 

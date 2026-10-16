@@ -103,6 +103,8 @@ export default function SubscriptionDetail({ id, p, onParams }: {
     <CancelSubModal sub={s} onClose={closeLayer}
       onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "lg");
 
+  /* The first installment the table shows as neither paid nor cancelled. */
+  const openInst = s.installments.filter((i) => i.status !== "paid" && i.status !== "cancelled")[0] || null;
   const src = sourceMeta(s.source);
   const cancellable = writable && s.status !== "cancelled" && s.status !== "refunded";
 
@@ -143,11 +145,16 @@ export default function SubscriptionDetail({ id, p, onParams }: {
       {/* ======================================================= schedule === */}
       {tab === "schedule" ? (
         <div className="flex min-w-0 flex-col gap-4">
+          {/* READ OFF THE SAME ROWS AS THE TABLE BELOW. `row.next` is null for a
+              subscription that is not active, and the strip read that as "all
+              settled" over a schedule still showing an installment due. */}
           <Chain dealRef={readInvoice(s.invoiceNumber)?.dealRef || null}
-            invoice={(row.next || s.installments[0])?.invoiceNumber || null}
-            installment={row.next
-              ? "Installment " + row.next.seq + " of " + row.next.of
-              : "All " + s.installments.length + " settled"}
+            invoice={(openInst || s.installments[0])?.invoiceNumber || null}
+            installment={openInst
+              ? "Installment " + openInst.seq + " of " + openInst.of
+              : row.paidN === s.installments.length
+                ? "All " + s.installments.length + " settled"
+                : row.paidN + " of " + s.installments.length + " paid"}
             cap={<>
               <span className="label-mono">Collected</span>
               <span className="font-mono text-sm font-semibold text-primary tnum">{inr(row.paidPaise)}</span>

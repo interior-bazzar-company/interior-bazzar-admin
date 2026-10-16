@@ -8,6 +8,13 @@
       "includes": "Finance → Subscriptions (deal ledger), plan payments and Other Transaction income. Deal payments only on deals this session can see. Never deal values. \"N payments\" counts deal and plan payments, not income.",
       "period": "The selected period, live (today in IST). Compared with the same number of days immediately before it."
     },
+    "payments": {
+      "label": "Collected",
+      "what": "Customer payments that actually arrived in the period — deal payments and plan purchases. Other income is not a customer payment and is not in this figure; it is in the Finance section's In.",
+      "how": "Σ deal-ledger payments by payment date (a reversed payment counts for nothing) + Σ plan purchases marked Paid or Refunded, at their full amount, by verified date (₹0 free plans are not payments). A refund is not taken off here: it is money out on the day it is settled, under Out. The one exception is a plan payment refunded before refund requests existed (Refunded, with no settled request), which still nets its refund off.",
+      "includes": "Finance → Subscriptions (deal ledger) and plan payments. Deal payments only on deals this session can see; with a Deal owner picked, only that owner's deal payments (plan purchases have no deal owner and drop out). The count under the figure counts exactly these payments. Never deal values.",
+      "period": "The selected period, live (today in IST). Compared with the same number of days immediately before it; a previous period near zero shows \"new\" rather than a percentage."
+    },
     "pipeline": {
       "label": "Pipeline value",
       "what": "The value of all deals that are open right now.",
@@ -34,7 +41,7 @@
       "what": "Active installment money owed right now — due in the next 30 days plus any failed installment.",
       "how": "Σ installments with status due in the next 30 days (today through today + 30) plus all installments with status failed. The line under it splits them into due and failed.",
       "includes": "Installments of accepted quotations on deals this session can see (narrowed by the owner filter when set). Deal values with no accepted quotation behind them are not receivable yet.",
-      "period": "Due in the next 30 days plus any failed installment, live (today in IST). Not compared."
+      "period": "Due in the next 30 days plus any failed installment, live (today in IST). Not compared. Installments due later than 30 days out (Finance's Upcoming) and due installments already past their date are NOT in this figure — the Collections health cell counts the overdue ones."
     },
     "team": {
       "label": "Today",

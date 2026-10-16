@@ -17,7 +17,7 @@
    ============================================================================= */
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
-import { qs } from "../../ui";
+import { errorLine, qs } from "../../ui";
 import { fmtDate, inr as inrFmt } from "../../ui/format";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
@@ -311,12 +311,12 @@ export function useDone(p: Params) {
   }, [shell, p]);
 }
 
-/* A toast for a refusal the engine returned. Same string the prototype built:
-   `http code — detail`. */
+/* A toast for a refusal the engine returned: a readable headline and the
+   server's reason — never the bare `http code` (F-AD-49). */
 export function useRefuse() {
   const shell = useShell();
   return useCallback((r: Refusal) => {
-    shell.toast(r.http + " " + r.code + " — " + r.detail, "bad");
+    shell.toast(errorLine(r.http, r.detail), "bad");
   }, [shell]);
 }
 
@@ -486,7 +486,7 @@ export function useDealsApi(p: Params): DealsApiState {
       const data = r.data;
       const counts = {
         total: data.counts.total,
-        stalled: data.counts.stalled ?? data.deals.filter((d: any) => d.stalled).length,
+        stalled: (data.counts as { stalled?: number }).stalled ?? data.deals.filter((d: any) => d.stalled).length,
         byStage: adaptByStage(data.counts.byStage, data.stages),
         // Paise straight through, same as every other money field — the strip
         // formats, it never arithmetics.

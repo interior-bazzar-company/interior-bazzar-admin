@@ -23,7 +23,7 @@ export function TeamIntel({ d }: { d: OverviewData }) {
   const t = d.teamTable;
   return (
     <Section id="ov-team" title="Team" tip="teamtable"
-      desc={t ? t.members.length + " active · " + t.done + " task" + (t.done === 1 ? "" : "s") + " completed " + d.periods.teamLive.label : undefined}
+      desc={t ? t.members.length + " active · " + t.done + " task" + (t.done === 1 ? "" : "s") + " completed " + d.periods.teamLive.label + d.allOwners : undefined}
       right={t ? <><Stamp clock={d.clocks.teamLive} /><Go to="#/team">Members</Go></> : null}>
       {!d.gates.team ? (
         <Card tight><Gone what="Team" needs="tasks, attendance and team access" /></Card>
@@ -106,7 +106,7 @@ export function Operations({ d }: { d: OverviewData }) {
   /* One backend read, every count worked out on the server's clock (d7). */
   const t = d.ops;
   return (
-    <Section id="ov-ops" title="Operations" tip="ops" desc={t ? "today on the Team clock" : undefined}
+    <Section id="ov-ops" title="Operations" tip="ops" desc={t ? "today on the Team clock" + d.allOwners : undefined}
       right={t ? <><Stamp clock={d.clocks.teamLive} /><Go to="#/reports?face=actions">Actions</Go></> : null}>
       <Card tight>
         {d.opsState === "loading" ? <ListSkeleton rows={4} />

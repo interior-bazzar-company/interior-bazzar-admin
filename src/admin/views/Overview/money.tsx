@@ -99,7 +99,7 @@ export function Finance({ d }: { d: OverviewData }) {
   const of = "vs prev " + (d.periods.financeLive?.days || 30) + "d";
 
   return (
-    <Section id="ov-finance" title="Finance" desc={d.periods.financeLive.label + " · cash, not profit"}
+    <Section id="ov-finance" title="Finance" desc={d.periods.financeLive.label + " · cash, not profit" + d.allOwners}
       right={<><Stamp clock={d.clocks.financeLive} /><Go to="#/finance-analytics">Analytics</Go></>}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tile("Net", "net", MONEY_SOURCES, () => (
@@ -108,7 +108,7 @@ export function Finance({ d }: { d: OverviewData }) {
             now={f.cur.netPaise} before={f.prev.netPaise} of={of} to="#/finance-analytics" />
         ))}
         {tile("In", "collected", ["ledger", "plans", "income", "refunds"], () => (
-          <Kpi k="In" tip="collected" v={<Money paise={inNow} />} s={inr(f.cur.collectedPaise, { compact: true }) + " subscriptions"}
+          <Kpi k="In" tip="collected" v={<Money paise={inNow} />} s={inr(f.cur.collectedPaise, { compact: true }) + " payments · " + inr(f.cur.otherInPaise, { compact: true }) + " other income"}
             now={inNow} before={inPrev} of={of} to="#/finance" />
         ))}
         {/* THE CAPTION NAMES EVERY PART OF THE FIGURE ABOVE IT. Salary is the

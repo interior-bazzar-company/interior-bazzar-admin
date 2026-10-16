@@ -34,7 +34,21 @@ export default function Orphans({ members = [], onChanged }: { members?: Member[
   const [data, setData] = useState<OrphansResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-  const [target, setTarget] = useState<ReassignTarget | null>(null);
+  const { modal, closeLayer } = useShell();
+
+  /* Through the shell's modal layer, like every other dialog in the panel —
+     it used to mount inline under the lists, so it opened off-screen. */
+  const setTarget = (target: ReassignTarget) => modal(
+    <ReassignOrphanModal
+      target={target}
+      members={members}
+      onClose={closeLayer}
+      onDone={() => {
+        closeLayer();
+        setTick((t) => t + 1);
+        onChanged?.();
+      }}
+    />);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,19 +112,6 @@ export default function Orphans({ members = [], onChanged }: { members?: Member[
         ) : null}
       />
       <UnassignedCard u={data.unassigned} onReassign={setTarget} />
-
-      {target ? (
-        <ReassignOrphanModal
-          target={target}
-          members={members}
-          onClose={() => setTarget(null)}
-          onDone={() => {
-            setTarget(null);
-            setTick((t) => t + 1);
-            onChanged?.();
-          }}
-        />
-      ) : null}
     </div>
   );
 }

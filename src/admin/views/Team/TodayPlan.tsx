@@ -85,9 +85,9 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
     [mine],
   );
 
-  /* WHAT IS ALREADY LATE OR DUE IS TICKED FOR YOU. It is what the day is about,
-     and a note that opens with every box empty asks you to re-decide something
-     the dates have already decided. Everything else starts off. */
+  /* NOTHING IS TICKED FOR YOU (F-AD-52). Pre-ticking every late item put seven
+     overdue tasks into a plan nobody chose; late and due-today items still sort
+     first and say so on their own line, so picking them is one press each. */
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   /* What you typed, and the row you are typing it in. Two pieces of state
      rather than one because the row exists before it holds anything — that is
@@ -101,9 +101,7 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
     /* Only the pre-submit picker has anything to seed; after the plan is in the
        rows come from the record and there is no local draft to reset. */
     if (!done) {
-      const seed: Record<string, boolean> = {};
-      openTasks.forEach((i) => { if (rank(i) < 2) seed[i.itemId] = true; });
-      setPicked(seed);
+      setPicked({});
       setExtra([]); setDraft("");
     }
     setOpen(true);
@@ -205,9 +203,12 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
   /* A count, not a sentence. What was here — "In, and 0 of 1 ticked off" over
      the list, and a paragraph under it explaining where to tick things — was
      three lines of prose on a note with one item in it. */
+  /* Typed lines become real tasks due today when the plan goes in — say so
+     before the press, not after (F-AD-52). */
+  const fresh = extra.length + (pending && !done ? 1 : 0);
   const footNote = done
     ? ticked + " of " + planned.length + " done"
-    : (total ? total + " to do" : "Nothing picked");
+    : (total ? total + " to do" + (fresh ? " · " + fresh + " new task" + (fresh === 1 ? "" : "s") : "") : "Nothing picked");
 
   return (
     <AriaDialogTrigger isOpen={open} onOpenChange={(v) => (v ? show() : setOpen(false))}>
@@ -295,7 +296,10 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
                 <Icon name="plus" size="sm" className="shrink-0 text-fg-quaternary" />
                 <Input className="min-w-0 flex-1" value={draft} ph="Type a task, press Enter" ariaLabel="Add a task"
                   onChange={setDraft}
-                  onBlur={commit}
+                  /* Blur keeps a draft line before the plan is in; after, a line
+                     is a new task at once, so only Enter adds it — clicking
+                     away must not write a task (F-AD-52). */
+                  onBlur={() => { if (!done) commit(); }}
                   onEnter={commit} />
               </div>
             </div>

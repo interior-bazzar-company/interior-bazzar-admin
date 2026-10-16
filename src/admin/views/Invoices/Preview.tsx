@@ -52,15 +52,15 @@ export default function InvoicePreview({ id, params }: {
       })
       .catch((e: unknown) => toast(errMessage(e), "bad"));
 
-  /* Issuing is the irreversible one -- it spends a number AND writes the deal
-     ledger row in the same transaction -- so it is confirmed first, exactly as
+  /* Issuing is the irreversible one -- it spends a number and freezes the
+     document (no payment is recorded) -- so it is confirmed first, exactly as
      the quotation's is. */
   const issue = () => modal(<IssueModal inv={inv} onClose={closeLayer}
     run={() => call(AdminOpsService.issueInvoice(inv.id))
       .then((row) => {
         closeLayer();
-        toast("Issued as " + (row.invoiceNumber || "a numbered invoice")
-          + " and " + inr(row.grandTotalPaise) + " logged to " + row.dealRef + ".");
+        toast("Issued as " + (row.invoiceNumber || "a numbered invoice") + " for "
+          + inr(row.grandTotalPaise) + ". Record the payment when it arrives.");
         setTick((t) => t + 1);
       })} />);
 
@@ -69,7 +69,7 @@ export default function InvoicePreview({ id, params }: {
      for issuing is the one that cannot be taken back. */
   const menu: MenuItem[] = [];
   if (isDraft && can("invoices", "issue"))
-    menu.push({ icon: "check", label: "Issue invoice", title: "Spends the number and writes the payment", act: issue });
+    menu.push({ icon: "check", label: "Issue invoice", title: "Spends the number and freezes the invoice. Records no payment.", act: issue });
   if (!isDraft)
     menu.push({ icon: "link", label: share ? "New share link" : "Create share link", title: "An expiring link, logged as SHARED", act: getLink });
   if (share)
@@ -85,7 +85,7 @@ export default function InvoicePreview({ id, params }: {
       kind="Tax invoice"
       label={inv.invoiceNumber || "Draft invoice"}
       scope={isDraft
-        ? "This is the artefact the customer receives. Issuing allocates the number and writes the payment."
+        ? "This is the artefact the customer receives. Issuing allocates the number and freezes it; the payment is recorded separately."
         : "The document exactly as the customer has it. " + (inv.billing.name || "") + " · " + STATUS_LABEL[inv.status]}
       fetchHtml={() => call(AdminOpsService.invoiceDocHtml(inv.id))}
       banner={share ? <ShareLine link={share.link} expires={share.expires} /> : null}
