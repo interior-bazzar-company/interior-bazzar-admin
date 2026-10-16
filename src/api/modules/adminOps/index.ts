@@ -1734,6 +1734,12 @@ export class AdminOpsService {
     return apiService.getPostApiResponse<{ flagged: number; cleared: number; scanned: number }>(
       `${base}/deals/stall-sweep/`, {});
   }
+  /** Whether a new business account may use this login (email or number) —
+   *  `available: false` means somebody can already sign in with it. */
+  static checkAccountLogin(login: string) {
+    return apiService.getGetApiResponse<{ login: string; available: boolean; message: string }>(
+      `${base}/deals/account-check/${qs({ login })}`);
+  }
   static createBusinessFromDeal(dealRef: string, data: DealCreateBusinessInput = {}) {
     return apiService.getPostApiResponse<DealCreateBusinessResponse>(
       `${base}/deals/${encodeURIComponent(dealRef)}/create-business/`, data);
