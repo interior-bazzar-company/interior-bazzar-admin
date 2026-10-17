@@ -328,6 +328,8 @@ export interface LeaveRequest {
   reason: string;
   state: LeaveState;
   decidedById: string | null;
+  memberName: string | null;
+  decidedByName: string | null;
   decidedAt: string | null;
   decisionNote: string | null;
   requestedAt: string;
@@ -689,6 +691,7 @@ const toLeave = (l: LeaveRow): LeaveRequest => ({
   leaveId: String(l.id), memberId: String(l.member.id), fromDate: l.fromDate, toDate: l.toDate,
   kind: l.kind.key, reason: l.reason, state: l.state.key as LeaveState,
   decidedById: l.decidedBy ? String(l.decidedBy.id) : null, decidedAt: l.decidedAt,
+  memberName: orNull(l.member.name), decidedByName: orNull(l.decidedBy?.name),
   decisionNote: orNull(l.decisionNote), requestedAt: l.createdAt,
 });
 
@@ -2268,11 +2271,11 @@ export function signAgreement(agreementId: string, name: string): Promise<Result
   return live(() => AdminOpsService.signAgreement(Number(agreementId), name.trim()), putAgreement);
 }
 
-export function revokeAgreement(agreementId: string): Promise<Result<Agreement>> {
+export function revokeAgreement(agreementId: string, reason = ""): Promise<Result<Agreement>> {
   const a = snap.agreements.filter((x) => x.agreementId === agreementId)[0];
   if (!a) return Promise.resolve(err("not_found", "No such agreement."));
   if (a.state === "signed") return Promise.resolve(err("already_signed", "A signed agreement cannot be revoked."));
-  return live(() => AdminOpsService.revokeAgreement(Number(agreementId)), putAgreement);
+  return live(() => AdminOpsService.revokeAgreement(Number(agreementId), reason), putAgreement);
 }
 
 /* ------------------------------------------------------------ documents --- */

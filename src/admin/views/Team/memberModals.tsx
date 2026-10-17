@@ -95,11 +95,11 @@ export function MemberNewModal({ roles, members = [], ops }: { roles: Role[]; me
       <div className="flex flex-col gap-6">
         <FormSection title="Team member">
           <FormField id="tmName" label="Name" req err={fieldErrs.name}>
-            <Input id="tmName" ph="Rhea Menon" autoFocus invalid={!!fieldErrs.name} onChange={() => fieldErrs.name && setFieldErrs((p) => ({ ...p, name: undefined }))} />
+            <Input id="tmName" ph="Rhea Menon" autoFocus err={!!fieldErrs.name} onChange={() => fieldErrs.name && setFieldErrs((p) => ({ ...p, name: undefined }))} />
           </FormField>
           <FieldRow>
             <FormField id="tmEmail" label="Email" req err={fieldErrs.email}>
-              <Input id="tmEmail" type="email" ph="rhea@interiorbazzar.com" invalid={!!fieldErrs.email} onChange={() => fieldErrs.email && setFieldErrs((p) => ({ ...p, email: undefined }))} />
+              <Input id="tmEmail" type="email" ph="rhea@interiorbazzar.com" err={!!fieldErrs.email} onChange={() => fieldErrs.email && setFieldErrs((p) => ({ ...p, email: undefined }))} />
             </FormField>
             <FormField id="tmPhone" label="Phone" req>
               <Input id="tmPhone" ph="+91 98100 00000" />
@@ -110,7 +110,7 @@ export function MemberNewModal({ roles, members = [], ops }: { roles: Role[]; me
         <FormSection title="Account">
           <FieldRow>
             <FormField id="tmUser" label="Username" req err={fieldErrs.username}>
-              <Input id="tmUser" ph="rhea.menon" autoComplete="off" invalid={!!fieldErrs.username} onChange={() => fieldErrs.username && setFieldErrs((p) => ({ ...p, username: undefined }))} />
+              <Input id="tmUser" ph="rhea.menon" autoComplete="off" err={!!fieldErrs.username} onChange={() => fieldErrs.username && setFieldErrs((p) => ({ ...p, username: undefined }))} />
             </FormField>
             <FormField id="tmPass" label="Password" req
               hint="Set it here and pass it on yourself — there is no generated, shown-once password on this endpoint.">

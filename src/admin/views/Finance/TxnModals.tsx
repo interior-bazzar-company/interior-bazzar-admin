@@ -10,7 +10,7 @@
    Every refusal from the store renders inside the dialog that produced it —
    the sentence it contradicts stays on screen.
    ============================================================================= */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Checkbox, DateInput, Input, SelectInput, Textarea } from "../../ui";
 import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
@@ -19,7 +19,7 @@ import { Check, Fine, Ledger, LedgerRow, Money, PaidReceipt, ProofField, TagChip
 import {
   BILL_THRESHOLD_PAISE, COMPANY_ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
   PROOF_MAX_BYTES, addTag, cancelTransaction, deactivateTag, fileSize,
-  isSuperAdmin, proofAccepted, proofTooBig, recordTransaction,
+  inr, isSuperAdmin, proofAccepted, proofTooBig, recordTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
 } from "./store";
 import type { CompanyTxn, Tag, TagKind } from "./store";
@@ -37,10 +37,16 @@ interface TxnForm {
   accountId: string; creditKind: string;
   bill: { filename: string; mime: string; bytes: number; file: File } | null;
 }
-function TxnFields({ f, set, tags, onErr }: {
+function TxnFields({ f, set, tags, onErr, needsBill, receiptErr }: {
   f: TxnForm; set: (patch: Partial<TxnForm>) => void; tags: Tag[];
-  onErr: (m: string) => void;
+  onErr: (m: string) => void; needsBill: boolean; receiptErr: string;
 }) {
+  const rcpt = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!receiptErr) return;
+    rcpt.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    rcpt.current?.focus({ preventScroll: true });
+  }, [receiptErr]);
   const isIn = f.direction === "in";
   return (
     <>
@@ -145,7 +151,9 @@ function TxnFields({ f, set, tags, onErr }: {
           fact any more, which is why the missing-bill queue is a closed backlog
           and why a row whose receipt turns out to be wrong is cancelled and
           recorded again with the right one. */}
-      <Field label="Receipt" help={"Mandatory — an image or a PDF, up to " + fileSize(PROOF_MAX_BYTES) + "."}>
+      <div ref={rcpt} tabIndex={-1} className="outline-none">
+      <Field label="Receipt" req={needsBill} err={receiptErr}
+        help={(needsBill ? "Required — " : "Optional — ") + "an image or a PDF, up to " + fileSize(PROOF_MAX_BYTES) + "."}>
         <ProofField file={f.bill} onClear={() => set({ bill: null })}
           hint={"Image or PDF, up to " + fileSize(PROOF_MAX_BYTES)}
           onFile={(file) => {
@@ -162,6 +170,7 @@ function TxnFields({ f, set, tags, onErr }: {
             set({ bill: { filename: file.name, mime: file.type, bytes: file.size, file } });
           }} />
       </Field>
+      </div>
 
       {/* LAST, AND A BOX RATHER THAN A LINE. It sat in the middle of the form
           as a one-line input, which made the field that has to make sense to
@@ -197,13 +206,14 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
     accountId: COMPANY_ACCOUNTS.filter((a) => a.active)[0]?.accountId || "", creditKind: "", bill: null,
   });
   const [err, setErr] = useState("");
+  const [receiptErr, setReceiptErr] = useState("");
   /* Set once the write has gone through. The dialog then STOPS being a form —
      the row is a fact, Cancel would be a lie, and what is left to offer is the
      record. The pay-salary dialog does exactly this and it is the reason that
      one never leaves somebody wondering whether it took. */
   const [done, setDone] = useState<{ txnId: string; paise: number; tag: string } | null>(null);
 
-  const set = (patch: Partial<TxnForm>) => { setF((prev) => ({ ...prev, ...patch })); setErr(""); };
+  const set = (patch: Partial<TxnForm>) => { setF((prev) => ({ ...prev, ...patch })); setErr(""); if (patch.bill) setReceiptErr(""); };
   const isIn = f.direction === "in";
   const account = COMPANY_ACCOUNTS.filter((x) => x.accountId === f.accountId)[0] || null;
   const paise = toPaise(f.amount);
@@ -238,6 +248,12 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
   }
 
   const submit = async () => {
+    if (needsBill && !f.bill) {
+      setReceiptErr(isIn ? "Attach the receipt. Money in needs the paper that shows it arrived."
+        : pickedTag?.proofRequired ? pickedTag.label + " needs a receipt attached."
+          : "Attach the receipt. A debit of " + inr(BILL_THRESHOLD_PAISE) + " or more needs one.");
+      return;
+    }
     /* toPaise returns null on anything that is not a clean rupee amount — a
        half-typed "1,2" or an empty box never becomes a number, let alone NaN
        in the field the person is still looking at. */
@@ -271,9 +287,7 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
   return (
     <Dlg title="Record a transaction" onClose={onClose} err={err}
       footer={<><Cancel onClose={onClose} />
-        {/* Disabled without the receipt, because the store refuses without it —
-            a button that is going to say no is better off saying so first. */}
-        <Button color="primary" isDisabled={needsBill && !f.bill} onClick={submit}>Record</Button></>}>
+        <Button color="primary" onClick={submit}>Record</Button></>}>
 
       {/* EVERY CHOICE IS A DROPDOWN AND EVERY FIELD IS ON ITS OWN LINE — the
           pay-salary dialog's rhythm. The three segmented pickers this had
@@ -288,7 +302,7 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
           refuses and says why at the moment it refuses — which is the moment
           somebody is actually asking. */}
       <Fs legend="What moved" req>
-        <TxnFields f={f} set={set} tags={tags} onErr={setErr} />
+        <TxnFields f={f} set={set} tags={tags} onErr={setReceiptErr} needsBill={needsBill} receiptErr={receiptErr} />
       </Fs>
 
     </Dlg>

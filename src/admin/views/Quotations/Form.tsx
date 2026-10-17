@@ -78,6 +78,10 @@ export function BuilderBody({ q, onSaved, detail }: {
   const mirrorAddon = (id: number) => (value: string) =>
     setLive((l) => ({ ...l, addons: { ...(l.addons || {}), [id]: value } }));
 
+  /* F-AD-17: a date already behind us saves fine (it is a draft) but cannot be issued or accepted. */
+  const until = live.until ?? q.validUntil ?? "";
+  const untilPast = !!until && until < new Date().toLocaleDateString("en-CA");
+
   const v = (id: string) =>
     (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null)?.value ?? "";
 
@@ -208,8 +212,10 @@ export function BuilderBody({ q, onSaved, detail }: {
                   <FormField id="qDate" label="Quotation date">
                     <DateInput id="qDate" defaultValue={q.quotationDate} onChange={mirror("date")} className="w-full" />
                   </FormField>
-                  <FormField id="qValid" label="Valid until"
-                    hint={"Defaults to +" + DEFAULT_VALIDITY_DAYS + " days (QT-OD-02)."}>
+                  <FormField id="qValid" label="Valid until" hintInline={untilPast}
+                    hint={untilPast
+                      ? <span className="text-warning-primary">This quotation's validity date has passed; it can't be issued or accepted. Pick a future date.</span>
+                      : "Defaults to +" + DEFAULT_VALIDITY_DAYS + " days (QT-OD-02)."}>
                     <DateInput id="qValid" defaultValue={q.validUntil} onChange={mirror("until")} className="w-full" />
                   </FormField>
                   <FormField id="qPos" label="Place of supply" hint="Drives the CGST/SGST ↔ IGST split.">

@@ -178,8 +178,15 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     setPop({ anchor, node, opts: opts || {} });
   }, []);
 
+  /* One toast per write (F-AD-79): a hook and its caller both announcing the
+     same outcome asked for the same line twice. An identical text + tone that
+     is already on screen is shown once. */
+  const liveToasts = useRef<Map<string, number>>(new Map());
   const toast = useCallback((msg: ReactNode, tone?: string) => {
+    const key = typeof msg === "string" ? (tone || "") + "|" + msg : null;
+    if (key && (liveToasts.current.get(key) || 0) > Date.now()) return;
     const id = ++toastN.current;
+    if (key) liveToasts.current.set(key, Date.now() + 3600);
     setToasts((t) => [...t, { id, msg, tone }]);
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600);
   }, []);

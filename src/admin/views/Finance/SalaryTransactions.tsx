@@ -172,7 +172,7 @@ export default function SalaryTransactions({ p, onUnfilter, onParams }: {
         title={narrowed ? "No slip matches those filters" : "No slip has been issued"}
         body={narrowed
           ? "Every slip ever issued is behind these filters, paid and unpaid alike."
-          : "Slips are issued by opening a salary run on the Accounts tab."}
+          : "Slips from payroll runs will appear here."}
         action={narrowed
           ? <Button color="secondary" onClick={() => onUnfilter("*")}>Clear the filters</Button>
           : null} />

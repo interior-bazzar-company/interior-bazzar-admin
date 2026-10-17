@@ -22,7 +22,7 @@ import type { ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { QuotationRow } from "../../../api/modules/adminOps";
 import {
-  Alert, Button, Card, EmptyState, KvList, MoreMenu, PageHeader, PaneLoading, Pill, 
+  Alert, Button, Card, ConfirmModal, EmptyState, KvList, MoreMenu, PageHeader, PaneLoading, Pill, 
   Table, Tabs, Tag, TbTitle, printHtml, publicDocUrl, qs, shareOrCopy,
 } from "../../ui";
 import type { MenuItem } from "../../ui";
@@ -126,12 +126,18 @@ export default function QuotationDetail({ id, tab, params }: {
   if (canAccept && (q.status === "issued" || q.status === "rejected" || q.status === "expired"))
     items.push({ icon: "check", label: "Mark accepted",
       title: "Writes " + inr(q.grandTotalPaise) + " to " + q.dealRef,
-      act: () => doAction("Accepting", () => call(AdminOpsService.acceptQuotation(q.id))) });
+      act: () => modal(<ConfirmModal title="Mark this quotation accepted?" verb="Mark accepted"
+        body={"This writes " + inr(q.grandTotalPaise) + " as the deal value on " + q.dealRef + "."}
+        onClose={closeLayer}
+        onConfirm={() => { closeLayer(); doAction("Accepting", () => call(AdminOpsService.acceptQuotation(q.id))); }} />) });
   if (canAccept && q.status === "issued")
     items.push({ icon: "x", label: "Mark rejected", title: "Records the customer's no", tone: "bad", act: openReject });
   if (isDraft && can("quotations", "cancel"))
     items.push({ icon: "trash", label: "Cancel draft", title: "Consumes no number, so nothing dangles", tone: "bad",
-      act: () => doAction("Cancelling", () => call(AdminOpsService.cancelQuotation(q.id))) });
+      act: () => modal(<ConfirmModal tone="bad" title="Cancel this draft?" verb="Cancel draft"
+        body="The draft is cancelled and never gets a number. It cannot be reopened."
+        onClose={closeLayer}
+        onConfirm={() => { closeLayer(); doAction("Cancelling", () => call(AdminOpsService.cancelQuotation(q.id))); }} />) });
 
   const taxed = q.taxMode !== "not_applicable";
 

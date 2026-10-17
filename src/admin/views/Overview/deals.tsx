@@ -97,8 +97,8 @@ function LensTable({ m, lens, today }: { m: DealMetrics; lens: Lens; today: stri
 const lakh = (paise: number) => Math.round(paise / 100000) / 100;
 
 export function DealsIntel({ d }: { d: OverviewData }) {
-  if (!d.gates.deals) return null;
   const [lens, setLens] = useState<Lens>("risk");
+  if (!d.gates.deals) return null;
   const ds = dealState(d);
   const m = d.deals;
   const today = d.clocks.deals.today;

@@ -90,7 +90,7 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
       title={"Assign to " + c.name}
       sub={manual
         ? <>Picked by hand · <b>not ranked</b> — no matching run put this business in the pool</>
-        : <>Rank {c.rank} · score {c.score} · rule {run!.ruleVersion}</>}
+        : run!.ranked ? <>Rank {c.rank} · score {c.score} · rule {run!.ruleVersion}</> : <>Unranked</>}
       ico="route"
       tone="brand"
       onClose={onClose}
@@ -128,7 +128,7 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
                   of why this one</>
               : needsReason
                 ? <>Rank {c.rank}, <b>{gap} points below</b> the top recommendation — a reason is required</>
-                : <>Top-ranked selection — <b>no override reason needed</b></>}
+                : run?.ranked ? <>Top-ranked selection — <b>no override reason needed</b></> : <>Nothing was ranked — <b>no override applies</b></>}
           </GuardCheck>
         </div>
 

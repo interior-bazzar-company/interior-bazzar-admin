@@ -1064,7 +1064,7 @@ function LeaveTable({ list, unrouted }: { list: LeaveRequest[]; unrouted?: boole
         return (
           <tr key={l.leaveId}>
             <Rail tone={unrouted || clash ? "warn" : l.state === "approved" ? "ok" : l.state === "rejected" ? "bad" : undefined} />
-            <td className="cell-1">{m ? <Who m={m} /> : l.memberId}</td>
+            <td className="cell-1">{m ? <Who m={m} /> : (l.memberName || l.memberId)}</td>
             <td className="font-mono tnum">
               {fmtDate(l.fromDate)}{l.toDate !== l.fromDate ? " – " + fmtDate(l.toDate) : ""}
               <span className="cell-2 block">{days + (days > 1 ? " days" : " day")}</span>
@@ -1082,13 +1082,13 @@ function LeaveTable({ list, unrouted }: { list: LeaveRequest[]; unrouted?: boole
               {unrouted ? <span className="cell-2 block text-warning-primary!">Waiting on an admin.</span> : null}
               {l.state === "escalated" ? (
                 <span className="cell-2 block text-warning-primary!">
-                  Escalated{l.decidedById ? " by " + (readMember(l.decidedById)?.name || "a manager") : ""}
+                  Escalated{l.decidedById ? " by " + (readMember(l.decidedById)?.name || l.decidedByName || "a manager") : ""}
                   {l.decisionNote ? " — " + l.decisionNote : ""}
                 </span>
               ) : null}
               {l.decidedById && l.state !== "escalated" ? (
                 <span className="cell-2 block text-tertiary">
-                  Decided by {readMember(l.decidedById)?.name || "Admin"}{l.decisionNote ? " — " + l.decisionNote : ""}
+                  Decided by {readMember(l.decidedById)?.name || l.decidedByName || "Admin"}{l.decisionNote ? " — " + l.decisionNote : ""}
                 </span>
               ) : null}
             </td>

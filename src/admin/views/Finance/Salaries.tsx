@@ -145,7 +145,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
     "sep",
     { k: "Active", v: active.length, dot: "ok", on: p.active === "yes",
       to: accHash({ active: offK("active", "yes"), due: undefined }),
-      tip: <>On the payroll: the next run issues them a slip.</> },
+      tip: <>On the payroll.</> },
     { k: "Closed", v: rows.length - active.length, on: p.active === "no",
       to: accHash({ active: offK("active", "no"), due: undefined }),
       tip: <>Kept for their slips. No run picks a closed account up again.</> },
@@ -165,7 +165,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
     "sep",
     /* The caution is LOAD-BEARING (FN-OD-06): this is net paid to people,
        not cost to company, and the metric tip is where that stays said. */
-    { k: <>Monthly payroll<MetricTip k="salary_cost" /></>, v: inr(payrollPaise) },
+    { k: <>Monthly payroll (net)<MetricTip k="salary_cost" /></>, v: inr(payrollPaise) },
   ];
 
   const txCells: (StatCell | "sep")[] = [
@@ -330,7 +330,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
           title={narrowed ? "Nobody matches those filters" : "No salary account has been opened"}
           body={narrowed
             ? "The figures in the strip above are for the whole payroll, before any filter."
-            : "A salary account attaches a monthly figure to a team member and issues them a numbered slip every month. Nothing is derived from a role: a salary is a contract with a person."}
+            : "A salary account attaches a monthly figure to a team member. Nothing is derived from a role: a salary is a contract with a person."}
           action={narrowed
             ? <Button color="secondary" onClick={() => onUnfilter("*")}>Clear the filters</Button>
             : writable
@@ -399,8 +399,8 @@ function PersonRow({ r, p, onPay }: {
           </>
         ) : (
           <>
-            <Pill dot tone="neutral" text="No slip yet" />
-            <div className="cell-2">no month has been issued</div>
+            <Pill dot tone="neutral" text="No slip" />
+            <div className="cell-2">nothing issued</div>
           </>
         )}
       </td>

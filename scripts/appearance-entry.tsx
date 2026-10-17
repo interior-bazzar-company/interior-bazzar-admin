@@ -17,7 +17,7 @@ import { ShellProvider, bootAppearance, useShell } from "../src/admin/shell/Shel
 import {
   ActivityFeed, Alert, Assignee, Avatar, Breadcrumbs, Button, Card, ChartFrame, Checkbox, ChipInput, ConfirmModal, DateRange, DealStatus, Delta,
   DrawerShell, EmptyState, Eyebrow, FieldRow, FilterBar, FilterChips, FormField, FormSection, IconButton, InfoDot, Input, InputGroup, KvList, LeadStatus,
-  ListSkeleton, ListTable, Meter, ModalShell, MoreMenu, MultiSelect, PageHeader, Pagination, PaneLoading, Person, Pill, Pipeline, Priority, Radio, Rail,
+  ListSkeleton, ListTable, Meter, MoreMenu, MultiSelect, PageHeader, Pagination, PaneLoading, Person, Pill, Pipeline, Priority, Radio, Rail,
   SearchField, SectionHead, Segmented, Select, SelectInput, StatStrip, Table, Tabs, Tag, Tags, Textarea, Tile, Tiles, Timeline, Toggle, Tooltip,
 } from "../src/admin/ui";
 import { BarRows, ColumnChart, FunnelChart, SignedColumns, Spark, Waterfall } from "../src/admin/views/charts";

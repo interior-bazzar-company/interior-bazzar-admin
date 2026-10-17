@@ -294,9 +294,10 @@ async function load(current: () => boolean): Promise<void> {
   await bootTeam();
   /* Asserted, not annotated: a closure assigns these, and TS would otherwise
      narrow them to `null` for the rest of the function. */
-  let wideErr = null as unknown, ownErr = null as unknown, answersErr = null as unknown;
+  let wideErr = null as unknown, ownErr = null as unknown;
+  const answersErr = null as unknown;
   const [all, roles, users, states, tagSuggestions, fieldTypes] = await Promise.all([
-    call(AdminOpsService.resources({ member: "all" })).catch((e) => { wideErr = e; return null; }),
+    call(AdminOpsService.resources({ member: "all", withResponses: "1" })).catch((e) => { wideErr = e; return null; }),
     call(AdminOpsService.listRoles()).catch(() => null),
     call(AdminOpsService.users()).catch(() => null),
     call(AdminOpsService.vocab("resource-states")).catch(() => null),
@@ -307,13 +308,10 @@ async function load(current: () => boolean): Promise<void> {
   let responses: ResourceResponseRow[];
   if (all) {
     resources = all.resources;
-    /* ponytail: one read per roster member, the only way the server returns
-       answers; a single "every response" read replaces this if the roster grows. */
-    const each = await Promise.all(readMembers().map((m) =>
-      call(AdminOpsService.resources({ member: m.memberId })).then((r) => r.responses || [])
-        .catch((e) => { if (answersErr === null) answersErr = e; return []; })));
+    /* Every answer arrives with the all-forms read (`withResponses`), one request
+       however big the roster is (F-AD-27: it was one read per member). */
     const seen: Record<number, boolean> = {};
-    responses = ([] as ResourceResponseRow[]).concat(...each).filter((x) => (seen[x.id] ? false : (seen[x.id] = true)));
+    responses = (all.responses || []).filter((x) => (seen[x.id] ? false : (seen[x.id] = true)));
   } else {
     const own = await call(AdminOpsService.resources({})).catch((e) => { ownErr = e; return null; });
     resources = own ? own.resources : [];

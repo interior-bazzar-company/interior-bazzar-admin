@@ -12,7 +12,7 @@ import { useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { InvoiceRow } from "../../../api/modules/adminOps";
-import { Alert, Button, Card, EmptyState, KvList, MoreMenu, PageHeader, PaneLoading, Pill, Table, Tabs, TbTitle, qs } from "../../ui";
+import { Alert, Button, Card, ConfirmModal, EmptyState, KvList, MoreMenu, PageHeader, PaneLoading, Pill, Table, Tabs, TbTitle, qs } from "../../ui";
 import type { MenuItem } from "../../ui";
 import { Figures } from "../Quotations/bits";
 import { inr, fmtDate } from "../../ui/format";
@@ -347,7 +347,7 @@ function PaymentTab({ inv, onChanged }: { inv: InvoiceRow; onChanged: () => void
 function DocumentTab({ inv, onView, onRegenerated }: {
   inv: InvoiceRow; onView: () => void; onRegenerated: () => void;
 }) {
-  const { toast } = useShell();
+  const { toast, modal, closeLayer } = useShell();
   const [info, setInfo] = useState<{ storageKey: string; version: number } | null>(null);
   if (inv.status !== "issued") return (
     <EmptyState icon="invoice" title="No document"
@@ -366,10 +366,16 @@ function DocumentTab({ inv, onView, onRegenerated }: {
         }>Document info</Button>
         <Button color="secondary" onClick={onView}>View</Button>
         {can("invoices", "issue")
-          ? <Button color="secondary" onClick={() =>
-              call(AdminOpsService.regenerateInvoiceDoc(inv.id))
-                .then(() => { onRegenerated(); toast("New document version generated."); })
-                .catch((e: unknown) => toast(errMessage(e), "bad"))
+          ? <Button color="secondary" onClick={() => modal(
+              <ConfirmModal title="Regenerate the document?" verb="Regenerate"
+                body="This makes a new version of the invoice document. The earlier version stays on record."
+                onClose={closeLayer}
+                onConfirm={() => {
+                  closeLayer();
+                  call(AdminOpsService.regenerateInvoiceDoc(inv.id))
+                    .then(() => { onRegenerated(); toast("New document version generated."); })
+                    .catch((e: unknown) => toast(errMessage(e), "bad"));
+                }} />)
             }>Regenerate</Button>
           : null}
       </div>

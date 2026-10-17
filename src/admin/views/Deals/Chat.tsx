@@ -777,7 +777,7 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
       <section className="flex flex-col gap-2">
         <Eyebrow>Deal facts</Eyebrow>
         <KvList pairs={([
-          ["Owner", <>{dl.owner_id || "—"}{dl.co_owner_id ? <span className="text-tertiary"> + {dl.co_owner_id}</span> : null}</>],
+          ["Owner", <>{dl.owner_id || "—"}{dl.co_owner_id ? <span className="block text-xs text-tertiary">co-owner: {dl.co_owner_id}</span> : null}</>],
           ["Interested in", orDash(dl.interested_in)],
           /* The intake reference. A plain string that points at whatever
              collected the submission — see Deal.enquiryRef — so it is shown and

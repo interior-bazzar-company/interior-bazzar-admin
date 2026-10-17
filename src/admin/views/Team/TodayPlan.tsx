@@ -34,7 +34,7 @@
 import { useMemo, useState } from "react";
 import { Dialog as AriaDialog, DialogTrigger as AriaDialogTrigger, Popover as AriaPopover } from "react-aria-components";
 import { cx } from "@/utils/cx";
-import { Button, Card, Checkbox, Icon, IconButton, Input, Pill } from "../../ui";
+import { Button, Card, Checkbox, ConfirmModal, Icon, IconButton, Input, Pill } from "../../ui";
 import { useShell } from "../../shell/ShellContext";
 import {
   TODAY, addPlanLine, fmtDate, isDelayed, isTerminal, meId, openDay, readMember, submitPlan,
@@ -138,7 +138,7 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
   /* Adding after the plan is in appends to it — same minting rule, same
      linking — rather than being refused with "change the work items instead",
      which is true of the record and useless as an answer. */
-  const put = async () => {
+  const doPut = async () => {
     /* A typed line is not a loose note: `submitPlan` matches it against what is
        already open and assigned to you and LINKS if it finds one, and otherwise
        mints a task due today in your name. Either way it is a real record the
@@ -149,6 +149,15 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     setOpen(false);
     shell.toast("Today's plan is in — " + lines.length + " to do.");
+  };
+
+  /* ASK FIRST (F-AD-52): filing the plan creates tasks and today's daily plan. */
+  const put = () => {
+    setOpen(false);
+    shell.modal(<ConfirmModal title="Put today's plan in?" verb="Put the plan in"
+      body="This files today's daily plan. Each line you typed becomes a new task due today, and each task you ticked is linked to the plan."
+      onClose={shell.closeLayer}
+      onConfirm={() => { shell.closeLayer(); void doPut(); }} />);
   };
 
   /* THE BACKUP, NOT THE NORMAL PATH. Opening the panel is the mark

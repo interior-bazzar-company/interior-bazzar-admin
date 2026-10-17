@@ -21,7 +21,7 @@
    before the button, which is the same question asked once and answered.
    ============================================================================= */
 import { useMemo, useState } from "react";
-import { Alert, Button, DateInput, Input, Pill, SelectInput, Textarea } from "../../ui";
+import { Alert, Button, Checkbox, DateInput, Input, Pill, SelectInput, Textarea } from "../../ui";
 import { Check, Derived, DocCard, Fine, Ledger, LedgerRow, PickList, PickRow, Picked } from "./bits";
 import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick } from "./dialog";
@@ -29,7 +29,7 @@ import type { Done } from "./dialog";
 import {
   COMPANY_ACCOUNTS, FAILURE_REASONS, MODES,
   cancelSubscription, fmtDate, inr, markFailToPay,
-  useUsers, previewSchedule, recordSubscription, rejectPlanPayment, chainsFor, attachableInvoices, attachableForInstallment, readInvoice, recordInstallmentPayment, reversePayment, superAdminOnly, todayIso,
+  useUsers, previewSchedule, recordSubscription, rejectPlanPayment, verifyPlanPayment, chainsFor, attachableInvoices, attachableForInstallment, readInvoice, recordInstallmentPayment, reversePayment, superAdminOnly, todayIso,
 } from "./store";
 import type { Installment, InstallmentPayment, PendingPayment, Subscription } from "./store";
 
@@ -710,6 +710,48 @@ export function CancelSubModal({ sub, onClose, onDone }: {
           ph="Customer closed the business · moved to a different plan · agreed exit on the deal."
           onChange={setReason} />
       </Fs>
+    </Dlg>
+  );
+}
+
+/* ============================================ verify a submitted payment === */
+/** The confirm step before Verify (F-AD-73): amount, payer and proof in front of
+ *  the person. With no proof uploaded, an explicit box is the only way through. */
+export function VerifyPaymentModal({ pay, onClose, onDone }: {
+  pay: PendingPayment; onClose: () => void; onDone: Done;
+}) {
+  const [noProof, setNoProof] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const blocked = !pay.proofUrl && !noProof;
+
+  const submit = async () => {
+    setBusy(true);
+    const e = await (pay.proofUrl ? verifyPlanPayment(pay.id) : verifyPlanPayment(pay.id, true));
+    setBusy(false);
+    if (e) { setErr(e); return; }
+    onDone(pay.reference + " verified · " + inr(pay.amountPaise) + " collected and the plan is on.", "ok");
+  };
+
+  return (
+    <Dlg title="Verify this payment" err={err} onClose={onClose}
+      sub={<span className="font-mono tnum">{pay.reference}</span>}
+      footer={<>
+        <Cancel onClose={onClose} />
+        <Button color="primary" isDisabled={busy || blocked} onClick={submit}>Verify the payment</Button>
+      </>}>
+      <Ledger>
+        <LedgerRow label="Amount">{inr(pay.amountPaise)}</LedgerRow>
+        <LedgerRow label="Payer">{pay.payer || "Unknown payer"}</LedgerRow>
+        <LedgerRow label="Proof">
+          {pay.proofUrl
+            ? <a href={pay.proofUrl} target="_blank" rel="noreferrer" className="font-semibold text-brand-secondary hover:underline">Open proof</a>
+            : "none uploaded"}
+        </LedgerRow>
+      </Ledger>
+      {pay.proofUrl ? null : (
+        <Checkbox checked={noProof} onChange={setNoProof} label="Verify without proof" />
+      )}
     </Dlg>
   );
 }

@@ -3,12 +3,44 @@ import { fetchWithAuthRetry } from "./authHelper/fetchWithAuthRetry";
 import type { ApiResponseType, RequestOptions } from "../../types/reqResType";
 import { getViewAs } from "../../admin/viewAs";
 
+/** The ONE error-code -> words table (F-AD-49). A server or panel refusal can
+ *  carry a machine code ("bill_required"); a person must never read it. Known
+ *  codes become a sentence; any other trailing "(snake_code)" or bare
+ *  snake_case message is dropped / spoken. Add a code here, not in a screen. */
+const CODE_WORDS: Record<string, string> = {
+  bill_required: "Attach the receipt.",
+  bill_type: "The receipt must be an image or a PDF.",
+  bill_too_big: "The receipt file is too large.",
+  proof_required: "Attach the proof.",
+  proof_type: "The proof must be an image or a PDF.",
+  proof_too_big: "The proof file is too large.",
+  reason_required: "Say why.",
+  duplicate_reference: "That reference is already on a record.",
+  duplicate_request: "That has already been requested.",
+  duplicate_tag: "That name is already in use.",
+  invalid_state_transition: "That is not possible in its current state.",
+  validation_failed: "Check the details and try again.",
+  creation_failed: "It could not be created.",
+  super_admin_required: "Only a super admin can do this.",
+  already_paid: "It is already paid.",
+  nothing_due: "Nothing is due.",
+  quotation_lapsed: "This quotation has lapsed. Revise it with a new valid-until date first.",
+  no_proof: "No proof is on file for this payment.",
+};
+export function plainMessage(message: string): string {
+  const m = String(message ?? "").trim();
+  if (!m) return m;
+  if (CODE_WORDS[m]) return CODE_WORDS[m];
+  if (/^[a-z]+(_[a-z]+)+$/.test(m)) return m.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) + ".";
+  return m.replace(/\s*\([a-z]+(?:_[a-z]+)+\)\s*$/, "").trim();
+}
+
 export class AppExceptions extends Error {
   public code: number;
   public response: boolean;
 
   constructor(message: string, code: number = -1, response: boolean = false) {
-    super(message);
+    super(plainMessage(message));
     this.code = code;
     this.response = response;
   }
@@ -50,9 +82,16 @@ export class ApiService {
       (request as RequestInit).signal = options.signal;
     }
     //new end
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
-
-    return this.returnResponse(response, options.responseType ?? "json");
+    const run = async () => {
+      const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
+      return this.returnResponse<T>(response, options.responseType ?? "json");
+    };
+    /* Identical GETs in flight at the same moment share ONE request (F-AD-27):
+       Overview mounted several widgets that each asked for the same ledger /
+       refunds / income URL. Aborted-by-caller requests and non-JSON bodies are
+       never shared. */
+    if (options.signal || (options.responseType ?? "json") !== "json") return run();
+    return this.once("GET", url, null, run);
   }
 
   /* One write at a time per identical request (F-AD-13). A double click sent
@@ -74,7 +113,7 @@ export class ApiService {
 
   async getPostApiResponse<T>(
     url: string,
-    body: any,
+    body: unknown,
     options: RequestOptions = {}
   ): Promise<ApiResponseType<T>> {
     const request = this.createRequest(
@@ -91,7 +130,7 @@ export class ApiService {
 
   async getPutApiResponse<T>(
     url: string,
-    body: any,
+    body: unknown,
     options: RequestOptions = {}
   ): Promise<ApiResponseType<T>> {
     const request = this.createRequest(
@@ -108,7 +147,7 @@ export class ApiService {
 
   async getPatchApiResponse<T>(
     url: string,
-    body: any,
+    body: unknown,
     options: RequestOptions = {}
   ): Promise<ApiResponseType<T>> {
     const request = this.createRequest(
@@ -126,7 +165,7 @@ export class ApiService {
 
   async getDeleteApiResponse<T>(
     url: string,
-    body?: any,
+    body?: unknown,
     options: RequestOptions = {}
   ): Promise<ApiResponseType<T>> {
     const request = this.createRequest(
@@ -170,7 +209,7 @@ export class ApiService {
   //   };
   // }
 
-  private createRequest(method: string, body: any, data = "json", auth = true) {
+  private createRequest(method: string, body: unknown, data = "json", auth = true) {
     const headers: Record<string, string> = {};
     // remove this because this will be handled by interceptor (fetchWithAuthRetry)
     if (auth) {
@@ -180,18 +219,20 @@ export class ApiService {
       // }
     }
 
+    // Read-only impersonation (Team's "See as this member"): the server keys
+    // its read-only, filtered response on this header and refuses every write
+    // that carries it, so it goes on EVERY method (without it a write would run
+    // as the real admin).
+    const viewAs = getViewAs();
+    if (viewAs) headers["X-View-As"] = String(viewAs.id);
+
     if (method === "GET") {
       headers["Content-Type"] = "application/json";
-      // Read-only impersonation (Team's "See as this member"): the server keys
-      // its read-only, filtered response on this header and refuses it outright
-      // on any other method, so it is only ever added here.
-      const viewAs = getViewAs();
-      if (viewAs) headers["X-View-As"] = String(viewAs.id);
       return { method, headers };
     }
 
     if (data === "formdata") {
-      return { method, body, headers };
+      return { method, body: body as BodyInit, headers };
     }
 
     headers["Content-Type"] = "application/json";
@@ -218,7 +259,7 @@ export class ApiService {
         default:
           body = await response.json();
       }
-    } catch (error) {
+    } catch {
       // Not JSON — an nginx 502 page, a Django debug traceback, a truncated
       // body. Whatever it is, it is not for the user to read.
       throw new AppExceptions(SERVICE_MESSAGE, 502, false);

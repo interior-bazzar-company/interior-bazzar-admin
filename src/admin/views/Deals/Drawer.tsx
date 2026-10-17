@@ -118,7 +118,7 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
           <SectionHead title="Deal facts" />
           <KvList pairs={([
             ["Owner", <>{dl.owner_id || "—"}{dl.co_owner_id
-              ? <span className="text-tertiary"> + {dl.co_owner_id}</span> : null}</>],
+              ? <span className="block text-xs text-tertiary">co-owner: {dl.co_owner_id}</span> : null}</>],
             ["Business", orDash(dl.business_name)],
             ["Phone", <ContactNumber phone={dl.phone} name={dl.customer_name} />],
             ["Email", dl.email

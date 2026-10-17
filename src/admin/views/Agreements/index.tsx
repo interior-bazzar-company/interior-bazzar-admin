@@ -24,7 +24,7 @@ import { can } from "../../auth/session";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  Alert, Button, Card, ConfirmModal, EmptyState, FilterBar, FilterChips, Icon, KvList, ModalShell, PageHeader, qs,
+  Alert, Button, Card, EmptyState, FilterBar, FilterChips, Icon, KvList, ModalShell, PageHeader, qs, ReasonModal,
   SearchField, Select, shareOrCopy, StatStrip, Table, Tabs, TbTitle,
 } from "../../ui";
 import type { StatCell } from "../../ui";
@@ -529,14 +529,14 @@ function DeedPage({ agreementId }: { agreementId: string }) {
   if (a.state !== "signed" && a.state !== "revoked") acts.push({ icon: "x", label: "Revoke", tone: "bad",
     title: "The link stops working immediately", act: () => shell.modal(
       /* ASK FIRST (F-AD-52): revoking cannot be undone. */
-      <ConfirmModal tone="bad" title={"Revoke " + a.title + "?"} verb="Revoke"
-        body="The signing link stops working immediately and this copy can no longer be signed. To change anything, send a fresh one from the template."
+      <ReasonModal tone="bad" heading={"Revoke " + a.title + "?"} confirmLabel="Revoke" required label="Reason"
+        sub="The signing link stops working immediately and this copy can no longer be signed. To change anything, send a fresh one from the template."
         onClose={shell.closeLayer}
-        onConfirm={async () => {
+        run={async (reason) => {
+          const r = await revokeAgreement(a.agreementId, reason);
+          if (!r.ok) throw new Error(r.message);
           shell.closeLayer();
-          const r = await revokeAgreement(a.agreementId);
-          if (!r.ok) shell.toast(r.message, "bad");
-          else shell.toast("Revoked. The link stops working.", "ok");
+          shell.toast("Revoked. The link stops working.", "ok");
         }} />) });
 
   return (

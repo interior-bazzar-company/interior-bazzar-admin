@@ -160,7 +160,7 @@ export function BuilderBody({ inv, onSaved, detail }: { inv: InvoiceRow; onSaved
       <BuilderLayout
         form={<>
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={1} title="Details" hint="from the deal, frozen at issue" />
+            <StepHead n={1} title="Details" hint="billing comes from the deal and is edited there; issue re-reads it" />
             <Card>
               <FormSection>
                 <BillTo name={inv.billing.name || "—"} address={inv.billing.address || "—"} phone={inv.billing.phone || "—"}

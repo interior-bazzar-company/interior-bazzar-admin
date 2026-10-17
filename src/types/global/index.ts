@@ -301,7 +301,7 @@ export interface OfferPopupType {
   image: string;
   openDelay: number;
   closeDelay: number;
-  isActive: Boolean;
+  isActive: boolean;
 }
 
 export interface VideoResType {
@@ -373,7 +373,7 @@ export interface VideoPlayerProps {
   type?: VideoType;
   isOverlay?: boolean;
   radius?: boolean;
-  setIsPlaying: React.Dispatch<React.SetStateAction<any>>;
+  setIsPlaying: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export interface VideoTypeTemp {

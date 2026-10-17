@@ -27,22 +27,18 @@ export class AdminService {
    *  excluded), how many are active, how many hold an unfinished seller
    *  profile, and the server's date the count was taken. */
   static async fetchTotalUsers() {
-    try {
-      const cached = getCache<ApiResponseType<UserTotals>>(CACHE_KEYS.TOTAL_USERS, 'session');
-      if (cached) return cached;
+    const cached = getCache<ApiResponseType<UserTotals>>(CACHE_KEYS.TOTAL_USERS, 'session');
+    if (cached) return cached;
 
-      const url = `${appUrl.admin}/v2/total-users/`;
-      const response: ApiResponseType<UserTotals> =
-        await apiService.getGetApiResponse(url);
+    const url = `${appUrl.admin}/v2/total-users/`;
+    const response: ApiResponseType<UserTotals> =
+      await apiService.getGetApiResponse(url);
 
-      if (response.response) {
-        setCache(CACHE_KEYS.TOTAL_USERS, response, 10, 'session');
-      }
-
-      return response;
-    } catch (error) {
-      throw error;
+    if (response.response) {
+      setCache(CACHE_KEYS.TOTAL_USERS, response, 10, 'session');
     }
+
+    return response;
   }
   /* Get  Analytics here  */
 }

@@ -106,8 +106,12 @@ const bucketIndex = (bs: Bucket[], d: string | null | undefined) =>
   d ? bs.findIndex((b) => inRange(d, b.from, b.to)) : -1;
 
 /** Percentage change, or null when there is nothing to compare against. */
-export const pctChange = (now: number, before: number): number | null =>
-  before ? Math.round(((now - before) / Math.abs(before)) * 1000) / 10 : null;
+export const pctChange = (now: number, before: number): number | null => {
+  const pct = before ? Math.round(((now - before) / Math.abs(before)) * 1000) / 10 : null;
+  /* Past +/-999 % the base was a rounding error (F-AD-46: "+13376%"), not a
+     trend - no comparison is more honest than a three-digit one. */
+  return pct !== null && Math.abs(pct) > 999 ? null : pct;
+};
 /** Points of difference between two rates. */
 export const ptsChange = (now: number | null, before: number | null): number | null =>
   now === null || before === null ? null : Math.round((now - before) * 10) / 10;

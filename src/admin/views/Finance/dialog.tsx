@@ -54,8 +54,8 @@ export function Fs({ legend, hint, req, hintInline, children }: {
   );
 }
 
-export function Field({ label, help, children }: { label: ReactNode; help?: ReactNode; children: ReactNode }) {
-  return <FormField label={label} hint={help}>{children}</FormField>;
+export function Field({ label, help, req, err, children }: { label: ReactNode; help?: ReactNode; req?: boolean; err?: ReactNode; children: ReactNode }) {
+  return <FormField label={label} hint={help} req={req} err={err}>{children}</FormField>;
 }
 
 /** Money in, money out — always typed in rupees and stored in paise, so the

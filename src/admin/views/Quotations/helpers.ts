@@ -186,6 +186,8 @@ export function blockersOf(q: QuotationRow): Blocker[] {
   if (!plan || !plan.amountPaise) out.push({ code: "quotation_empty", text: "The plan line needs an amount." });
   if (!q.placeOfSupply) out.push({ code: "validation_failed", text: "A place of supply is required." });
   if (!q.validUntil) out.push({ code: "invalid_validity", text: "A validity date is required." });
+  else if (daysUntil(q.validUntil) < 0)
+    out.push({ code: "quotation_lapsed", text: "This quotation lapsed on " + String(q.validUntil).slice(0, 10) + ". Move its valid-until date forward before issuing." });
   if (q.grandTotalPaise <= 0) out.push({ code: "invalid_pricing", text: "The grand total must be greater than zero." });
   return out;
 }

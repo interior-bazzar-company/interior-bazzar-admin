@@ -129,7 +129,7 @@ function Totals({ y, year }: { y: PayrollYear; year: string }) {
     {
       k: <>On the payroll<PayrollMetricTip k="payroll_headcount" /></>,
       v: head.active,
-      s: inr(head.monthlyPaise) + " a month, committed",
+      s: inr(head.monthlyPaise) + " a month, committed (gross)",
       foot: head.openedInYear
         ? <span className="label-mono">{head.openedInYear} opened in {yearLabel(year)}</span>
         : null,

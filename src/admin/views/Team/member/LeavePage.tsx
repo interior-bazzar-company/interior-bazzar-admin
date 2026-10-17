@@ -107,7 +107,7 @@ export default function LeavePage({ m, viewer }: { m: Member; viewer: Viewer }) 
               <td>{labelOf(LEAVE_KIND, l.kind)}</td>
               <td>
                 <Pill xs dot text={labelOf(LEAVE_STATE, l.state)} tone={tone} />
-                {decider ? <span className="block cell-2">{l.state === "escalated" ? "escalated by " : "by "}{decider.name}</span> : null}
+                {decider ? <span className="block cell-2">{l.state === "escalated" ? "escalated by " : "by "}{decider.name}</span> : l.decidedByName ? <span className="block cell-2">{l.state === "escalated" ? "escalated by " : "by "}{l.decidedByName}</span> : null}
               </td>
               <td className="cell-1">
                 {l.reason}

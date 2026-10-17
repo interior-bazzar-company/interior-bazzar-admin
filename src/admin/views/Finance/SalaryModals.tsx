@@ -192,7 +192,7 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
     if (r.error) return setErr(r.error);
     onDone(a
       ? memberName + " revised to " + inr(gross - dedTotal) + " net a month. Slips already issued keep the figures they were issued with."
-      : memberName + " is on the payroll at " + inr(gross - dedTotal) + " net a month. The next run opened carries a slip for them.",
+      : memberName + " is on the payroll at " + inr(gross - dedTotal) + " net a month.",
     "ok");
   };
 

@@ -24,7 +24,7 @@ import {
   Avatar, Button, Card, EmptyState, Icon, KvList, LinkChip, MoreMenu, Notice,
   PageHeader, PaneLoading, Pill, Table, Tabs, Tag, Timeline, ActivityFeed,
 } from "../../ui";
-import { Assumed, ClassPill, Completeness, TagChips } from "./bits";
+import { ClassPill, Completeness, TagChips } from "./bits";
 import EditProfile from "./EditProfile";
 import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {

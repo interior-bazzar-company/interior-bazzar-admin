@@ -18,7 +18,6 @@
    buyer SUBMITTED but nobody has checked is not in the table at all: it sits
    in Pending verification above it, and no figure counts it until verified.
    ============================================================================= */
-import { useState } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
 import {
@@ -30,12 +29,12 @@ import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
 import { ActionMenu, InstStrip, Money, SourceTag, SubPill } from "./bits";
-import { RecordSubModal, RejectPaymentModal } from "./SubModals";
+import { RecordSubModal, RejectPaymentModal, VerifyPaymentModal } from "./SubModals";
 import SubAnalytics from "./SubAnalytics";
 import {
   FILTER_LABELS, PERIOD, SUB_SOURCES, SUB_STATUSES,
   applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, subYears, todayIso,
-  useOverview, usePendingPayments, usePlansSeen, useSubRows, useSubTotals, useSubsLoading, verifyPlanPayment,
+  useOverview, usePendingPayments, usePlansSeen, useSubRows, useSubTotals, useSubsLoading,
 } from "./store";
 import type { Params, PendingPayment, SubRow } from "./store";
 
@@ -302,17 +301,12 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
 function PendingVerification() {
   const { toast, modal, closeLayer } = useShell();
   const rows = usePendingPayments();
-  const [busy, setBusy] = useState<number | null>(null);
   if (!rows || !rows.length) return null;
   const decides = can("payments", "record");
 
-  const verify = async (x: PendingPayment) => {
-    setBusy(x.id);
-    const e = await verifyPlanPayment(x.id);
-    setBusy(null);
-    if (e) toast(e, "bad");
-    else toast(x.reference + " verified · " + inr(x.amountPaise) + " collected and the plan is on.", "ok");
-  };
+  const verify = (x: PendingPayment) => modal(
+    <VerifyPaymentModal pay={x} onClose={closeLayer}
+      onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />);
   const reject = (x: PendingPayment) => modal(
     <RejectPaymentModal pay={x} onClose={closeLayer}
       onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />);
@@ -354,8 +348,8 @@ function PendingVerification() {
             {decides && (
               <td className="acts whitespace-nowrap">
                 <div className="flex items-center justify-end gap-1.5">
-                  <Button size="sm" color="primary" ico="check" isDisabled={busy !== null} onClick={() => void verify(x)}>Verify</Button>
-                  <Button size="sm" color="secondary" isDisabled={busy !== null} onClick={() => reject(x)}>Reject</Button>
+                  <Button size="sm" color="primary" ico="check" onClick={() => verify(x)}>Verify</Button>
+                  <Button size="sm" color="secondary" onClick={() => reject(x)}>Reject</Button>
                 </div>
               </td>
             )}

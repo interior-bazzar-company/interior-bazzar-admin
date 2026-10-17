@@ -1053,14 +1053,13 @@ function liveSubscription(x: SubPurchaseRow): Subscription {
     : status === "cancelled" || status === "expired" ? "cancelled" : "due";
   const f = failed && held ? held.failure : null;
 
-  const installments: Installment[] = (p || (isWeb && totalPaise > 0)) ? [{
+  /* One row whenever there is a payment or a price. A purchase with no payment
+     row (sold by hand) used to get a second branch that ignored `failed`, so a
+     recorded fail to pay still read "due" (F-AD-81). */
+  const installments: Installment[] = (p || totalPaise > 0) ? [{
     seq: 1, of: 1, dueDate: startDate || todayIso(), amountPaise: totalPaise,
     status: instStatus, invoiceNumber: null, payment: settled ? payment : null,
     failure: f ? { at: f.at || "", reason: f.reason, attempt: 0, note: f.note } : null,
-  }] : totalPaise > 0 ? [{
-    seq: 1, of: 1, dueDate: startDate || todayIso(), amountPaise: totalPaise,
-    status: (status === "cancelled" || status === "expired") ? "cancelled" : "due",
-    invoiceNumber: null, payment: null, failure: null,
   }] : [];
   const planName = cleanPlanName(x.planTitle);
   return {
@@ -2770,7 +2769,7 @@ export async function markFailToPay(subscriptionId: string, seq: number, reason:
   if (sale !== null) {
     if (!reason.trim()) return "Pick what happened.";
     if (!evidence.trim())
-      return "Say what the gateway or the bank said, in their words. A failure with no evidence is indistinguishable from a guess. (reason_required)";
+      return "Say what the gateway or the bank said, in their words. A failure with no evidence is indistinguishable from a guess.";
     try {
       await call(AdminOpsService.failSubscriptionInstallment(sale, seq, { reason: reason.trim(), note: evidence.trim() }));
     } catch (e) {
@@ -2783,7 +2782,7 @@ export async function markFailToPay(subscriptionId: string, seq: number, reason:
     return "A plan purchase is paid once, so there is a single installment and it is the one that failed.";
   if (!reason.trim()) return "Pick what happened.";
   if (!evidence.trim())
-    return "Say what the gateway or the bank said, in their words. A failure with no evidence is indistinguishable from a guess. (reason_required)";
+    return "Say what the gateway or the bank said, in their words. A failure with no evidence is indistinguishable from a guess.";
   const held = await heldFor(subscriptionId);
   if (held.error) return held.error;
   try {
@@ -2807,7 +2806,7 @@ export async function reversePayment(paymentId: string, reason: string): Promise
   const hit = seedPayments().filter((h) => h.pay.paymentId === paymentId)[0];
   if (!hit) return "That payment is not on any subscription.";
   const sa = superAdminOnly("Reversing a payment"); if (sa) return sa;
-  if (!reason.trim()) return "Say why it is being reversed. It goes into the history verbatim. (reason_required)";
+  if (!reason.trim()) return "Say why it is being reversed. It goes into the history verbatim.";
   const held = await heldFor(hit.sub.subscriptionId);
   if (held.error) return held.error;
   try {
@@ -2846,10 +2845,10 @@ async function decidePayment(write: () => Promise<unknown>): Promise<string> {
   await Promise.all([bootFinanceLive(true), bootSubs(true)]);
   return "";
 }
-export const verifyPlanPayment = (id: number) =>
-  decidePayment(() => call(AdminOpsService.verifyPayment(id)));
+export const verifyPlanPayment = (id: number, allowNoProof = false) =>
+  decidePayment(() => call(AdminOpsService.verifyPayment(id, allowNoProof)));
 export function rejectPlanPayment(id: number, reason: string): Promise<string> {
-  if (!reason.trim()) return Promise.resolve("Say why it is rejected. It goes into the history verbatim. (reason_required)");
+  if (!reason.trim()) return Promise.resolve("Say why it is rejected. It goes into the history verbatim.");
   return decidePayment(() => call(AdminOpsService.rejectPayment(id, reason.trim())));
 }
 
@@ -2860,7 +2859,7 @@ export async function cancelSubscription(id: string, reason: string): Promise<st
   const sub = readSubscription(id);
   if (!sub) return "That subscription no longer exists.";
   if (!reason.trim())
-    return "Say why it is ending. It goes into the history verbatim. (reason_required)";
+    return "Say why it is ending. It goes into the history verbatim.";
   const held = await heldFor(id);
   if (held.error) return held.error;
   try {
@@ -2974,8 +2973,8 @@ Promise<{ error: string; salaryAccountId: string | null }> {
 export async function closeSalaryAccount(id: string, reason: string): Promise<string> {
   const acc = readSalaryAccount(id);
   if (!acc) return "That salary account no longer exists.";
-  if (!acc.active) return "It is already closed. (invalid_state_transition)";
-  if (!reason.trim()) return "Say why it is closing. (reason_required)";
+  if (!acc.active) return "It is already closed.";
+  if (!reason.trim()) return "Say why it is closing.";
   const ref = serverIdOf(id, SAL);
   if (ref === null) return "That salary account no longer exists.";
   try {
@@ -3030,7 +3029,7 @@ export async function setLop(slipId: string, lopDays: number): Promise<string> {
   const slip = readSlip(slipId);
   if (!slip) return "That slip no longer exists.";
   if (slip.paidAt)
-    return slip.slipId + " is paid and frozen. A paid document does not move. (already_paid)";
+    return slip.slipId + " is paid and frozen. A paid document does not move.";
   if (!Number.isInteger(lopDays) || lopDays < 0 || lopDays >= daysInMonth(slip.month))
     return "Loss of pay is a whole number of days inside " + fmtMonth(slip.month) + ".";
   const ref = serverIdOf(slipId, SLIP);
@@ -3073,7 +3072,7 @@ export async function paySalary(salaryAccountId: string, input: PaySalaryInput):
   const acc = readSalaryAccount(salaryAccountId);
   if (!acc) return "That salary account no longer exists.";
   const due = dueOf(toSalaryRow(acc));
-  if (!due.unpaid.length) return acc.memberName + " has nothing outstanding. (nothing_due)";
+  if (!due.unpaid.length) return acc.memberName + " has nothing outstanding.";
 
   const via = payViaMeta(input.via);
   if (!via) return "Pick how it was paid.";
@@ -3082,12 +3081,12 @@ export async function paySalary(salaryAccountId: string, input: PaySalaryInput):
      presigned upload, kept against every slip this transfer settles, because
      one transfer is one receipt whether it covers one month or three. */
   const filename = (input.proof?.filename || "").trim();
-  if (!filename) return "Attach the receipt. It is the only evidence this payment has. (proof_required)";
+  if (!filename) return "Attach the receipt. It is the only evidence this payment has.";
   if (!proofAccepted(input.proof.mime))
-    return filename + " is neither an image nor a PDF. A receipt has to be something somebody can open and read. (proof_type)";
+    return filename + " is neither an image nor a PDF. A receipt has to be something somebody can open and read.";
   if (proofTooBig(input.proof.bytes))
     return filename + " is " + fileSize(input.proof.bytes as number) + ". The limit is "
-      + fileSize(PROOF_MAX_BYTES) + ". (proof_too_big)";
+      + fileSize(PROOF_MAX_BYTES) + ".";
   /* Cash has no account to pick -- the server's accounts carry no type, so
      there is no "the cash account" to name -- and `paidFrom` is optional
      server-side. Every other method names the account it left. */
@@ -3098,9 +3097,9 @@ export async function paySalary(salaryAccountId: string, input: PaySalaryInput):
   if (incentivePaise < 0 || deductionPaise < 0)
     return "An incentive and a deduction are both whole amounts above zero.";
   if (deductionPaise && !(input.deduction as { label: string }).label.trim())
-    return "Say what the deduction is for — it is the only thing that explains it on the slip. (reason_required)";
+    return "Say what the deduction is for — it is the only thing that explains it on the slip.";
   if (!input.proof.file)
-    return "Pick " + filename + " again — the receipt is uploaded when the payment is recorded. (proof_required)";
+    return "Pick " + filename + " again — the receipt is uploaded when the payment is recorded.";
 
   let receiptUrl: string;
   try {
@@ -3150,11 +3149,11 @@ export async function setSlipHold(slipId: string, hold: boolean, reason: string)
   const slip = readSlip(slipId);
   if (!slip) return "That slip no longer exists.";
   if (slip.paidAt)
-    return slip.slipId + " is paid and frozen. A paid document cannot be held. (already_paid)";
+    return slip.slipId + " is paid and frozen. A paid document cannot be held.";
   if (!!slip.held === hold)
     return hold ? slip.slipId + " is already on hold." : slip.slipId + " is not on hold.";
   if (hold && !reason.trim())
-    return "Say why it is held. The hold prints on no document, so the reason is the only record it has. (reason_required)";
+    return "Say why it is held. The hold prints on no document, so the reason is the only record it has.";
   const ref = serverIdOf(slipId, SLIP);
   if (ref === null) return "That slip no longer exists.";
   try {
@@ -3181,7 +3180,7 @@ export async function addTag(label: string, kind: TagKind, budgetPaise: number |
   const name = label.trim();
   if (!name) return { error: "Give the tag a label.", tagKey: null };
   if (live.tags.some((t) => t.label.toLowerCase() === name.toLowerCase()))
-    return { error: "A tag called " + name + " already exists. (duplicate_tag)", tagKey: null };
+    return { error: "A tag called " + name + " already exists.", tagKey: null };
   let key: string;
   try {
     const row = await call(AdminOpsService.createExpenseTag({
@@ -3201,7 +3200,7 @@ export async function addTag(label: string, kind: TagKind, budgetPaise: number |
 export async function deactivateTag(key: string): Promise<string> {
   const t = tagOf(key);
   if (!t) return "That tag no longer exists.";
-  if (!t.active) return "It is already inactive. (invalid_state_transition)";
+  if (!t.active) return "It is already inactive.";
   const sa = superAdminOnly("Deactivating a tag"); if (sa) return sa;
   try {
     await call(AdminOpsService.updateExpenseTag(key, { isActive: false }));
@@ -3218,7 +3217,7 @@ export async function setBudget(key: string, budgetPaise: number | null): Promis
   const t = tagOf(key);
   if (!t) return "That tag no longer exists.";
   if (budgetPaise !== null && (!Number.isInteger(budgetPaise) || budgetPaise < 0))
-    return "A budget is a whole rupee amount, or nothing at all. (validation_failed)";
+    return "A budget is a whole rupee amount, or nothing at all.";
   try {
     await call(AdminOpsService.updateExpenseTag(key, { budgetPaise: budgetPaise || 0 }));
   } catch (e) {
@@ -3269,23 +3268,31 @@ export async function recordTransaction(input: TxnInput): Promise<{ error: strin
   if (!Number.isInteger(input.amountPaise) || input.amountPaise <= 0) return fail("The amount must be a whole figure above zero.");
   if (!input.description.trim()) return fail("Say what it was for.");
   if (!input.reference.trim()) return fail("The reference is mandatory — without it this row can never be tied to a statement.");
-  if (dupLiveReference(input.reference)) return fail("A record already carries reference " + input.reference.trim() + ". (duplicate_reference)");
+  if (dupLiveReference(input.reference)) return fail("A record already carries reference " + input.reference.trim() + ".");
   if (!input.valueDate || input.valueDate > liveToday()) return fail("The value date is when the money moved — it cannot be in the future.");
   if (!COMPANY_ACCOUNTS.some((a) => a.active && a.accountId === input.accountId)) return fail("Pick the account.");
   const billName = (input.bill?.filename || "").trim();
-  if (!billName)
-    return fail("Attach the receipt. A recorded row with no paper behind it is a claim, not a transaction. (bill_required)");
-  if (!proofAccepted(input.bill.mime))
-    return fail(billName + " is neither an image nor a PDF. A receipt is a photograph of one or a document, and a spreadsheet is neither. (bill_type)");
-  if (proofTooBig(input.bill.bytes))
-    return fail(billName + " is " + fileSize(input.bill.bytes as number) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + " — a receipt that size is a scan nobody set the resolution on. (bill_too_big)");
+  /* A RECEIPT IS REQUIRED WHERE THE SERVER REQUIRES IT: every money-in row, a
+     debit whose tag demands proof, and a debit at or above the panel
+     threshold. Any other debit records without one (F-AD-11). */
+  const billNeeded = !out || !!tag?.proofRequired || input.amountPaise >= BILL_THRESHOLD_PAISE;
+  if (!billName && billNeeded)
+    return fail(!out
+      ? "Attach the receipt. Money in needs the paper that shows it arrived."
+      : tag?.proofRequired
+        ? tag.label + " needs a receipt attached."
+        : "Attach the receipt. A debit of " + inr(BILL_THRESHOLD_PAISE) + " or more needs one.");
+  if (billName && !proofAccepted(input.bill.mime))
+    return fail(billName + " is neither an image nor a PDF. A receipt is a photograph of one or a document, and a spreadsheet is neither.");
+  if (billName && proofTooBig(input.bill.bytes))
+    return fail(billName + " is " + fileSize(input.bill.bytes as number) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + " — a receipt that size is a scan nobody set the resolution on.");
   if (!out && !CREDIT_KINDS.some((c) => c.key === input.creditKind))
     return fail("Money in is restricted here to bank interest, an own transfer or a vendor refund. Customer money has exactly one way in: a subscription.");
-  if (!input.bill.file) return fail("Pick " + billName + " again — the receipt is uploaded when the row is recorded. (bill_required)");
+  if (billName && !input.bill.file) return fail("Pick " + billName + " again — the receipt is uploaded when the row is recorded.");
 
   let txnId: string;
   try {
-    const url = await uploadReceipt(input.bill.file);
+    const url = input.bill?.file ? await uploadReceipt(input.bill.file) : "";
     if (out && tag) {
       const row = await call(AdminOpsService.addExpense({
         label: input.description.trim(), amount: input.amountPaise / 100, // the endpoint takes RUPEES
@@ -3295,7 +3302,8 @@ export async function recordTransaction(input: TxnInput): Promise<{ error: strin
         kind: tag.kind === "reinvestment" ? "reinvestment" : "fixed",
         incurredAt: input.valueDate, tag: tag.tagKey, mode: input.mode, reference: input.reference.trim(),
         party: input.party.trim(),
-        account: input.accountId, billUrl: s3KeyOf(url), billName, billMime: input.bill.mime, billBytes: input.bill.bytes,
+        account: input.accountId, billUrl: url ? s3KeyOf(url) : undefined, billName: billName || undefined,
+        billMime: billName ? input.bill.mime : undefined, billBytes: billName ? input.bill.bytes : undefined,
       })) as { id: number };
       txnId = TXN_OUT + row.id;
     } else {
@@ -3322,9 +3330,9 @@ export async function recordTransaction(input: TxnInput): Promise<{ error: strin
 export async function cancelTransaction(id: string, reason: string): Promise<string> {
   const t = readTransaction(id);
   if (!t) return "That transaction no longer exists.";
-  if (t.state === "cancelled") return "It is already cancelled. (invalid_state_transition)";
+  if (t.state === "cancelled") return "It is already cancelled.";
   if (!reason.trim())
-    return "Say why it is being cancelled. A cancellation with no reason is indistinguishable from a mistake at audit. (reason_required)";
+    return "Say why it is being cancelled. A cancellation with no reason is indistinguishable from a mistake at audit.";
   const sa = superAdminOnly("Cancelling a transaction"); if (sa) return sa;
   const spendId = idIn(id, TXN_OUT);
   const incomeId = idIn(id, TXN_IN);
@@ -3354,7 +3362,7 @@ export async function requestRefund(paymentId: string, ground: string, detail: s
   const serverId = planIdOf(paymentId);
   if (!hit || serverId === null) return fail("That payment is not in the ledger.");
   if (refundStanding(paymentId))
-    return fail("A refund already stands against this payment. (duplicate_request)");
+    return fail("A refund already stands against this payment.");
   if (!REFUND_GROUNDS.some((g) => g.key === ground)) return fail("Pick why the money is going back.");
   let id: number;
   try {
@@ -3402,9 +3410,9 @@ export async function decideRefund(id: string, verdict: "approve" | "decline", d
   const r = readRefund(id);
   const serverId = idIn(id, RF);
   if (!r || serverId === null) return "That request no longer exists.";
-  if (r.state !== "requested") return "This request is already decided. (invalid_state_transition)";
+  if (r.state !== "requested") return "This request is already decided.";
   if (verdict !== "approve" && !decisionNote.trim())
-    return "Say what is missing or why it is refused — the requester only sees this note. (reason_required)";
+    return "Say what is missing or why it is refused — the requester only sees this note.";
   if (!can("finance-refunds", "decide")) return "Your role cannot decide refunds.";
   const me = getSession()?.user?.username;
   if (me && me === r.requestedBy)
@@ -3430,9 +3438,9 @@ export const recordRefundTransfer: (id: string, mode: string, reference: string,
   const r = readRefund(id);
   const serverId = idIn(id, RF);
   if (!r || serverId === null) return "That request no longer exists.";
-  if (r.state !== "approved") return "Only an approved refund can be paid. (invalid_state_transition)";
-  if (!reference.trim()) return "The transfer reference is mandatory — it is the proof the money left. (validation_failed)";
-  if (dupLiveReference(reference)) return "A record already carries reference " + reference.trim() + ". (duplicate_reference)";
+  if (r.state !== "approved") return "Only an approved refund can be paid.";
+  if (!reference.trim()) return "The transfer reference is mandatory — it is the proof the money left.";
+  if (dupLiveReference(reference)) return "A record already carries reference " + reference.trim() + ".";
   try {
     await call(AdminOpsService.settleRefund(serverId, {
       mode, reference: reference.trim(),
@@ -3553,7 +3561,7 @@ export async function importStatement(input: StatementImport): Promise<{ error: 
 export async function resolveException(lineId: string, kind: string, reason: string): Promise<string> {
   const serverId = idIn(lineId, "L-");
   if (serverId === null) return "That statement line does not exist.";
-  if (!reason.trim()) return "Both a write-off and a carry-forward need a reason. (reason_required)";
+  if (!reason.trim()) return "Both a write-off and a carry-forward need a reason.";
   if (kind === "write_off") { const sa = superAdminOnly("Writing off"); if (sa) return sa; }
   try {
     await call(AdminOpsService.resolveBankLine(serverId, { kind, reason: reason.trim() }));

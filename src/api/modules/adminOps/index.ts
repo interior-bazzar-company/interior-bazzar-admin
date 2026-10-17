@@ -784,7 +784,7 @@ export interface CustomerIntakeRow {
   address: string;
   dealRefProvided: string;
   createdAt: string;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
 }
 
 export interface UnassignedIntakesResponse {
@@ -1252,7 +1252,7 @@ export interface DealPaymentRecordInput {
   idempotencyKey: string; date?: string;
 }
 
-const qs = (params: Record<string, any>) => {
+const qs = (params: Record<string, unknown>) => {
   const clean = Object.fromEntries(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
   ) as Record<string, string>;
@@ -1287,7 +1287,7 @@ export class AdminOpsService {
     return apiService.getGetApiResponse<{ serverNow: string; epochMs: number }>("v1/engine/server-time/");
   }
   /** GET resources/?member=<id> — own freely, anybody else's with resources.view. */
-  static resources(params: { member?: string; state?: string } = {}) {
+  static resources(params: { member?: string; state?: string; withResponses?: string } = {}) {
     return apiService.getGetApiResponse<{ resources: ResourceRow[]; responses: ResourceResponseRow[] | null }>(
       `${base}/resources/${qs(params)}`);
   }
@@ -1474,7 +1474,7 @@ export class AdminOpsService {
     return apiService.getGetApiResponse<RevenueOverview>(`${base}/revenue/${qs(params)}`);
   }
   static addExpense(data: ExpenseInput) {
-    return apiService.getPostApiResponse<any>(`${base}/revenue/expense/`, data);
+    return apiService.getPostApiResponse<unknown>(`${base}/revenue/expense/`, data);
   }
   // ── Plans & pricing ──
   static plans() {
@@ -1571,32 +1571,33 @@ export class AdminOpsService {
 
   // ── Businesses ──
   static businesses(params: { search?: string; pageNo?: number; pageSize?: number } = {}) {
-    return apiService.getGetApiResponse<any>(`${base}/businesses/${qs(params)}`);
+    return apiService.getGetApiResponse<unknown>(`${base}/businesses/${qs(params)}`);
   }
   // Catalog & Trust > Businesses Moderation (distinct shape from the Users list).
   // ── Payments ──
   /** `status` takes a comma list (PAID,REFUNDED); `start`/`end` filter on verifiedAt's date. */
   static payments(params: { status?: string; refunded?: boolean; paymentMethod?: string; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
-    return apiService.getGetApiResponse<any>(`${base}/payments/${qs(params)}`);
+    return apiService.getGetApiResponse<PlanPaymentsListResponse>(`${base}/payments/${qs(params)}`);
   }
 
   // ── Manual-payment verify/reject (task 11) ──
-  static verifyPayment(txnId: number) {
-    return apiService.getPostApiResponse<any>(`${base}/payments/${txnId}/verify/`, {});
+  /** `allowNoProof` is the explicit override: the server refuses a payment with no proof otherwise (F-AD-73). */
+  static verifyPayment(txnId: number, allowNoProof = false) {
+    return apiService.getPostApiResponse<unknown>(`${base}/payments/${txnId}/verify/`, allowNoProof ? { allowNoProof: true } : {});
   }
   static rejectPayment(txnId: number, reason: string) {
-    return apiService.getPostApiResponse<any>(`${base}/payments/${txnId}/reject/`, { reason });
+    return apiService.getPostApiResponse<unknown>(`${base}/payments/${txnId}/reject/`, { reason });
   }
 
   // ── Refunds ──
   static refund(txnId: number, data: { amount?: string; reason: string; reject?: boolean }) {
-    return apiService.getPostApiResponse<any>(`${base}/payments/${txnId}/refund/`, data);
+    return apiService.getPostApiResponse<unknown>(`${base}/payments/${txnId}/refund/`, data);
   }
 
   // ── Support ──
   // ── Templates ──
   static templates() {
-    return apiService.getGetApiResponse<any>(`${base}/templates/`);
+    return apiService.getGetApiResponse<unknown>(`${base}/templates/`);
   }
   // ── Brand assets ──
   // Scheduled seasonal logos (task 27)
@@ -1605,7 +1606,7 @@ export class AdminOpsService {
   // ── Testimonials ──
   // ── Reports ──
   static reports(params: { status?: string; pageNo?: number; pageSize?: number } = {}) {
-    return apiService.getGetApiResponse<any>(`${base}/reports/${qs(params)}`);
+    return apiService.getGetApiResponse<unknown>(`${base}/reports/${qs(params)}`);
   }
   // ── Subscriptions ──
   /** The PURCHASES, each carrying whatever commitment stands over it. */
@@ -1653,9 +1654,9 @@ export class AdminOpsService {
   // ── Web analytics ──
   // ── Reviews ──
   // ── Taxonomy (cat-region) ──
-  static taxonomy() { return apiService.getGetApiResponse<any>(`${base}/taxonomy/`); }
+  static taxonomy() { return apiService.getGetApiResponse<Record<string, { value: string; label: string; meta?: unknown; isActive?: boolean }[]>>(`${base}/taxonomy/`); }
   // ── Feedback ──
-  static feedback(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/feedback/${qs(params)}`); }
+  static feedback(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<unknown>(`${base}/feedback/${qs(params)}`); }
   // ── Plan requests ──
   // ── Deals (interior_admin DealsViews — read AND write) ──
   static deals(params: {
@@ -1753,7 +1754,7 @@ export class AdminOpsService {
       `${base}/deals/intakes/unassigned/${qs({ q })}`);
   }
   static linkIntakeToDeal(dealRef: string, intakeId: number) {
-    return apiService.getPostApiResponse<{ message: string; dealRef: string; submission: any }>(
+    return apiService.getPostApiResponse<{ message: string; dealRef: string; submission: unknown }>(
       `${base}/deals/${encodeURIComponent(dealRef)}/link-intake/`, { intakeId });
   }
 
@@ -2084,8 +2085,8 @@ export class AdminOpsService {
     return apiService.getPostApiResponse<AgreementRow>(`${base}/agreements/${id}/sign/`, { signedName });
   }
   /** Full access; a signed copy cannot be revoked. */
-  static revokeAgreement(id: number) {
-    return apiService.getPostApiResponse<AgreementRow>(`${base}/agreements/${id}/revoke/`, {});
+  static revokeAgreement(id: number, reason = "") {
+    return apiService.getPostApiResponse<AgreementRow>(`${base}/agreements/${id}/revoke/`, { reason });
   }
   /** `member` omitted = own; an id or `all` is full access only. */
   static memberDocuments(params: { member?: string } = {}) {
@@ -2297,7 +2298,7 @@ export class AdminOpsService {
   }
 
   // ── Content (blog) ──
-  static content(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/content/${qs(params)}`); }
+  static content(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<unknown>(`${base}/content/${qs(params)}`); }
 }
 
 export default AdminOpsService;

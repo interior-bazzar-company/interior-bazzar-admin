@@ -114,16 +114,34 @@ export function useQuotation(id: number | null, tick: number): QuotationState {
  *  left out: a plan that is not sold is not quotable. A session without plan
  *  access simply gets an empty list, and the builder falls back to a typed
  *  plan name rather than breaking. */
+/* ONE catalogue fetch shared by every consumer (F-AD-72, F-AD-27). The builder,
+   its live preview sheet and the picker each used to fetch `plans/` on their
+   own mount - four requests per open - and a consumer that remounted while its
+   request was in flight dropped the answer and stayed on "Loading". The
+   in-flight promise is now shared and the answer kept for 30 s. */
+const CATALOGUE_TTL_MS = 30000;
+let catalogue: { at: number; plans: PlanRow[] | null; p: Promise<PlanRow[]> } | null = null;
+function loadCatalogue(): Promise<PlanRow[]> {
+  if (catalogue && Date.now() - catalogue.at < CATALOGUE_TTL_MS) return catalogue.p;
+  const entry: NonNullable<typeof catalogue> = { at: Date.now(), plans: null, p: Promise.resolve([]) };
+  entry.p = AdminOpsService.plans()
+    .then((r) => {
+      const rows = r.response === false ? [] : (r.data.plans || []).filter((p) => p.isActive && !p.isArchived);
+      entry.plans = rows;
+      return rows;
+    })
+    .catch(() => { if (catalogue === entry) catalogue = null; return [] as PlanRow[]; });
+  catalogue = entry;
+  return entry.p;
+}
+
 export function usePlanCatalogue(): { plans: PlanRow[]; loading: boolean } {
-  const [state, setState] = useState<{ plans: PlanRow[]; loading: boolean }>({ plans: [], loading: true });
+  const [state, setState] = useState<{ plans: PlanRow[]; loading: boolean }>(() =>
+    catalogue && catalogue.plans && Date.now() - catalogue.at < CATALOGUE_TTL_MS
+      ? { plans: catalogue.plans, loading: false } : { plans: [], loading: true });
   useEffect(() => {
     let cancelled = false;
-    AdminOpsService.plans()
-      .then((r) => {
-        if (cancelled) return;
-        setState({ loading: false, plans: r.response === false ? [] : (r.data.plans || []).filter((p) => p.isActive && !p.isArchived) });
-      })
-      .catch(() => { if (!cancelled) setState({ plans: [], loading: false }); });
+    loadCatalogue().then((plans) => { if (!cancelled) setState({ plans, loading: false }); });
     return () => { cancelled = true; };
   }, []);
   return state;

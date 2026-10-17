@@ -103,7 +103,7 @@ export function RequirementForm({ e, restating = false }: { e: Enquiry; restatin
               <Input id="be-f-name" value={c.name} disabled={!writes}
                 onChange={(v) => setC({ ...c, name: v })} />
             </FormField>
-            <FormField id="be-f-phone" label="Phone" hint="Masked in this prototype.">
+            <FormField id="be-f-phone" label="Phone">
               <Input id="be-f-phone" value={c.phone} disabled={!writes} mono
                 onChange={(v) => setC({ ...c, phone: v })} />
             </FormField>

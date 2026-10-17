@@ -16,7 +16,7 @@
    somebody has to remember. The only writes on this page are: send a new one,
    revoke an unsigned one, and sign one — and signing is the member's own act.
    ============================================================================= */
-import { Alert, Button, ConfirmModal, ListTable, Notice, Pill, Rail } from "../../../ui";
+import { Alert, Button, ListTable, Notice, Pill, Rail, ReasonModal } from "../../../ui";
 import { go } from "../../../ui/nav";
 import { useShell } from "../../../shell/ShellContext";
 import {
@@ -49,13 +49,14 @@ export default function AgreementsPage({ m, viewer }: { m: Member; viewer: Viewe
 
   /* ASK FIRST (F-AD-52): revoking cannot be undone. */
   const revoke = (a: Agreement) => shell.modal(
-    <ConfirmModal tone="bad" title={"Revoke " + a.title + "?"} verb="Revoke"
-      body="The signing link stops working immediately and this copy can no longer be signed. To change anything, send a fresh one."
+    <ReasonModal tone="bad" heading={"Revoke " + a.title + "?"} confirmLabel="Revoke" required label="Reason"
+      sub="The signing link stops working immediately and this copy can no longer be signed. To change anything, send a fresh one."
       onClose={shell.closeLayer}
-      onConfirm={async () => {
+      run={async (reason) => {
+        const r = await revokeAgreement(a.agreementId, reason);
+        if (!r.ok) throw new Error((r as { message: string }).message);
         shell.closeLayer();
-        const r = await revokeAgreement(a.agreementId);
-        shell.toast(r.ok ? "Revoked. The link is dead." : (r as { message: string }).message, r.ok ? "" : "bad");
+        shell.toast("Revoked. The link is dead.", "");
       }} />);
 
   return (

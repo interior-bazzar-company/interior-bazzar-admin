@@ -84,7 +84,7 @@ export default function SalaryDetail({ id, p, onParams }: {
       back={back}
       pills={<>
         {a.active
-          ? <Pill dot lg tone="ok" text="Active" title="On the payroll. The next run opened issues a slip." />
+          ? <Pill dot lg tone="ok" text="Active" title="On the payroll." />
           : <Pill dot lg tone="neutral" text="Closed" title="Closed. No run picks this account up again." />}
         {row.inOpenRun ? <Pill dot lg tone="warn" text="On the open run" /> : null}
       </>}
@@ -231,7 +231,7 @@ export default function SalaryDetail({ id, p, onParams }: {
           </div>
         ) : (
           <EmptyState icon="doc" title="No slip has been issued on this account"
-            body="A slip appears when a run is opened for a month, and it is numbered and hashed when that run is paid." />
+            body="Slips from payroll runs will appear here." />
         )
       ) : null}
 

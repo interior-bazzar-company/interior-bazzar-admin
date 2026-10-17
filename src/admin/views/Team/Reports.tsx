@@ -402,7 +402,7 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
 
   leave.forEach((l) => list.push({
     key: "lv" + l.leaveId, kind: "Leave", tone: "warn",
-    what: readMember(l.memberId)?.name || l.memberId,
+    what: readMember(l.memberId)?.name || l.memberName || l.memberId,
     why: l.state === "escalated"
       ? <>Escalated to the Admin{l.decisionNote ? " — " + l.decisionNote : ""}. From {fmtDate(l.fromDate)}.</>
       : <>Undecided from {fmtDate(l.fromDate)} — those days read as absent until you answer.</>,

@@ -205,7 +205,7 @@ export function MoneyCell({ d }: { d: any }) {
 
 export function OwnerCell({ d }: { d: any }) {
   if (!d.owner_id) return <span className="inline-flex items-center gap-1.5 text-sm text-quaternary"><Icon name="user" size="xs" />Unassigned</span>;
-  return <Person name={d.owner_id} sm sub={d.co_owner_id ? "with " + d.co_owner_id : undefined} />;
+  return <Person name={d.owner_id} sm sub={d.co_owner_id ? "co-owner " + d.co_owner_id : undefined} />;
 }
 
 export function NextCell({ d }: { d: any }) {

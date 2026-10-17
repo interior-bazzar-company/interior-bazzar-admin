@@ -354,7 +354,7 @@ function Overview({ month }: { month?: string }) {
                   </span>
                   <span className={recon.bankOnly.length ? "text-error-primary" : "text-quaternary"}>
                     {recon.bankOnly.length
-                      ? recon.bankOnly.length + " unexplained (net " + inr(recon.variancePaise) + ") · this period cannot be closed yet"
+                      ? recon.bankOnly.length + " unexplained (net " + inr(recon.variancePaise) + ")"
                       : "every line ties to a record"}
                   </span>
                 </div>
