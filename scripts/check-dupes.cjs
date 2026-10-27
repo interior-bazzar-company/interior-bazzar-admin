@@ -28,6 +28,12 @@ const files = [];
 (function walk(d) {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
     const p = path.join(d, e.name);
+    /* CMS live previews (src/admin/components/cms-previews + their sheets in
+       src/styles/cms-previews) are the PUBLIC SITE's components and CSS,
+       ported verbatim so an editor sees the real thing. They are the
+       frontend's design system, not this one, so they are not held to it —
+       the same exemption Untitled UI's own components get. */
+    if (e.isDirectory() && e.name === "cms-previews") continue;
     if (e.isDirectory()) walk(p);
     else files.push(p);
   }

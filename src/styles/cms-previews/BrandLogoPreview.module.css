@@ -1,0 +1,29 @@
+/* PortalHeader logo rules (PortalHeader.module.css), copied verbatim. */
+.root {
+  --pt-tap: 44px;
+  font-family: "Poppins", system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  border-radius: 10px;
+  border: 1px solid #e4e7e3;
+}
+.light { background: #ffffff; color: #0e1411; }
+.dark { background: #0e1411; color: #ffffff; border-color: #0e1411; }
+.logo {
+  display: flex;
+  align-items: center;
+  min-height: var(--pt-tap);
+}
+.logo img {
+  height: 38px;
+  width: auto;
+  display: block;
+}
+.tagline { font-size: 12px; font-weight: 500; opacity: 0.8; }

@@ -1,0 +1,69 @@
+.root {
+  --pt-ink: #0e1411;
+  --pt-soft: #f6f7f5;
+  --pt-forest: #0f4a34;
+  --pt-forest-deep: #0b3b29;
+  --pt-on-dark: #ffffff;
+  --pt-fs-body: 14px;
+  --pt-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  font-family: "Poppins", sans-serif;
+  width: 180px;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--pt-ink);
+  text-decoration: none;
+}
+.media {
+  display: block;
+  border-radius: 16px;
+  overflow: hidden;
+  isolation: isolate;
+}
+.frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  background: var(--pt-soft);
+  aspect-ratio: 20 / 19;
+}
+.frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 450ms var(--pt-ease);
+}
+.tile:hover .media img {
+  transform: scale(1.04);
+}
+.fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--pt-forest), var(--pt-forest-deep));
+  color: var(--pt-on-dark);
+  font-family: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.label {
+  font-size: var(--pt-fs-body);
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tile:hover .label {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.empty {
+  opacity: 0.5;
+}

@@ -1,0 +1,29 @@
+/* CategoryFilterBar .pill rules, copied verbatim; --text defined here. */
+.root {
+  --text: #1a1a17;
+  font-family: "Poppins", system-ui, sans-serif;
+  display: inline-flex;
+}
+.pill {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: #eeeae0;
+  color: var(--text, #1a1a17);
+  white-space: nowrap;
+  font-weight: 500;
+  font-family: inherit;
+  border: none;
+}
+.thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.empty { opacity: 0.5; font-style: italic; }

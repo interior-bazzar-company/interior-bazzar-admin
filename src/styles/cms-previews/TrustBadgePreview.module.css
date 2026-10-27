@@ -1,0 +1,36 @@
+/* ProfileIdentity .nameRow / .name / .badgeChip rules, copied verbatim; tokens from PortalLayout. */
+.nameRow {
+  --pt-ink: #0e1411;
+  --pt-sand: #efece7;
+  font-family: "Poppins", system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.name {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--pt-ink);
+}
+.badgeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--pt-sand, #efece7);
+  color: var(--pt-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.badgeChip img,
+.badgeChip svg {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  display: block;
+}
+.note { font-size: 11px; color: #5f6862; width: 100%; }

@@ -52,6 +52,7 @@ const ICON_OF: Record<string, string> = {
   reports: "inbox",
   resources: "flag",
   agreements: "shield",
+  content: "doc",
 };
 
 /* ------------------------------------------------------- group override ---
@@ -266,6 +267,8 @@ const GROUP_ORDER = [
   "Resources",
   "Finance",
   "Catalogue",
+  /* The CMS: what the public site says. Edited in bursts, not daily. */
+  "Content",
   "Settings",
 ];
 

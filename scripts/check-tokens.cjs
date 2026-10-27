@@ -41,6 +41,9 @@ const consumers = [];
     const rel = path.relative(SRC, p).split(path.sep).join("/");
     if (e.isDirectory()) {
       if (/^components\/(base|application|foundations|shared-assets)/.test(rel)) continue;
+      /* the CMS live previews are the PUBLIC SITE's components, ported verbatim
+         with their own tokens defined on each root class — not panel paint */
+      if (/(^|\/)cms-previews$/.test(rel)) continue;
       walk(p);
     } else if (/\.(css|tsx|ts)$/.test(e.name) && rel !== "styles/theme.css") consumers.push(p);
   }

@@ -1,0 +1,435 @@
+/* ── Legal v3 page ── prototype legal shell (lx-*) ported to a CSS module.
+   The article body arrives as backend HTML using global classes
+   (.lx-intro / .lx-sec / .lx-dl / .lx-note / .lx-contactbox), styled here
+   via :global scoped under .art. */
+.wrapper {
+  --color-brand-primary: #085041;
+  --color-bg-primary: #fffdf8;
+  --color-bg-section: #f7f6f2;
+  --color-text-dark: #1a1a17;
+  --color-text-light: #6b6b6b;
+  --color-border-white-light: #e8e6df;
+  font-family: "Poppins", sans-serif;
+
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 0 22px 90px;
+}
+
+/* ── hero ── */
+.hero {
+  padding: 30px 0 8px;
+  border-bottom: 1px solid var(--color-border-white-light);
+  margin-bottom: 30px;
+}
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ba7517;
+  margin-bottom: 12px;
+}
+.title {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-style: italic;
+  font-size: 40px;
+  line-height: 1.12;
+  font-weight: 400;
+  color: var(--color-text-dark);
+  margin-bottom: 12px;
+}
+.sub {
+  font-size: 16.5px;
+  color: var(--color-text-light);
+  max-width: 680px;
+  margin-bottom: 18px;
+  line-height: 1.6;
+}
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 12.5px;
+  color: var(--color-text-light);
+  padding-bottom: 14px;
+}
+.metaRow b {
+  color: var(--color-text-dark);
+  font-weight: 600;
+}
+
+/* ── layout grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 48px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+/* ── TOC ── */
+.toc {
+  position: sticky;
+  top: 88px;
+}
+@media (max-width: 860px) {
+  .toc {
+    position: static;
+    margin-bottom: 26px;
+  }
+}
+.tocHead {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-light);
+  margin-bottom: 12px;
+}
+.toc ol {
+  list-style: none;
+  counter-reset: toc;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+}
+.toc li:not([data-sub]) {
+  counter-increment: toc;
+  counter-reset: tocsub;
+}
+.toc li[data-sub] {
+  counter-increment: tocsub;
+}
+.toc li[data-sub] a {
+  font-size: 12.5px;
+  padding-left: 18px;
+}
+.toc li[data-sub] a::before {
+  content: counter(toc) "." counter(tocsub);
+  min-width: 22px;
+}
+.toc a {
+  display: flex;
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--color-text-light);
+  padding: 5px 9px;
+  border-radius: 7px;
+  line-height: 1.35;
+  text-decoration: none;
+}
+.toc a::before {
+  content: counter(toc);
+  color: var(--color-text-light);
+  font-variant-numeric: tabular-nums;
+  min-width: 16px;
+  text-align: right;
+}
+.toc a:hover {
+  background: var(--color-bg-section);
+  color: var(--color-brand-primary);
+}
+
+/* ── article body (backend HTML) ── */
+.art {
+  max-width: 760px;
+  counter-reset: legalsec;
+  line-height: 1.72;
+}
+.art .state {
+  font-size: 16px;
+  color: var(--color-text-light);
+}
+.art :global(.lx-intro) {
+  font-size: 16.5px;
+  color: var(--color-text-dark);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-white-light);
+  border-left: 3px solid var(--color-brand-primary);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 34px;
+}
+.art :global(.lx-intro) p + p {
+  margin-top: 12px;
+}
+.art :global(.lx-intro) p:last-child {
+  margin-bottom: 0;
+}
+/* Body typography hangs off the ELEMENTS, not off .lx-sec: copy saved through the
+   Quill editor comes back as bare <h2>/<p>/<ul> with every class stripped, and it has
+   to render the same. .lx-sec only adds the extra spacing between sections, and the
+   section number/anchor lives on the h2 so it survives the wrapper going missing. */
+.art :global(.lx-sec) {
+  padding-top: 14px;
+  margin-bottom: 30px;
+}
+/* Heading scale. Every level is styled, because the body may be plain pasted HTML
+   using h1/h2/h3 rather than our authored h2-only copy. useLegalV3 marks whichever
+   level is shallowest in the document with [data-sec] -- that is the level that gets
+   the 01/02 counter, whether it is an h1 or an h2. */
+.art h1,
+.art h2,
+.art h3,
+.art h4,
+.art h5,
+.art h6 {
+  scroll-margin-top: 84px;
+  color: var(--color-text-dark);
+}
+.art h1 {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 34px 0 14px;
+}
+.art h2 {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 30px 0 14px;
+}
+.art h3 {
+  font-size: 16.5px;
+  font-weight: 700;
+  margin: 22px 0 8px;
+}
+.art h4 {
+  font-size: 14.5px;
+  font-weight: 700;
+  margin: 18px 0 7px;
+}
+.art h5,
+.art h6 {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-light);
+  margin: 16px 0 6px;
+}
+/* Section heading: numbered, and it owns the top spacing when there is no .lx-sec
+   wrapper to supply it. */
+.art [data-sec],
+.art [data-sub] {
+  display: flex;
+  gap: 11px;
+  align-items: baseline;
+}
+.art [data-sec] {
+  counter-increment: legalsec;
+  counter-reset: legalsub;
+}
+.art [data-sub] {
+  counter-increment: legalsub;
+}
+.art [data-sec]::before,
+.art [data-sub]::before {
+  font-family: ui-monospace, "DM Mono", monospace;
+  color: var(--color-brand-primary);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.art [data-sec]::before {
+  content: counter(legalsec, decimal-leading-zero);
+  font-size: 14px;
+}
+.art [data-sub]::before {
+  content: counter(legalsec) "." counter(legalsub);
+  font-size: 12.5px;
+}
+/* .lx-sec already spaces the sections apart; the article's opening block never needs
+   a top margin. */
+.art :global(.lx-sec) > :first-child,
+.art > :first-child {
+  margin-top: 0;
+}
+.art p {
+  margin-bottom: 13px;
+  color: var(--color-text-dark);
+}
+.art ul {
+  margin: 0 0 14px;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.art ul li {
+  position: relative;
+  padding-left: 22px;
+}
+.art ul li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  background: var(--color-brand-primary);
+  border-radius: 50%;
+}
+.art :global(.lx-dl) {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-bottom: 6px;
+}
+.art :global(.lx-dl) > div {
+  padding: 11px 14px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-white-light);
+  border-radius: 9px;
+}
+.art :global(.lx-dl) dt {
+  font-weight: 700;
+  color: var(--color-text-dark);
+  font-size: 14.5px;
+  margin-bottom: 2px;
+}
+.art :global(.lx-dl) dd {
+  font-size: 14.5px;
+  color: var(--color-text-light);
+  margin: 0;
+}
+.art :global(.lx-note) {
+  font-size: 14px;
+  background: var(--color-bg-section);
+  border-radius: 10px;
+  padding: 13px 16px;
+  color: var(--color-brand-primary);
+  margin: 14px 0;
+}
+.art :global(.lx-contactbox) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+  font-size: 14.5px;
+  margin-top: 8px;
+}
+.art a {
+  color: var(--color-brand-primary);
+}
+
+/* ── cross links ── */
+.cross {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 42px 0 0;
+}
+.cross a {
+  display: block;
+  padding: 16px 18px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-white-light);
+  border-radius: 13px;
+  transition: 0.16s;
+  text-decoration: none;
+}
+.cross a:hover {
+  border-color: var(--color-brand-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(8, 80, 65, 0.08);
+}
+.crossCur {
+  border-color: var(--color-brand-primary) !important;
+  background: var(--color-bg-section) !important;
+}
+.crossTitle {
+  font-weight: 700;
+  color: var(--color-text-dark);
+  font-size: 14.5px;
+  margin-bottom: 3px;
+}
+.crossDesc {
+  font-size: 12.5px;
+  color: var(--color-text-light);
+}
+
+/* ── entity footer ── */
+.foot {
+  margin-top: 54px;
+  padding-top: 26px;
+  border-top: 1px solid var(--color-border-white-light);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 30px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.entity {
+  font-size: 13px;
+  color: var(--color-text-light);
+  line-height: 1.7;
+  max-width: 560px;
+}
+.entity b {
+  color: var(--color-text-dark);
+}
+.tagline {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--color-brand-primary);
+}
+
+@media (max-width: 640px) {
+  .title {
+    font-size: 32px;
+  }
+}
+
+/* ── Phones (PHONE-REDESIGN.md M5b) ── 12px type floor; contents links and the
+   support email are 44px targets. On the new phone layer the contents list is a
+   closed disclosure (index.tsx), so the document starts on the first screen. */
+@media (max-width: 768px) {
+  .eyebrow,
+  .tocHead {
+    font-size: var(--pt-fs-caption, 12px);
+  }
+  .toc a {
+    align-items: center;
+    min-height: var(--pt-tap, 44px);
+  }
+  .entity a {
+    display: inline-block;
+    padding: 12px 0;
+    margin: -12px 0;
+  }
+  .tocFold {
+    border: 1px solid var(--pt-line, gainsboro);
+    border-radius: var(--pt-r-md, 8px);
+    padding: 0 8px;
+  }
+  .tocFold[open] {
+    padding-bottom: 8px;
+  }
+  .tocSummary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--pt-tap, 44px);
+    padding: 0 4px;
+    font-size: var(--pt-fs-body, 14px);
+    font-weight: 600;
+    color: var(--pt-ink, black);
+    list-style: none;
+    cursor: pointer;
+  }
+  .tocSummary::-webkit-details-marker {
+    display: none;
+  }
+  .tocFold[open] .tocSummary i {
+    transform: rotate(180deg);
+  }
+}

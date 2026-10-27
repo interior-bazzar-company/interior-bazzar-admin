@@ -1,0 +1,87 @@
+/* Ported from interior-bazzar-frontend components/Home/portal/HomeSearch/HomeSearch.module.css (city segment + city panel);
+   --pt-* tokens from layout/Portal/PortalLayout.module.css. */
+.root {
+  --pt-ink: #0e1411;
+  --pt-muted: #5f6862;
+  --pt-line: #e4e7e3;
+  --pt-bg: #ffffff;
+  --pt-soft: #f6f7f5;
+  --pt-forest: #0f4a34;
+  --pt-forest-tint: #e3efe8;
+  --pt-r-sm: 6px;
+  --pt-r-md: 8px;
+  --pt-r-lg: 10px;
+  --pt-fs-caption: 12px;
+  --pt-fs-body: 14px;
+  --pt-fs-title: 16px;
+  --pt-shadow-lg: 0 18px 44px -18px rgba(14, 20, 17, 0.3);
+  --pt-shadow-float: 0 10px 30px -12px rgba(14, 20, 17, 0.2);
+  font-family: "Poppins", sans-serif;
+  padding: 16px;
+  width: 300px;
+  max-width: 100%;
+}
+.city {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 20px;
+  border: 1px solid var(--pt-line);
+  border-radius: var(--pt-r-lg);
+  box-shadow: var(--pt-shadow-float);
+  background: var(--pt-bg);
+  font: inherit;
+  font-size: var(--pt-fs-title);
+  color: var(--pt-ink);
+  white-space: nowrap;
+}
+.pin { font-size: 18px; }
+.cityName { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+.chev { font-size: 12px; color: var(--pt-muted); }
+.panel {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--pt-bg);
+  border: 1px solid var(--pt-line);
+  border-radius: var(--pt-r-lg);
+  box-shadow: var(--pt-shadow-lg);
+}
+.panelTitle {
+  margin: 0 4px 10px;
+  font-size: var(--pt-fs-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pt-muted);
+}
+.cityFilter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  margin-bottom: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--pt-line);
+  border-radius: var(--pt-r-md);
+  color: var(--pt-muted);
+  font-size: var(--pt-fs-body);
+}
+.panel ul { list-style: none; margin: 0; padding: 0; }
+.cityOpt {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--pt-r-sm);
+  font-size: var(--pt-fs-body);
+  color: var(--pt-ink);
+  text-align: left;
+}
+.cityOpt.optOn { background: var(--pt-forest-tint); font-weight: 600; }
+.ico { color: var(--pt-muted); }
+.cityOptName { flex: 1; }
+.check { color: var(--pt-forest); }
+/* Not part of the site: admin-only annotation. */
+.note { margin: 10px 4px 0; font-size: 12px; color: #8a8f8b; line-height: 1.5; }

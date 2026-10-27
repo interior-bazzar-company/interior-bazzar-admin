@@ -42,6 +42,7 @@ const Agreements = lazy(() => import("./Agreements"));
 const Attendance = lazy(() => import("./Team/Attendance"));
 const Work = lazy(() => import("./Team/Work"));
 const TeamReports = lazy(() => import("./Team/Reports"));
+const Cms = lazy(() => import("./Cms"));
 
 /** route key → the component that owns that workspace. */
 export const VIEWS: Record<string, ComponentType> = {
@@ -71,6 +72,8 @@ export const VIEWS: Record<string, ComponentType> = {
   reports: TeamReports,
   resources: Resources,
   agreements: Agreements,
+  /* The CMS: one key, every content resource under #/content/<resource>. */
+  content: Cms,
 };
 
 export function ViewHost() {
