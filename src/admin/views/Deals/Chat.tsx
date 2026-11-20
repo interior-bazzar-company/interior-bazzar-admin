@@ -36,6 +36,11 @@ import AdminOpsService from "../../../api/modules/adminOps";
 import type { InvoiceRow, QuotationRow } from "../../../api/modules/adminOps";
 import { STATUS_LABEL as Q_LABEL } from "../Quotations/api";
 import { STATUS_LABEL as I_LABEL } from "../Invoices/api";
+import { call } from "../Quotations/api";
+import { errMessage } from "../../../api/apiService";
+import { fmtDate } from "../../ui/format";
+import PaymentLinkModal from "../Quotations/PaymentLinkModal";
+import { canGeneratePaymentLink } from "../../auth/session";
 import type { DealsApiState, Params } from "./useDeals";
 import { ChainCard, ChainDots, ContactNumber, MoneyCellCtx, Rich, StagePipeline, TagChips, orDash } from "./bits";
 import { useActs } from "./Modals";
@@ -827,6 +832,98 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
             ))
           : <ChainAdd dl={dl} kind="invoice" docs={docs} />}
       </section>
+
+      {/* Razorpay Payment Links for Custom Plans */}
+      {canGeneratePaymentLink() && (docs.paymentLinks?.length || (quote && (quote.status === "accepted" || quote.status === "issued"))) ? (
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <Eyebrow>Payment Links{docs.paymentLinks?.length ? ` · ${docs.paymentLinks.length}` : ""}</Eyebrow>
+            {quote && (quote.status === "accepted" || quote.status === "issued") ? (
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-brand-secondary hover:underline cursor-pointer flex items-center gap-1"
+                onClick={() =>
+                  shell.modal(
+                    <PaymentLinkModal
+                      quotation={quote}
+                      dealRef={dl.deal_id}
+                      onClose={shell.closeLayer}
+                      onSuccess={() => render()}
+                    />,
+                    "md"
+                  )
+                }
+              >
+                <Icon name="plus" size="xs" /> New Link
+              </button>
+            ) : null}
+          </div>
+
+          {docs.paymentLinks?.length ? (
+            docs.paymentLinks.map((pl) => (
+              <div
+                key={pl.id}
+                className="flex flex-col gap-2 rounded-lg border border-secondary bg-primary/40 p-2.5 text-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-semibold text-primary">{inr(pl.amountPaise)}</span>
+                  <Pill
+                    text={pl.status === "paid" ? "Paid" : pl.status === "expired" ? "Expired" : "Pending"}
+                    tone={pl.status === "paid" ? "ok" : pl.status === "expired" ? "bad" : "warn"}
+                    dot
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-tertiary">
+                  <span className="truncate font-mono">{pl.plinkId}</span>
+                  {pl.paidAt ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      Paid {fmtDate(pl.paidAt)}
+                    </span>
+                  ) : pl.expireBy ? (
+                    <span>Expires {fmtDate(pl.expireBy)}</span>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 pt-1 border-t border-secondary/50">
+                  <button
+                    type="button"
+                    className="text-[11px] font-medium text-brand-secondary hover:underline flex items-center gap-1 cursor-pointer"
+                    onClick={() => {
+                      navigator.clipboard.writeText(pl.shortUrl);
+                      shell.toast("Link copied to clipboard!");
+                    }}
+                  >
+                    <Icon name="link" size="xs" /> Copy Link
+                  </button>
+                  {pl.status !== "paid" ? (
+                    <>
+                      <span className="text-tertiary">·</span>
+                      <button
+                        type="button"
+                        className="text-[11px] font-medium text-secondary hover:underline flex items-center gap-1 cursor-pointer"
+                        onClick={() => {
+                          shell.toast("Checking Razorpay status…");
+                          call(AdminOpsService.syncPaymentLink(pl.id))
+                            .then((res) => {
+                              shell.toast(res.message || "Payment status refreshed.");
+                              render();
+                            })
+                            .catch((e: unknown) => shell.toast(errMessage(e), "bad"));
+                        }}
+                      >
+                        <Icon name="refresh" size="xs" /> Sync Status
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-lg border border-dashed border-secondary p-2.5 text-center text-xs text-tertiary">
+              No payment links created yet.
+            </div>
+          )}
+        </section>
+      ) : null}
 
       {/* Customer Intake / Onboarding Form */}
       <section className="flex flex-col gap-2">

@@ -35,6 +35,8 @@ import { addonsOf, daysUntil, partyLine, planItemOf } from "./helpers";
 import { DocTimeline, Figures, PaperStage, QuotationSheet, VersionChip, VersionRailFrame } from "./bits";
 import ReasonModal from "./ReasonModal";
 import ReviseModal from "./ReviseModal";
+import PaymentLinkModal from "./PaymentLinkModal";
+import { canGeneratePaymentLink } from "../../auth/session";
 import { ChainStrip } from "../chainStrip";
 
 const TABS = ["items", "document", "versions", "history"];
@@ -122,6 +124,23 @@ export default function QuotationDetail({ id, tab, params }: {
     items.push({ icon: "print", label: "Print", title: "Opens the document and prints it", act: print });
   if (!isDraft && q.hasDocument)
     items.push({ icon: "link", label: "Share link", title: "An expiring link, logged as SHARED", act: share });
+  if (canGeneratePaymentLink() && (q.status === "accepted" || q.status === "issued")) {
+    items.push({
+      icon: "cash",
+      label: "Create Razorpay link",
+      title: "Generate hosted payment link for custom plan",
+      act: () =>
+        modal(
+          <PaymentLinkModal
+            quotation={q}
+            dealRef={q.dealRef}
+            onClose={closeLayer}
+            onSuccess={() => bump()}
+          />,
+          "md"
+        ),
+    });
+  }
   const canAccept = can("quotations", "accept");
   if (canAccept && (q.status === "issued" || q.status === "rejected" || q.status === "expired"))
     items.push({ icon: "check", label: "Mark accepted",
@@ -159,6 +178,25 @@ export default function QuotationDetail({ id, tab, params }: {
             ? <MoreMenu items={items} label="Actions" data-act="qt-more"
                 aria-label="Everything this quotation can do" />
             : null}
+          {canGeneratePaymentLink() && (q.status === "accepted" || q.status === "issued") ? (
+            <Button
+              color="secondary"
+              ico="cash"
+              onClick={() =>
+                modal(
+                  <PaymentLinkModal
+                    quotation={q}
+                    dealRef={q.dealRef}
+                    onClose={closeLayer}
+                    onSuccess={() => bump()}
+                  />,
+                  "md"
+                )
+              }
+            >
+              Razorpay Link
+            </Button>
+          ) : null}
           {q.status === "accepted" ? (
             <Button
               color="primary"

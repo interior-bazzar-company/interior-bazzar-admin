@@ -22,10 +22,10 @@ import { fmtDate, inr as inrFmt } from "../../ui/format";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { currentActor, scopeLabel, scopeOf, wideScope } from "../../auth/session";
+import { currentActor, scopeLabel, scopeOf, wideScope, canGeneratePaymentLink } from "../../auth/session";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type {
-  DealPersonRef, DealPriorityVocab, DealStageVocab, DealTagVocab, InvoiceRow, QuotationRow
+  DealPersonRef, DealPriorityVocab, DealStageVocab, DealTagVocab, InvoiceRow, QuotationRow, DealPaymentLinkRow
 } from "../../../api/modules/adminOps";
 import { AppExceptions } from "../../../api/apiService";
 import { PRIORITY, STAGES, adaptByStage, adaptDeal, adaptTimeline, dateOnly, ownersFromRows } from "./adapter";
@@ -628,40 +628,40 @@ export interface DealDocsState {
   /** Newest first — the panel shows the current quotation, which is the top one. */
   quotations: QuotationRow[];
   invoices: InvoiceRow[];
+  paymentLinks: DealPaymentLinkRow[];
 }
-const DOCS_IDLE: DealDocsState = { loading: true, quotations: [], invoices: [] };
+const DOCS_IDLE: DealDocsState = { loading: true, quotations: [], invoices: [], paymentLinks: [] };
 
 export function useDealDocs(ref: string | null): DealDocsState {
   const [state, setState] = useState<DealDocsState>(DOCS_IDLE);
   const version = useDataVersion();
 
   useEffect(() => {
-    if (!ref) { setState({ loading: false, quotations: [], invoices: [] }); return; }
+    if (!ref) { setState({ loading: false, quotations: [], invoices: [], paymentLinks: [] }); return; }
     let cancelled = false;
     setState((s) => ({ ...s, loading: true }));
-    /* Both, or neither. A half-drawn chain — quotations in, invoices still
-       pending — reads as "no invoices yet", which is a different and wrong
-       statement about the deal.
-       ponytail: pageSize 50 on each, no pager. A deal with more than fifty
-       quotations is a data problem, not a paging one. */
-    Promise.all([
+    
+    const reqs: [Promise<any>, Promise<any>, Promise<any>?] = [
       AdminOpsService.quotations({ deal: ref, pageSize: 50 }),
       AdminOpsService.invoices({ deal: ref, pageSize: 50 }),
-    ]).then(([q, i]) => {
+    ];
+    if (canGeneratePaymentLink()) {
+      reqs.push(AdminOpsService.listPaymentLinks(ref));
+    }
+
+    Promise.all(reqs).then(([q, i, pl]) => {
       if (cancelled) return;
       setState({
         loading: false,
         // Newest version first, so [0] is the quotation that is live.
         quotations: (q.response === false ? [] : q.data.quotations || [])
-          .slice().sort((a, b) => b.version - a.version || b.id - a.id),
+          .slice().sort((a: QuotationRow, b: QuotationRow) => b.version - a.version || b.id - a.id),
         invoices: (i.response === false ? [] : i.data.invoices || [])
-          .slice().sort((a, b) => b.id - a.id),
+          .slice().sort((a: InvoiceRow, b: InvoiceRow) => b.id - a.id),
+        paymentLinks: pl && pl.response !== false ? pl.data.paymentLinks || [] : [],
       });
     }).catch(() => {
-      // A failure here must not blank the pane that is ALREADY correct about
-      // the deal. Empty + not-loading renders the "none yet" affordance, which
-      // is the same thing the panel shows before anything is raised.
-      if (!cancelled) setState({ loading: false, quotations: [], invoices: [] });
+      if (!cancelled) setState({ loading: false, quotations: [], invoices: [], paymentLinks: [] });
     });
     return () => { cancelled = true; };
   }, [ref, version]);

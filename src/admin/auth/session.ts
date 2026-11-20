@@ -175,6 +175,11 @@ export function can(moduleKey: string, action?: string): boolean {
 }
 export const canWrite = (moduleKey: string, action?: string) => can(moduleKey, action || "edit");
 
+/** May this user create Razorpay Payment Links? Requires deals, quotations, AND invoices. */
+export function canGeneratePaymentLink(): boolean {
+  return can("deals") && can("quotations") && can("invoices");
+}
+
 /* ================================================== RECORD SCOPE ========
    HOW MUCH of a module this session sees — NOT what it may do to it. Deals,
    Quotations and Invoices are narrowed by who owns the deal, and until now

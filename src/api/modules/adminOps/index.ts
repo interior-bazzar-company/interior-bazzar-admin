@@ -578,6 +578,26 @@ export interface InvoiceAddonInput { rowVersion: number; description?: string; h
 export interface InvoiceDocumentVersion {
   version: number; storageKey: string; checksumSha256: string; generatedAt: string;
 }
+export interface DealPaymentLinkRow {
+  id: number;
+  plinkId: string;
+  shortUrl: string;
+  amountPaise: number;
+  currency: string;
+  status: "created" | "paid" | "expired" | "cancelled";
+  razorpayPaymentId?: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  expireBy: string | null;
+  paidAt: string | null;
+  dealRef: string;
+  quotationId: number;
+  invoiceId: number | null;
+  invoiceNumber: string | null;
+  createdBy: { id: number; name: string; username: string } | null;
+  createdAt: string;
+}
 
 /** The deal-payment ledger (interior_deals_billing.DealPayment). Distinct
  *  from `payments()`/`verifyPayment()`/`refund()` below, which are the
@@ -1920,6 +1940,31 @@ export class AdminOpsService {
   /** `start`/`end` filter on paymentDate. */
   static dealPayments(params: { deal?: string; invoice?: number; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<DealPaymentsListResponse>(`${base}/payments/deal-ledger/${qs(params)}`);
+  }
+
+  // ── Razorpay Payment Links (deals + quotations + invoices) ──
+  static createPaymentLink(dealRef: string, quotationId: number, data?: { customerEmail?: string; customerPhone?: string }) {
+    return apiService.getPostApiResponse<{ paymentLink: DealPaymentLinkRow; reused?: boolean }>(
+      `${base}/deals/${encodeURIComponent(dealRef)}/payment-link/`,
+      { quotationId, ...data }
+    );
+  }
+  static listPaymentLinks(dealRef: string) {
+    return apiService.getGetApiResponse<{ paymentLinks: DealPaymentLinkRow[] }>(
+      `${base}/deals/${encodeURIComponent(dealRef)}/payment-links/`
+    );
+  }
+  static syncPaymentLink(id: number) {
+    return apiService.getPostApiResponse<{ paymentLink: DealPaymentLinkRow; message?: string }>(
+      `${base}/payment-links/${id}/sync/`,
+      {}
+    );
+  }
+  static cancelPaymentLink(id: number) {
+    return apiService.getPostApiResponse<{ paymentLink: DealPaymentLinkRow }>(
+      `${base}/payment-links/${id}/cancel/`,
+      {}
+    );
   }
 
   // ── Installments / other income / tasks / attendance / value lists (overview d3) ──
