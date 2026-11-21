@@ -186,21 +186,6 @@ export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: 
   return out;
 }
 
-/** Cut a wrapped block to the number of lines its allotted height can hold.
- *  An ellipsis is only ever added when something was actually dropped — a card
- *  that ends in "…" is telling the reader to go and open the record, and it
- *  must not say that about a summary it printed in full. */
-function clampLines(
-  ctx: CanvasRenderingContext2D, lines: string[], maxLines: number, maxWidth: number,
-): string[] {
-  if (maxLines <= 0) return [];
-  if (lines.length <= maxLines) return lines;
-  const kept = lines.slice(0, maxLines);
-  let last = kept[maxLines - 1];
-  while (last.length > 1 && ctx.measureText(last + "…").width > maxWidth) last = last.slice(0, -1);
-  kept[maxLines - 1] = last.replace(/[\s,;:.·—-]+$/, "") + "…";
-  return kept;
-}
 
 /** Letter-spaced small caps, drawn a character at a time. `ctx.letterSpacing`
  *  exists in Chrome and not in Safari or Firefox's older builds, and a heading
@@ -243,11 +228,11 @@ function pill(
 type MeasuredRow = { key: string; lines: string[]; height: number };
 
 function measureRows(
-  ctx: CanvasRenderingContext2D, rows: [string, string][], maxLines: number,
+  ctx: CanvasRenderingContext2D, rows: [string, string][],
 ): MeasuredRow[] {
   ctx.font = FONT_VALUE;
   return rows.map(([key, value]) => {
-    const lines = clampLines(ctx, wrapText(ctx, dash(value), VAL_W), maxLines, VAL_W);
+    const lines = wrapText(ctx, dash(value), VAL_W);
     return { key, lines, height: ROW_PAD * 2 + Math.max(1, lines.length) * ROW_LEAD };
   });
 }
@@ -305,21 +290,96 @@ function drawBlock(
   return top + h;
 }
 
-const boxLines = (space: number) => Math.max(0, Math.floor((space - BOX_PAD * 2) / BOX_LEAD));
-
 /* ================================================================ THE CARD === */
 
-function render(ctx: CanvasRenderingContext2D, e: Enquiry) {
-  const src = sourceOf(e.source.kind);
+type CardLayout = {
+  cardHeight: number;
+  footRuleY: number;
+  customerRows: MeasuredRow[];
+  requirementRows: MeasuredRow[];
+  handlingRows: MeasuredRow[];
+  summaryLines: string[];
+  quoteLines: string[];
+  confirmed: boolean;
+};
+
+function measureCard(ctx: CanvasRenderingContext2D, e: Enquiry): CardLayout {
   const u = urgencyOf(e.qualification.urgency);
   const a = activeAssignment(e);
   const q = e.qualification;
   const last = lastResponse(e);
 
+  const customer: [string, string][] = [
+    ["Customer", e.customer.name],
+    ["Phone", e.customer.phone],
+  ];
+  if (e.customer.email) customer.push(["Email", e.customer.email]);
+  customer.push([
+    "Location",
+    place(e) + (e.requirement.state ? ", " + e.requirement.state : "") +
+      (e.requirement.pincode ? " · " + e.requirement.pincode : ""),
+  ]);
+
+  const requirement: [string, string][] = [
+    ["Category", dash(e.requirement.category)],
+    ["Service", dash(e.requirement.service)],
+  ];
+  if (e.requirement.projectType) requirement.push(["Project type", e.requirement.projectType]);
+  requirement.push(["Urgency", dash(u ? u.label : null)]);
+
+  const handling: [string, string][] = [["Status", statusOf(e.status).label]];
+  if (a) handling.push(["Assigned to", a.businessName + " · " + dateTimeLabel(a.assignedAt)]);
+
+  const customerRows = measureRows(ctx, customer);
+  const requirementRows = measureRows(ctx, requirement);
+  const handlingRows = measureRows(ctx, handling);
+
+  const confirmed = !!q.requirementSummary;
+  ctx.font = FONT_BLOCK;
+  const summaryLines = wrapText(ctx, dash(q.requirementSummary || e.requirement.text), BOX_TEXT_W);
+  ctx.font = FONT_QUOTE;
+  const quoteLines = last?.response
+    ? wrapText(ctx, "“" + last.response + "”", BOX_TEXT_W)
+    : [];
+
+  const summaryBlockHeight = BOX_PAD * 2 + Math.max(1, summaryLines.length) * BOX_LEAD;
+  const quoteBlockHeight = quoteLines.length
+    ? (BOX_PAD * 2 + Math.max(1, quoteLines.length) * BOX_LEAD)
+    : 0;
+
+  let y = BODY_TOP;
+  y += HEAD_H + rowsHeight(customerRows) + GAP;
+  y += HEAD_H + rowsHeight(requirementRows) + GAP;
+  y += HEAD_H + summaryBlockHeight + GAP;
+  if (quoteLines.length) {
+    y += HEAD_H + quoteBlockHeight + GAP;
+  }
+  y += HEAD_H + rowsHeight(handlingRows) + GAP;
+
+  const footRuleY = Math.max(1268, y + 20);
+  const cardHeight = Math.max(HEIGHT, footRuleY + 82);
+
+  return {
+    cardHeight,
+    footRuleY,
+    customerRows,
+    requirementRows,
+    handlingRows,
+    summaryLines,
+    quoteLines,
+    confirmed,
+  };
+}
+
+function render(ctx: CanvasRenderingContext2D, e: Enquiry, layout: CardLayout) {
+  const { cardHeight, footRuleY, customerRows, requirementRows, handlingRows, summaryLines, quoteLines, confirmed } = layout;
+  const src = sourceOf(e.source.kind);
+  const u = urgencyOf(e.qualification.urgency);
+
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = PAPER;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillRect(0, 0, WIDTH, cardHeight);
 
   /* ------------------------------------------------------- the header band --
      Reference, when it arrived, and the three chips that say what state it is
@@ -361,77 +421,11 @@ function render(ctx: CanvasRenderingContext2D, e: Enquiry) {
     px += pill(ctx, text, px, 190, fg, bg, edge) + 10;
   });
 
-  /* ------------------------------------------------------------- the rows --
-     The same field selection as `shareText`, in the same order, minus the two
-     that the band above already says (source, received). Owner is not here on
-     purpose: the recipient of this image does not need to know which of our
-     people is holding it. */
-  const customer: [string, string][] = [
-    ["Customer", e.customer.name],
-    /* The phone. The reason the image exists, and personal data leaving the
-       audited surface — see the file header. */
-    ["Phone", e.customer.phone],
-  ];
-  if (e.customer.email) customer.push(["Email", e.customer.email]);
-  customer.push([
-    "Location",
-    place(e) + (e.requirement.state ? ", " + e.requirement.state : "") +
-      (e.requirement.pincode ? " · " + e.requirement.pincode : ""),
-  ]);
-
-  const requirement: [string, string][] = [
-    ["Category", dash(e.requirement.category)],
-    ["Service", dash(e.requirement.service)],
-  ];
-  if (e.requirement.projectType) requirement.push(["Project type", e.requirement.projectType]);
-  requirement.push(["Urgency", dash(u ? u.label : null)]);
-
-  const handling: [string, string][] = [["Status", statusOf(e.status).label]];
-  if (a) handling.push(["Assigned to", a.businessName + " · " + dateTimeLabel(a.assignedAt)]);
-
-  /* ------------------------------------------------- what gets the leftover --
-     Fixed rows are measured at two lines each; if that leaves the free-text
-     blocks less than a single line to stand in, they are re-measured at one
-     line. The requirement is the reason somebody is looking at this card, so it
-     is the last thing allowed to disappear. */
-  const blockCount = last?.response ? 2 : 1;
-  const minBlocks = (BOX_PAD * 2 + BOX_LEAD + HEAD_H) * blockCount;
-  const spaceFor = (rows: MeasuredRow[][]) =>
-    BODY_MAX - BODY_TOP - rows.reduce((n, r) => n + HEAD_H + rowsHeight(r), 0) -
-    GAP * (blockCount + 2);
-
-  let sections = [customer, requirement, handling].map((r) => measureRows(ctx, r, 2));
-  if (spaceFor(sections) < minBlocks) {
-    sections = [customer, requirement, handling].map((r) => measureRows(ctx, r, 1));
-  }
-  const forBlocks = spaceFor(sections) - HEAD_H * blockCount;
-
-  /* The confirmed summary if a person wrote one; otherwise the raw submission,
-     labelled so nobody quotes it back to the customer as though we had checked
-     it. Same rule, same words, as the text and the print sheet. */
-  const confirmed = !!q.requirementSummary;
-  ctx.font = FONT_BLOCK;
-  const summaryAll = wrapText(ctx, dash(q.requirementSummary || e.requirement.text), BOX_TEXT_W);
-  ctx.font = FONT_QUOTE;
-  const quoteAll = last?.response
-    ? wrapText(ctx, "“" + last.response + "”", BOX_TEXT_W)
-    : [];
-
-  let quoteSpace = 0;
-  if (quoteAll.length) {
-    const wants = BOX_PAD * 2 + quoteAll.length * BOX_LEAD;
-    quoteSpace = Math.min(wants, Math.max(BOX_PAD * 2 + BOX_LEAD, Math.floor(forBlocks * 0.45)));
-  }
-  ctx.font = FONT_BLOCK;
-  const summaryLines = clampLines(ctx, summaryAll, boxLines(forBlocks - quoteSpace), BOX_TEXT_W);
-  ctx.font = FONT_QUOTE;
-  const quoteLines = clampLines(ctx, quoteAll, boxLines(quoteSpace), BOX_TEXT_W);
-
   /* ------------------------------------------------------------- the draw -- */
   let y = BODY_TOP;
 
-  y = drawRows(ctx, sections[0], sectionHead(ctx, "Customer", y)) + GAP;
-  y = drawRows(ctx, sections[1], sectionHead(ctx, "Requirement", y)) + GAP;
+  y = drawRows(ctx, customerRows, sectionHead(ctx, "Customer", y)) + GAP;
+  y = drawRows(ctx, requirementRows, sectionHead(ctx, "Requirement", y)) + GAP;
 
   y = drawBlock(
     ctx,
@@ -448,7 +442,7 @@ function render(ctx: CanvasRenderingContext2D, e: Enquiry) {
     ) + GAP;
   }
 
-  drawRows(ctx, sections[2], sectionHead(ctx, "Handling", y));
+  drawRows(ctx, handlingRows, sectionHead(ctx, "Handling", y));
 
   /* ------------------------------------------------------------ the footer --
      The reference again, because a card cropped by a chat app's preview should
@@ -456,13 +450,13 @@ function render(ctx: CanvasRenderingContext2D, e: Enquiry) {
      has no other way of saying how old it is. Nothing else: no company name, no
      domain, no "generated by". */
   ctx.fillStyle = RULE;
-  ctx.fillRect(PAD, FOOT_RULE, COL, 1);
+  ctx.fillRect(PAD, footRuleY, COL, 1);
   ctx.font = FONT_FOOT_MONO;
   ctx.fillStyle = MUTED;
-  ctx.fillText(e.enquiryId, PAD, FOOT_RULE + 38);
+  ctx.fillText(e.enquiryId, PAD, footRuleY + 38);
   ctx.font = FONT_FOOT;
   ctx.textAlign = "right";
-  ctx.fillText(dateTimeLabel(new Date().toISOString()), WIDTH - PAD, FOOT_RULE + 38);
+  ctx.fillText(dateTimeLabel(new Date().toISOString()), WIDTH - PAD, footRuleY + 38);
   ctx.textAlign = "left";
 }
 
@@ -473,10 +467,11 @@ function render(ctx: CanvasRenderingContext2D, e: Enquiry) {
 export function enquiryImageBlob(e: Enquiry): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH;
-  canvas.height = HEIGHT;
   const ctx = canvas.getContext("2d");
   if (!ctx) return Promise.reject(new Error("This browser did not give us a 2D canvas context."));
-  render(ctx, e);
+  const layout = measureCard(ctx, e);
+  canvas.height = layout.cardHeight;
+  render(ctx, e, layout);
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error("The image could not be encoded."))),

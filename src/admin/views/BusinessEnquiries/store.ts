@@ -262,8 +262,31 @@ export type StatusRow = {
    and the route renders its failure instead of a screen — a panel that silently
    falls back to bundled data cannot tell you whether the backend is wired up. */
 
+export const DEFAULT_SERVICES = [
+  "Complete Home Interior",
+  "Full Home Interior",
+  "Modular Kitchen",
+  "Wardrobes & Storage",
+  "Living Room Interior",
+  "Bedroom Interior",
+  "Bathroom Interior & Renovation",
+  "Office Interior",
+  "Commercial Interior",
+  "Retail Shop Interior",
+  "Restaurant & Cafe Interior",
+  "Clinic & Hospital Interior",
+  "Salon & Spa Interior",
+  "Turnkey Interior Project",
+  "False Ceiling & Painting",
+  "Civil & Renovation Work",
+  "Architecture & Space Planning",
+  "Home Automation & Lighting",
+  "Flooring & Tiling",
+  "Wooden & Metal Fabrication",
+];
+
 export let RULES = {} as MatchingRulesResponse;
-export let VOCAB = {} as VocabulariesResponse;
+export let VOCAB = { categories: [], services: DEFAULT_SERVICES, cities: [], states: [] } as unknown as VocabulariesResponse;
 export let STATUSES: StatusRow[] = [];
 export let SUBSCRIBED_COUNT = 0;
 
@@ -413,7 +436,10 @@ export function bootState(): BootState { return boot; }
  *  arrived" means, and because the offline checks (check:clock) need to state
  *  the same thing without standing up a server. */
 export function applyVocabulary(vocab: VocabulariesResponse): void {
-  VOCAB = vocab;
+  VOCAB = {
+    ...vocab,
+    services: (vocab.services && vocab.services.length > 0) ? vocab.services : DEFAULT_SERVICES,
+  };
   STATUSES = (vocab.statuses || []) as StatusRow[];
   TAGS = (vocab.tags || []) as TagRow[];
   CHECKLIST = (vocab.qualificationChecklist || []) as ChecklistRow[];

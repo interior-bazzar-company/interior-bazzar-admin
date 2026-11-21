@@ -40,7 +40,7 @@ import {
 import { useShell } from "../../shell/ShellContext";
 import { InfoNote, VocabInput } from "./bits";
 import {
-  CHANNELS, CONTACT_OUTCOMES, MANUAL_VIA, SOURCES, STATES, VOCAB, assign, businessDirectory,
+  CHANNELS, CONTACT_OUTCOMES, DEFAULT_SERVICES, MANUAL_VIA, SOURCES, STATES, VOCAB, assign, businessDirectory,
   createEnquiry, findEarlierFrom, knownCategory, knownCity, logContact, markQualified, place,
   setCheck, sourceOf, statusOf,
 } from "./store";
@@ -290,14 +290,26 @@ export default function NewEnquiryModal({ onClose, onDone }: {
         {/* ---------------------------------------------------- requirement --- */}
         <FormSection title="What they want" desc="Everything here is optional.">
           <FieldRow cols={2}>
-            <VocabInput id="ne-cat" label="Category" value={f.category}
-              options={VOCAB.categories} onChange={set("category")}
-              known={knownCategory} placeholder="Interior Design, Modular Kitchen…"
-              unknownNote="Not a category the matching rules know. Stage 1 eliminates on this, so it will match nobody until the category list catches up — worth recording anyway, and worth telling whoever maintains that list." />
-            <FormField id="ne-svc" label="Service">
-              <Input id="ne-svc" value={f.service} ph="Full home interiors, bathroom…"
-                onChange={set("service")} />
-            </FormField>
+            <VocabInput
+              id="ne-cat"
+              label="Category"
+              value={f.category}
+              options={VOCAB.categories || []}
+              onChange={set("category")}
+              known={knownCategory}
+              placeholder="Select or create category…"
+              hint="Choose from existing categories or type to create a new one."
+              unknownNote="Not in the default taxonomy. Stored as-is and eligible for custom matching."
+            />
+            <VocabInput
+              id="ne-svc"
+              label="Service"
+              value={f.service}
+              options={VOCAB.services || DEFAULT_SERVICES}
+              onChange={set("service")}
+              placeholder="Select or create service…"
+              hint="Choose from existing services or type to create a new one."
+            />
           </FieldRow>
 
           <FieldRow cols={2}>

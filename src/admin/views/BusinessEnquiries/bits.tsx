@@ -8,7 +8,7 @@
    Everything below is composed from `admin/ui` and Tailwind utilities on the
    semantic tokens. There is no stylesheet in this module any more.
    ============================================================================= */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { cx } from "@/utils/cx";
 import { InputBase } from "@/components/base/input/input";
@@ -533,7 +533,20 @@ export function ProtoBar({ onReset }: { onReset?: () => void }) {
 
    `InputBase` rather than the panel's `Input`: a datalist needs `list` on the
    real element and the wrapper does not forward it. Noted for promotion. */
-export function VocabInput({ id, label, value, options, onChange, known, unknownNote, placeholder, req, disabled }: {
+export function VocabInput({
+  id,
+  label,
+  value,
+  options = [],
+  onChange,
+  known,
+  unknownNote,
+  placeholder,
+  hint,
+  req,
+  disabled,
+  allowCreate = true,
+}: {
   id: string;
   label: string;
   value: string;
@@ -543,36 +556,262 @@ export function VocabInput({ id, label, value, options, onChange, known, unknown
   known?: (v: string) => boolean;
   unknownNote?: string;
   placeholder?: string;
+  hint?: string;
   req?: boolean;
   disabled?: boolean;
+  allowCreate?: boolean;
 }) {
-  const listId = id + "-list";
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value || "");
+  const [highlighted, setHighlighted] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
+
   const off = !!value.trim() && !!known && !known(value.trim());
+
+  // Filtered options based on typed text
+  const trimmed = query.trim();
+  const qLower = trimmed.toLowerCase();
+
+  const filtered = useMemo(() => {
+    if (!qLower) return options;
+    return options.filter((o) => o && o.toLowerCase().includes(qLower));
+  }, [options, qLower]);
+
+  const hasExactMatch = useMemo(() => {
+    return options.some((o) => o && o.toLowerCase() === qLower);
+  }, [options, qLower]);
+
+  const showCreate = allowCreate && trimmed.length > 0 && !hasExactMatch;
+
+  const handleSelect = (val: string) => {
+    onChange(val);
+    setQuery(val);
+    setOpen(false);
+    setHighlighted(-1);
+  };
+
+  useEffect(() => {
+    const handlePointerDown = (ev: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(ev.target as Node)) {
+        setOpen(false);
+        setHighlighted(-1);
+        if (allowCreate && query.trim() !== value.trim()) {
+          onChange(query.trim());
+        } else if (!allowCreate && query.trim() !== value.trim()) {
+          setQuery(value);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [query, value, allowCreate, onChange]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) {
+        setOpen(true);
+        setHighlighted(0);
+      } else {
+        const total = (showCreate ? 1 : 0) + filtered.length;
+        setHighlighted((prev) => (prev + 1) % Math.max(1, total));
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (open) {
+        const total = (showCreate ? 1 : 0) + filtered.length;
+        setHighlighted((prev) => (prev - 1 + total) % Math.max(1, total));
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (open) {
+        if (showCreate && highlighted === 0) {
+          handleSelect(trimmed);
+        } else {
+          const optIdx = showCreate ? highlighted - 1 : highlighted;
+          if (filtered[optIdx]) {
+            handleSelect(filtered[optIdx]);
+          } else if (allowCreate && trimmed) {
+            handleSelect(trimmed);
+          }
+        }
+      } else {
+        setOpen(true);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      setHighlighted(-1);
+    }
+  };
+
   return (
     <FormField
       id={id}
       label={label}
       req={req}
-      /* ONLY WHILE IT IS EMPTY. Three of these sit on one form and the same
-         sentence under all three read as noise the moment they were filled in —
-         which is most of the time. It is guidance for an empty box, so it
-         leaves with the empty box. */
-      hint={off || value.trim() ? undefined : "Type anything — the values we already use are suggested as you go."}
+      hint={
+        hint ||
+        (off || value.trim()
+          ? undefined
+          : "Choose from dropdown or type to create new.")
+      }
       err={off ? unknownNote : undefined}
     >
-      <InputBase
-        id={id}
-        size="sm"
-        value={value}
-        list={listId}
-        placeholder={placeholder}
-        autoComplete="off"
-        isDisabled={disabled}
-        onChange={(ev) => onChange(ev.target.value)}
-      />
-      <datalist id={listId}>
-        {options.map((o) => <option key={o} value={o} />)}
-      </datalist>
+      <div ref={containerRef} className="relative w-full min-w-0">
+        <div
+          onClick={() => {
+            if (!disabled) {
+              setOpen(true);
+              inputRef.current?.focus();
+            }
+          }}
+          className={cx(
+            "flex items-center w-full rounded-lg border bg-primary px-3 py-1.5 text-sm transition-all shadow-xs",
+            disabled
+              ? "opacity-50 cursor-not-allowed bg-secondary/20 border-secondary"
+              : "cursor-text",
+            open
+              ? "border-brand-primary ring-2 ring-brand-primary/20"
+              : "border-secondary hover:border-primary/50",
+            off && "border-error ring-1 ring-error/20"
+          )}
+        >
+          <input
+            ref={inputRef}
+            id={id}
+            type="text"
+            className="w-full bg-transparent text-primary placeholder:text-placeholder focus:outline-none text-sm"
+            value={query}
+            placeholder={placeholder || `Select or create ${label.toLowerCase()}…`}
+            autoComplete="off"
+            disabled={disabled}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+              setHighlighted(-1);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={handleKeyDown}
+          />
+          <div className="flex items-center gap-1 pl-1 shrink-0">
+            {query ? (
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label="Clear value"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelect("");
+                  inputRef.current?.focus();
+                }}
+                className="p-1 text-tertiary hover:text-primary transition-colors rounded-sm focus:outline-none"
+              >
+                <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            ) : null}
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label="Toggle options"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!disabled) {
+                  setOpen(!open);
+                  if (!open) inputRef.current?.focus();
+                }
+              }}
+              className="p-1 text-tertiary hover:text-primary transition-colors rounded-sm focus:outline-none"
+            >
+              <svg
+                className={cx("size-4 transition-transform duration-200", open && "rotate-180")}
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {open && !disabled && (
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-secondary bg-primary p-1 shadow-lg ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in-0 zoom-in-95 duration-100">
+            {showCreate && (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => handleSelect(trimmed)}
+                className={cx(
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors cursor-pointer mb-1",
+                  highlighted === 0
+                    ? "bg-brand-solid text-white"
+                    : "bg-brand-solid/10 text-brand-primary hover:bg-brand-solid/20"
+                )}
+              >
+                <span className={cx(
+                  "flex size-4.5 items-center justify-center rounded-full text-xs shrink-0",
+                  highlighted === 0 ? "bg-white text-brand-solid" : "bg-brand-solid text-white"
+                )}>
+                  <svg className="size-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+                  </svg>
+                </span>
+                <span className="truncate">Create "{trimmed}"</span>
+                <span className="ml-auto text-xs opacity-75 font-normal shrink-0">New</span>
+              </div>
+            )}
+
+            {filtered.map((opt, idx) => {
+              const itemIdx = showCreate ? idx + 1 : idx;
+              const isSelected = opt.toLowerCase() === value.trim().toLowerCase();
+              return (
+                <div
+                  key={opt}
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => handleSelect(opt)}
+                  className={cx(
+                    "flex items-center justify-between rounded-md px-3 py-2 text-sm cursor-pointer transition-colors",
+                    isSelected
+                      ? "bg-secondary text-primary font-medium"
+                      : "text-secondary hover:bg-secondary/60 hover:text-primary",
+                    highlighted === itemIdx && "bg-secondary text-primary"
+                  )}
+                >
+                  <span className="truncate">{opt}</span>
+                  {isSelected && (
+                    <svg className="size-4 text-brand-primary shrink-0 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path
+                        fillRule="evenodd"
+                        d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  )}
+                </div>
+              );
+            })}
+
+            {filtered.length === 0 && !showCreate && (
+              <div className="px-3 py-3 text-center text-xs text-tertiary">
+                No matching options found
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </FormField>
   );
 }

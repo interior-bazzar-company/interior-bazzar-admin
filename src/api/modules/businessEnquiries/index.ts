@@ -48,6 +48,7 @@ export interface VocabulariesResponse {
    *  so a state added server-side is legible with no frontend change. */
   genuinenessStates: { key: string; label: string; tone: string; passed: boolean }[];
   categories: string[];
+  services?: string[];
   cities: string[];
   states: string[];
   exclusionStages: string[];
